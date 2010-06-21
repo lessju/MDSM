@@ -1,15 +1,15 @@
+// MDSM stuff
+#include "dedispersion_manager.h"
 #include "file_handler.cpp"
 #include "TCPStreamer.h"
 #include "survey.h"
+
+// QT Stuff
+#include <QCoreApplication>
+
+// C++ stuff
 #include <stdio.h>
 #include <stdlib.h>
-
-// Forward declarations
-extern "C" float *initialiseMDSM(int argc, char *argv[], SURVEY *survey);
-extern "C" void tearDownMDSM();
-extern "C" int process_chunk(int data_amount);
-
-#define TRUE 1
 
 // To make configurable
 SURVEY *processSurveyParameters()
@@ -104,6 +104,9 @@ int readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans)
 // MDSM entry point
 int main(int argc, char *argv[])
 {
+    // Create mait QCoreApplication instance
+    QCoreApplication app(argc, argv);
+
     SURVEY *survey = processSurveyParameters();
     process_arguments(argc, argv, survey);
 

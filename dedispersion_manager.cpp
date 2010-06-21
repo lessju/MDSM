@@ -1,15 +1,10 @@
-#include "dedispersion_thread.cu"
-#include "dedispersion_output.cu"
-#include "math.h"
-#include "string.h"
-#include "stdlib.h"
-#include "stdio.h"
+#include "dedispersion_output.h"
+#include "dedispersion_thread.h"
 #include "unistd.h"
 
-// Forward decleration of methods
-extern "C" float *initialiseMDSM(int argc, char *argv[], SURVEY* survey);
-extern "C" void tearDownMDSM();
-extern "C" int process_chunk(int data_amount);
+// Forward declarations
+extern "C" void* call_dedisperse(void* thread_params);
+extern "C" DEVICE_INFO** call_initialise_devices(int *num_devices);
 
 // Global parameters
 SURVEY *survey;
@@ -31,54 +26,14 @@ pthread_barrier_t input_barrier, output_barrier;
 OUTPUT_PARAMS output_params;
 int loop_counter = 0;
 
+static int max(int a, int b) {
+  return a > b ? a : b;
+}
+
 void report_error(char* description)
 {
    fprintf(stderr, description);
    exit(0);
-}
-
-// Query CUDA-capable devices
-DEVICE_INFO** initialise_devices(int *num_devices)
-{
-    // Enumerate devices and create DEVICE_INFO list, storing device capabilities
-    cutilSafeCall(cudaGetDeviceCount(num_devices));
-
-    if (*num_devices <= 0) 
-        report_error("No CUDA-capable device found");
-
-    DEVICE_INFO **info = (DEVICE_INFO **) malloc( *num_devices * sizeof(DEVICE_INFO *));
-
-    int orig_num = *num_devices, counter = 0;
-    for(int i = 0; i < orig_num; i++) {
-        cudaDeviceProp deviceProp;
-        cutilSafeCall(cudaGetDeviceProperties(&deviceProp, i));
-        
-        if (deviceProp.major == 9999 && deviceProp.minor == 9999)
-            report_error("No CUDA-capable device found");
-        else {
-            if (deviceProp.totalGlobalMem < (long) 2 * 1024 * 1024 * 1024)
-                *num_devices = *num_devices - 1;
-            else {
-                info[counter] = (DEVICE_INFO *) malloc(sizeof(DEVICE_INFO));
-                info[counter] -> multiprocessor_count = deviceProp.multiProcessorCount;
-                info[counter] -> constant_memory = deviceProp.totalConstMem;
-                info[counter] -> shared_memory = deviceProp.sharedMemPerBlock;
-                info[counter] -> register_count = deviceProp.regsPerBlock;
-                info[counter] -> thread_count = deviceProp.maxThreadsPerBlock;
-                info[counter] -> clock_rate = deviceProp.clockRate;
-                info[counter] -> device_id = i;
-                counter++;
-            }
-        }
-    }
-
-    if (*num_devices == 0)
-        report_error("No CUDA-capable device found");
-
-    *num_devices = 1;
-
-    // OPTIONAL: Perform load-balancing calculations
-    return info;
 }
 
 // Calculate number of samples which can be loaded at once
@@ -114,7 +69,7 @@ float dmdelay(float f1, float f2)
 
 // Initliase MDSM parameters, return pointer to input buffer where
 // input data will be stored
-extern "C" float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
+float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
 {
     // Initialise survey
     survey = input_survey;
@@ -123,7 +78,7 @@ extern "C" float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
     pthread_attr_init(&thread_attr);
     pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
 
-    devices = initialise_devices(&num_devices);
+    devices = call_initialise_devices(&num_devices);
     threads = (pthread_t *) calloc(sizeof(pthread_t), num_devices);
     threads_params = (THREAD_PARAMS *) malloc(num_devices * sizeof(THREAD_PARAMS));
 
@@ -209,7 +164,7 @@ extern "C" float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
         threads_params[i].outputsize = *outputsize;
 
          // Create thread (using function in dedispersion_thread)
-         if (pthread_create(&threads[i], &thread_attr, dedisperse, (void *) &threads_params[i]))
+         if (pthread_create(&threads[i], &thread_attr, call_dedisperse, (void *) &threads_params[i]))
              report_error("Error occured while creating thread\n");
     }
 
@@ -222,7 +177,7 @@ extern "C" float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
 }
 
 // Cleanup MDSM
-extern "C" void tearDownMDSM()
+void tearDownMDSM()
 {
     // Join all threads, making sure they had a clean cleanup
     void *status;
@@ -254,7 +209,7 @@ extern "C" void tearDownMDSM()
 }
 
 // Process one data chunk
-extern "C" int process_chunk(int data_read)
+int process_chunk(int data_read)
 {   
     printf("%d: Read %d * 1024 samples [%d]\n", (int) (time(NULL) - start), data_read / 1024, loop_counter);  
 

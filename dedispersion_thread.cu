@@ -1,7 +1,48 @@
 #include "dedispersion_kernel.cu"
 #include "dedispersion_thread.h"
 
-// NOTE: need a way to end thread execution in a clean way [in params?]
+DEVICE_INFO** initialise_devices(int *num_devices)
+{
+    // Enumerate devices and create DEVICE_INFO list, storing device capabilities
+    cutilSafeCall(cudaGetDeviceCount(num_devices));
+
+    if (*num_devices <= 0) 
+        { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
+
+    DEVICE_INFO **info = (DEVICE_INFO **) malloc( *num_devices * sizeof(DEVICE_INFO *));
+
+    int orig_num = *num_devices, counter = 0;
+    for(int i = 0; i < orig_num; i++) {
+        cudaDeviceProp deviceProp;
+        cutilSafeCall(cudaGetDeviceProperties(&deviceProp, i));
+        
+        if (deviceProp.major == 9999 && deviceProp.minor == 9999)
+            { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
+        else {
+            if (deviceProp.totalGlobalMem < (long) 2 * 1024 * 1024 * 1024)
+                *num_devices = *num_devices - 1;
+            else {
+                info[counter] = (DEVICE_INFO *) malloc(sizeof(DEVICE_INFO));
+                info[counter] -> multiprocessor_count = deviceProp.multiProcessorCount;
+                info[counter] -> constant_memory = deviceProp.totalConstMem;
+                info[counter] -> shared_memory = deviceProp.sharedMemPerBlock;
+                info[counter] -> register_count = deviceProp.regsPerBlock;
+                info[counter] -> thread_count = deviceProp.maxThreadsPerBlock;
+                info[counter] -> clock_rate = deviceProp.clockRate;
+                info[counter] -> device_id = i;
+                counter++;
+            }
+        }
+    }
+
+    if (*num_devices == 0)
+        { fprintf(stderr,"No CUDA-capable device found"); exit(0); }
+
+    *num_devices = 1;
+ 
+    // OPTIONAL: Perform load-balancing calculations
+    return info;
+}
 
 // Dedispersion algorithm
 void* dedisperse(void* thread_params)

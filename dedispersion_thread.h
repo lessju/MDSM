@@ -49,6 +49,7 @@ typedef struct {
 
 } THREAD_PARAMS;
 
-void* dedisperse(void* thread_params);
+// void* dedisperse(void* thread_params);
+// DEVICE_INFO** initialise_devices(int *num_devices);
 
 #endif

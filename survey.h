@@ -1,10 +1,12 @@
 #ifndef SURVEY_H_
 #define SURVEY_H_
 
+#include "stdio.h"
+
 typedef struct {
 
     float lowdm, highdm, dmstep, sub_dmstep;
-    int binsize, ndms, ncalls, calldms;
+    int binsize, ndms, ncalls, calldms, mean, stddev;
 
 } SUBBAND_PASSES ;
 
