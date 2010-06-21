@@ -11,12 +11,15 @@ typedef struct {
 typedef struct {
 
     // Data parameters
+    int nsamp, nchans, tdms, maxshift, nbits;
     float tsamp, foff, fch1;
-    int nsamp, nchans, tdms;
     
     // subband dedispersion paramters
     SUBBAND_PASSES *pass_parameters;
     int num_passes, nsubs;
+
+    // File pointer (to be substitued with QIODevice
+    FILE *fp;
 
 } SURVEY;
 
