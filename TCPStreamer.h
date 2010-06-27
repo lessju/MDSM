@@ -1,3 +1,0 @@
-
-void SetupPelicanClient();
-void GetNextChunk();

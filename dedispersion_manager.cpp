@@ -26,10 +26,12 @@ pthread_barrier_t input_barrier, output_barrier;
 OUTPUT_PARAMS output_params;
 int loop_counter = 0;
 
-static int max(int a, int b) {
+// Return the maximum of two numbers
+inline int max(int a, int b) {
   return a > b ? a : b;
 }
 
+// Report any fatal errors and exit MDSM
 void report_error(char* description)
 {
    fprintf(stderr, description);
@@ -46,6 +48,11 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
         chans += survey -> nchans / survey -> pass_parameters[i].binsize;
     }
 
+    // Total nsamp we can process depends on the number of available devices
+    // We are splitting ndms and ncalls among the devices, so we divide by num_devices
+    output /= num_devices;
+    input /= num_devices;
+
     if (survey -> nsamp == 0) 
         survey -> nsamp = ((1024 * 1024 * 1000) / (max(input, chans) + max(output, input))) - maxshift;
 
@@ -57,6 +64,8 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
     *inputsize = (max(input, chans) * survey -> nsamp + maxshift * max(input, survey -> nchans)) * sizeof(float);  
     *outputsize = max(output, input) * (survey -> nsamp + maxshift) * sizeof(float);
     printf("Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
+
+    printf("inputsize: %ld, outputsize: %ld\n", *inputsize, *outputsize);
 
     return survey -> nsamp;
 }
@@ -79,6 +88,7 @@ float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
     pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
 
     devices = call_initialise_devices(&num_devices);
+    survey -> num_threads = num_devices;
     threads = (pthread_t *) calloc(sizeof(pthread_t), num_devices);
     threads_params = (THREAD_PARAMS *) malloc(num_devices * sizeof(THREAD_PARAMS));
 
@@ -99,10 +109,9 @@ float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
     survey -> nsamp = calculate_nsamp(maxshift, inputsize, outputsize);
 
     // Initialise buffers and create output buffer (a separate buffer for each GPU output)
-    // TODO: Change to use all GPUs
     input_buffer = (float *) malloc(*inputsize);
     output_buffer = (float **) malloc(num_devices * sizeof(float *));
-    for (i = 0; i < num_devices; i++)
+    for(i = 0; i < num_devices; i++)
         output_buffer[i] = (float *) malloc(*outputsize);
 
     // Log parameters
@@ -116,20 +125,17 @@ float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
         report_error("Unable to initialise output barrier\n");
 
     // Create output params and output file
-     output_params.nchans = survey -> nchans;
-     output_params.nsamp = survey -> nsamp;
-     output_params.nthreads = num_devices;
-     output_params.iterations = 2;
-     output_params.maxiters = 2;
-     output_params.ndms = survey -> tdms;
-     output_params.output_buffer = output_buffer;
-     output_params.stop = 0;
-     output_params.rw_lock = &rw_lock;
-     output_params.input_barrier = &input_barrier;
-     output_params.output_barrier = &output_barrier;
-     output_params.start = start;
-     output_params.output_file = fopen("output.dat", "w");
-     output_params.survey = survey;
+    output_params.nthreads = num_devices;
+    output_params.iterations = 2;
+    output_params.maxiters = 2;
+    output_params.output_buffer = output_buffer;
+    output_params.stop = 0;
+    output_params.rw_lock = &rw_lock;
+    output_params.input_barrier = &input_barrier;
+    output_params.output_barrier = &output_barrier;
+    output_params.start = start;
+    output_params.output_file = fopen("output.dat", "w");
+    output_params.survey = survey;
 
     // Create output thread 
     if (pthread_create(&output_thread, &thread_attr, process_output, (void *) &output_params))
@@ -142,18 +148,13 @@ float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
         threads_params[i].iterations = 1;
         threads_params[i].maxiters = 2;
         threads_params[i].stop = 0;
-        threads_params[i].nchans = survey -> nchans;
-        threads_params[i].nsamp = survey -> nsamp;
-        threads_params[i].tsamp = survey -> tsamp;
         threads_params[i].maxshift = maxshift;
         threads_params[i].binsize = 1;
         threads_params[i].output = output_buffer[i];
         threads_params[i].input = input_buffer;
-        threads_params[i].ndms = 0;
         threads_params[i].dmshifts = dmshifts;
-        threads_params[i].startdm = 0;
-        threads_params[i].dmstep = 0;
         threads_params[i].thread_num = i;
+        threads_params[i].num_threads = num_devices;
         threads_params[i].device_id = devices[i] -> device_id;
         threads_params[i].rw_lock = &rw_lock;
         threads_params[i].input_barrier = &input_barrier;
@@ -246,12 +247,9 @@ int process_chunk(int data_read)
       if (data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
           data_read -= data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize;
 
-        output_params.nsamp = data_read;
         output_params.survey -> nsamp = data_read;
-        for(i = 0; i < num_devices; i++) {
-            threads_params[i].nsamp = data_read;
+        for(i = 0; i < num_devices; i++)
             threads_params[i].survey -> nsamp = data_read;
-        }
     }
 
     // Release rw_lock

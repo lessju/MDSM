@@ -1,9 +1,10 @@
+#include "file_handler.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include <math.h>
-#include "file_handler.h"
 
 #define HI4BITS   240
 #define LO4BITS   15

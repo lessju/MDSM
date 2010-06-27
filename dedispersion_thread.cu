@@ -35,11 +35,11 @@ DEVICE_INFO** initialise_devices(int *num_devices)
         }
     }
 
+//    *num_devices = 2;  // TEMPORARY TESTING HACK
+
     if (*num_devices == 0)
         { fprintf(stderr,"No CUDA-capable device found"); exit(0); }
 
-    *num_devices = 1;
- 
     // OPTIONAL: Perform load-balancing calculations
     return info;
 }
@@ -49,19 +49,22 @@ void* dedisperse(void* thread_params)
 {
     THREAD_PARAMS* params = (THREAD_PARAMS *) thread_params;
     int i, j, nsamp = params -> survey -> nsamp, nchans = params -> survey -> nchans;
-    int ret, loop_counter = 0, maxshift = params -> maxshift, iters = 0;
+    float tsamp = params -> survey -> tsamp;
+    int ret, loop_counter = 0, maxshift = params -> maxshift, iters = 0, tid = params -> thread_num;
+    int num_threads = params -> num_threads;
     time_t start = params -> start;
     SURVEY *survey = params -> survey;
     float *d_input, *d_output;      
 
-    printf("%d: Started thread %d\n", (int) (time(NULL) - start), params -> thread_num);
+    printf("%d: Started thread %d\n", (int) (time(NULL) - start), tid);
 
     // Initialise device, allocate device memory and copy dmshifts and dmvalues to constant memory
     cutilSafeCall( cudaSetDevice(params -> device_id));
+    cudaSetDeviceFlags( cudaDeviceBlockingSync );
 
     cutilSafeCall( cudaMalloc((void **) &d_input, params -> inputsize));
     cutilSafeCall( cudaMalloc((void **) &d_output, params -> outputsize));
-    cutilSafeCall( cudaMemcpyToSymbol(dm_shifts, params -> dmshifts, params -> nchans * sizeof(float)) );
+    cutilSafeCall( cudaMemcpyToSymbol(dm_shifts, params -> dmshifts, nchans * sizeof(float)) );
 
     // Temporary store for maxshift
     float *tempshift = (float *) malloc(maxshift * nchans * sizeof(float));
@@ -71,23 +74,24 @@ void* dedisperse(void* thread_params)
     float timestamp;
 
     cudaEventCreate(&event_start); 
-    cudaEventCreate(&event_stop); 
+    cudaEventCreateWithFlags(&event_stop, cudaEventBlockingSync); // Thread blocks when syncings
 
     // Define kernel thread configuration
     int gridsize_dedisp = 128, blocksize_dedisp = 128;
-    dim3 gridDim_bin(128, nchans / 128.0 < 1 ? 1 : nchans / 128.0);
+    dim3 gridDim_bin(128, (nchans / 128.0) < 1 ? 1 : nchans / 128.0);
     dim3 blockDim_bin(min(nchans, 128), 1);
+
+    printf("Binning: %f, %d\n", nchans / 128.0 < 1 ? 1 : nchans / 128.0, min(nchans, 128));
 
     // Survey parameters
     int lobin = survey -> pass_parameters[0].binsize;
     int binsize, inshift, outshift, kernelBin;
 
-    // Calculate output size
+    // Calculate output size and allocate thread output buffer
     int outsize = 0;
-
     for(i = 0; i < survey -> num_passes; i++)
         outsize += survey -> pass_parameters[i].ndms / survey -> pass_parameters[i].binsize;
-    outsize *= nsamp;
+    outsize *= nsamp / num_threads;
 
     // Thread processing loop
     while (1) {
@@ -113,7 +117,7 @@ void* dedisperse(void* thread_params)
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);
             cudaEventElapsedTime(&timestamp, event_start, event_stop);
-            printf("%d: Copied data to GPU %d: %f\n", (int) (time(NULL) - start), params -> thread_num, timestamp);
+            printf("%d: Copied data to GPU %d: %f\n", (int) (time(NULL) - start), tid, timestamp);
 
             // Clear GPU output buffer
             cutilSafeCall( cudaMemset(d_output, 0, params -> outputsize));
@@ -127,6 +131,8 @@ void* dedisperse(void* thread_params)
         if (loop_counter >= params -> iterations) {
 
             // ------------------------------------- Perform downsampling on GPU --------------------------------------
+            // All input data is copied to all GPUs, so we need to perform binning on all of them
+
             cudaEventRecord(event_start, 0);
             binsize = lobin; inshift = 0, outshift = 0, kernelBin = binsize;
             for( i = 0; i < survey -> num_passes; i++) {
@@ -152,14 +158,8 @@ void* dedisperse(void* thread_params)
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);
             cudaEventElapsedTime(&timestamp, event_start, event_stop);
-            printf("%d: Processed Binning %d: %lf\n", (int) (time(NULL) - start), params -> thread_num, timestamp);
+            printf("%d: Processed Binning %d: %lf\n", (int) (time(NULL) - start), tid, timestamp);
 
-           // CHECK OUTPUT
-/*            cutilSafeCall(cudaMemcpy( params -> output, d_input, params -> outputsize, cudaMemcpyDeviceToHost) );
-            for(i = 0; i < (params -> nsamp + params -> maxshift) * params -> nchans / params -> survey -> pass_parameters[0].binsize; i++)
-                if (params -> output[i] > 256)
-                    printf("bin.. %d, %f\n", i, params -> output[i]);
-*/
             // --------------------------------- Perform subband dedispersion on GPU ---------------------------------
             cudaEventRecord(event_start, 0);
 
@@ -169,44 +169,53 @@ void* dedisperse(void* thread_params)
                              * survey -> pass_parameters[survey -> num_passes - 1].highdm /  
                              survey -> tsamp );
 
+            int ncalls;
+            float startdm;
+
             for( i = 0; i < survey -> num_passes; i++) {
 
+                // Setup call parameters (ncalls is split among all GPUs)
+                ncalls = survey -> pass_parameters[i].ncalls / num_threads;
+                startdm = survey -> pass_parameters[i].lowdm + survey -> pass_parameters[i].sub_dmstep * ncalls * tid;
+ 
+//                printf("Thread: %d, pass: %d,  ncalls: %d, startdm: %f\n", tid, i, ncalls, startdm);     
+
                 // Perform subband dedispersion
-                dedisperse_subband <<< dim3(gridsize_dedisp, survey -> pass_parameters[i].ncalls), blocksize_dedisp >>>
+                dedisperse_subband <<< dim3(gridsize_dedisp, ncalls), blocksize_dedisp >>>
                     (d_output, d_input, (nsamp + tempval) / binsize, nchans, survey -> nsubs, 
-                     survey -> pass_parameters[i].lowdm, survey -> pass_parameters[i].sub_dmstep,
-                     params -> tsamp * binsize, inshift, outshift); 
+                     startdm, survey -> pass_parameters[i].sub_dmstep,
+                     tsamp * binsize, inshift, outshift); 
 
                 inshift += (nsamp + maxshift) * nchans / binsize;
-                outshift += (nsamp + tempval) * survey -> nsubs * survey -> pass_parameters[i].ncalls / binsize ;
+                outshift += (nsamp + tempval) * survey -> nsubs * ncalls / binsize ;
                 binsize *= 2;
             }
 
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);
             cudaEventElapsedTime(&timestamp, event_start, event_stop);
-            printf("%d: Processed Subband Dedispersion %d: %lf\n", (int) (time(NULL) - start), params -> thread_num, timestamp);     
+            printf("%d: Processed Subband Dedispersion %d: %lf\n", (int) (time(NULL) - start), tid, timestamp);     
 
             // CHECK OUTPUT
-/*            cutilSafeCall(cudaMemcpy( params -> output, d_output, params -> outputsize, cudaMemcpyDeviceToHost) );
+//            cutilSafeCall(cudaMemcpy( params -> output, d_output, params -> outputsize, cudaMemcpyDeviceToHost) );
 
-            int a, b, c, l, k;
-            inshift = 0;
-            for(i = 0; i < survey -> num_passes; i++) {
+//            int a, b, c, l, k;
+//            inshift = 0;
+//            for(i = 0; i < survey -> num_passes; i++) {
 
-                a = (nsamp + tempval) / survey -> pass_parameters[i].binsize;
-                b = survey -> nsubs;
-                c = survey -> pass_parameters[i].ncalls;
+//                a = (nsamp + tempval) / survey -> pass_parameters[i].binsize;
+//                b = survey -> nsubs;
+//                c = survey -> pass_parameters[i].ncalls / num_threads;
 
-                for (l = 0; l < c; l++)          //ncalls
-                    for (j = 0; j < b; j++)      //nsubs
-                        for (k = 0; k < a; k++)  //nsamp
-                            if (params -> output[inshift + l*a*b + j*a + k] > 6 * 1024)
-                                {    printf("%d. ncall: %d, nsub: %d, samp: %d, %f\n", i, l, j, k, params -> output[inshift + l*a*b + j*a + k]);   } 
+//                for (l = 0; l < c; l++)          //ncalls
+//                    for (j = 0; j < b; j++)      //nsubs
+//                        for (k = 0; k < a; k++)  //nsamp
+//                            if (params -> output[inshift + l*a*b + j*a + k] > 7 * 1024)
+//                                {    printf("%d. ncall: %d, nsub: %d, samp: %d, %f\n", i, l, j, k, params -> output[inshift + l*a*b + j*a + k]);   } 
 
-                inshift = a * b * c;
-            }
-*/
+//                inshift = a * b * c;
+//            }
+
             // Copy subband output as dedispersion input
             cutilSafeCall( cudaMemcpy(d_input, d_output, params -> outputsize, cudaMemcpyDeviceToDevice) );
 
@@ -217,15 +226,21 @@ void* dedisperse(void* thread_params)
             binsize = lobin, inshift = outshift = 0;
             for (i = 0; i < survey -> num_passes; i++) {
 
-                // Perform subband dedispersion for all subband calls
-                for(j = 0; j < survey -> pass_parameters[i].ncalls; j++) {
+                // Setup call parameters (calldms is split among all GPUs)
+                ncalls = survey -> pass_parameters[i].ncalls / num_threads;
+                startdm = survey -> pass_parameters[i].lowdm + survey -> pass_parameters[i].sub_dmstep * ncalls * tid;
 
-                    dm = max(survey -> pass_parameters[i].lowdm + survey -> pass_parameters[i].sub_dmstep * j
+                // Perform subband dedispersion for all subband calls
+                for(j = 0; j < ncalls; j++) {
+
+                    dm = max(startdm + survey -> pass_parameters[i].sub_dmstep * j
                          - survey -> pass_parameters[i].calldms * survey -> pass_parameters[i].dmstep / 2, 0.0);
+
+//                   printf("Thread: %d, pass: %d, call: %d, ncalls: %d, startdm: %f, dm: %f\n", tid, i, j, ncalls, startdm, dm);     
 
                     dedisperse_loop<<< dim3(gridsize_dedisp, survey -> pass_parameters[i].calldms), blocksize_dedisp >>>
                         (d_output, d_input, nsamp / binsize, survey -> nsubs, 
-                         params -> tsamp * binsize, params -> nchans /  survey -> nsubs, 
+                         tsamp * binsize, nchans /  survey -> nsubs, 
                          dm, survey -> pass_parameters[i].dmstep,
                          inshift, outshift);
                     
@@ -241,29 +256,29 @@ void* dedisperse(void* thread_params)
             cudaEventElapsedTime(&timestamp, event_start, event_stop);
 
             // CHECK OUTPUT
-/*            cutilSafeCall(cudaMemcpy( params -> output, d_output, params -> outputsize, cudaMemcpyDeviceToHost) );
+//            cutilSafeCall(cudaMemcpy( params -> output, d_output, params -> outputsize, cudaMemcpyDeviceToHost) );
 
-            inshift = 0;
-            for(i = 0; i < survey -> num_passes; i++) {
+//            inshift = 0;
+//            for(i = 0; i < survey -> num_passes; i++) {
 
-                a = survey -> nsamp / survey -> pass_parameters[i].binsize;
-                b = survey -> pass_parameters[i].ndms;
-                for (j = 0; j < b; j++)
-                    for (k = 0; k < a; k++)
-                        if (params -> output[inshift + j * a + k] < 6 * 1024)
-                            {    printf("%d. ndm: %d, samp: %d, %d, %f\n", i, j, k, inshift + j * a + k, params -> output[inshift + j * a + k]);   } 
+//                a = survey -> nsamp / survey -> pass_parameters[i].binsize;
+//                b = (survey -> pass_parameters[i].ncalls  / num_threads) * survey -> pass_parameters[i].calldms;
+//                for (j = 0; j < b; j++)
+//                    for (k = 0; k < a; k++)
+//                        if (params -> output[inshift + j * a + k] < 6 * 1024)
+//                            {    printf("%d.%d - ndm: %d, samp: %d, %d, %f\n", tid, i, j, k, inshift + j * a + k, params -> output[inshift + j * a + k]);   } 
 
-                inshift += a * b;
-            }
-*/
-            printf("%d: Processed Dedispersion %d: %lf\n", (int) (time(NULL) - start), params -> thread_num, timestamp);
+//                inshift += a * b;
+//            }
+
+            printf("%d: Processed Deispersion %d: %lf\n", (int) (time(NULL) - start), tid, timestamp);
         }
 
         // Wait output barrier
         ret = pthread_barrier_wait(params -> output_barrier);
         if (!(ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD))
             { fprintf(stderr, "Error during barrier synchronisation 2 [thread]\n"); exit(0); }
-  
+
         if(loop_counter >= params -> iterations) { 
 
             // Collect and write output to host memory
@@ -274,7 +289,7 @@ void* dedisperse(void* thread_params)
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);
             cudaEventElapsedTime(&timestamp, event_start, event_stop);
-            printf("%d: Written output %d: %f\n", (int) (time(NULL) - start), params -> thread_num, timestamp);
+            printf("%d: Written output %d: %f\n", (int) (time(NULL) - start), tid, timestamp);
         }
 
         // Acquire rw lock
@@ -282,7 +297,7 @@ void* dedisperse(void* thread_params)
             { fprintf(stderr, "Unable to acquire rw_lock [thread]\n"); exit(0); }
 
         // Update params  
-        nsamp = params -> nsamp;
+        nsamp = params -> survey -> nsamp;
 
         // Stopping clause
         if (((THREAD_PARAMS *) thread_params) -> stop) {
@@ -315,6 +330,6 @@ void* dedisperse(void* thread_params)
     cudaEventDestroy(event_stop);
     cudaEventDestroy(event_start); 
 
-    printf("%d: Exited gracefully %d\n", (int) (time(NULL) - start), params -> thread_num);
+    printf("%d: Exited gracefully %d\n", (int) (time(NULL) - start), tid);
     pthread_exit((void*) thread_params);
 }

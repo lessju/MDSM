@@ -20,8 +20,11 @@ typedef struct {
     SUBBAND_PASSES *pass_parameters;
     int num_passes, nsubs;
 
-    // File pointer (to be substitued with QIODevice
+    // File pointer (to be substitued with QIODevice)
     FILE *fp;
+
+    // Number of GPUs which
+    int num_threads;
 
 } SURVEY;
 

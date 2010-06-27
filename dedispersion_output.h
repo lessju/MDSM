@@ -6,11 +6,7 @@
 
 typedef struct {
     // Input parameters
-    int nchans, nsamp, nthreads, iterations, maxiters;
-
-    // Dedispersion parameters
-    float startdm, dmstep;
-    int ndms;
+    int nthreads, iterations, maxiters;
 
     // Input and output buffers memory pointers
     float** output_buffer;

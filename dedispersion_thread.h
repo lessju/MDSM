@@ -21,22 +21,20 @@ typedef struct {
 
 typedef struct {
     // Input parameters
-    int nchans, nsamp, iterations, maxiters;
-    float tsamp;
+    int iterations, maxiters;
 
     // Dedispersion parameters
+    int maxshift, binsize;
     float *dmshifts;
-    float *dmvalues, startdm, dmstep;
-    int ndms, maxshift, binsize;
 
     // Input and output buffers memory pointers & sizes
-    size_t inputsize, outputsize;
+    size_t inputsize, outputsize, dm_output;
     float* output;
     float* input; 
    
     // Thread-specific info + synchronisation objects
     int device_id;
-    unsigned short thread_num, stop;
+    unsigned short thread_num, num_threads, stop;
     pthread_rwlock_t  *rw_lock;
     pthread_barrier_t *input_barrier;
     pthread_barrier_t *output_barrier;
@@ -48,8 +46,5 @@ typedef struct {
     SURVEY* survey;
 
 } THREAD_PARAMS;
-
-// void* dedisperse(void* thread_params);
-// DEVICE_INFO** initialise_devices(int *num_devices);
 
 #endif

@@ -1,6 +1,9 @@
+#ifndef FILE_HANDLER_H
+#define FILE_HANDLER_H
+
+#include "stdio.h"
 
 typedef struct {
-
     char rawdatafile[80], source_name[80];
     int machine_id, telescope_id, data_type, nchans, nbits, nifs, scan_number;
     int barycentric,pulsarcentric; 
@@ -25,3 +28,6 @@ typedef struct {
 } FILE_HEADER;
 
 FILE_HEADER *read_header(FILE *inputfile);
+int read_block(FILE *input, int nbits, float *block, int nread);
+
+#endif // FILE_HANDLER_H

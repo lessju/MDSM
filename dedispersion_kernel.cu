@@ -7,7 +7,7 @@
 __shared__ float localvalue[4008];
 
 // Stores temporary shift values
-__constant__ float dm_shifts[4096];
+__constant__ float dm_shifts[16384];
 
 // -------------------------- The Dedispersion Loop -----------------------------------
 __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchans, float tsamp,
@@ -37,6 +37,7 @@ __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchan
 }
 
 // -------------------------- The Subband Dedispersion Loop -----------------------------------
+// TODO: Optimise (process each subband in a different thread, instead of sample per thread)
 __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int nchans, int nsubs, 
                                    float startdm, float dmstep, float tsamp, int inshift, int outshift)
 {
