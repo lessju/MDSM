@@ -35,7 +35,7 @@ DEVICE_INFO** initialise_devices(int *num_devices)
         }
     }
 
-//    *num_devices = 2;  // TEMPORARY TESTING HACK
+    *num_devices = 4;  // TEMPORARY TESTING HACK
 
     if (*num_devices == 0)
         { fprintf(stderr,"No CUDA-capable device found"); exit(0); }
@@ -74,14 +74,12 @@ void* dedisperse(void* thread_params)
     float timestamp;
 
     cudaEventCreate(&event_start); 
-    cudaEventCreateWithFlags(&event_stop, cudaEventBlockingSync); // Thread blocks when syncings
+    cudaEventCreateWithFlags(&event_stop, cudaEventBlockingSync); // Blocking sync when waiting for kernel launches 
 
     // Define kernel thread configuration
     int gridsize_dedisp = 128, blocksize_dedisp = 128;
-    dim3 gridDim_bin(128, (nchans / 128.0) < 1 ? 1 : nchans / 128.0);
-    dim3 blockDim_bin(min(nchans, 128), 1);
-
-    printf("Binning: %f, %d\n", nchans / 128.0 < 1 ? 1 : nchans / 128.0, min(nchans, 128));
+    dim3 gridDim_bin(128, (nchans / 256.0) < 1 ? 1 : nchans / 256.0);
+    dim3 blockDim_bin(min(nchans, 256), 1);
 
     // Survey parameters
     int lobin = survey -> pass_parameters[0].binsize;

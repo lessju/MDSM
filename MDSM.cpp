@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define USING_PELICAN_LOFAR 1
+#define USING_PELICAN_LOFAR 0
 
 // To make configurable
 SURVEY *processSurveyParameters()
@@ -19,20 +19,20 @@ SURVEY *processSurveyParameters()
     // Hard code survey parameters, for now
     SURVEY *survey = (SURVEY *) malloc(sizeof(SURVEY));
 
-    survey -> num_passes = 1;//3;
+    survey -> num_passes = 3;
     survey -> pass_parameters = (SUBBAND_PASSES *) malloc(3 * sizeof(SUBBAND_PASSES)) ;
-    survey -> tdms = 8192;// + 792 + 572;
+    survey -> tdms = 8192 + 792 + 572;
     survey -> fp = NULL;
 
     survey -> pass_parameters[0].lowdm      = 0;
-    survey -> pass_parameters[0].highdm     = 81.92;
+    survey -> pass_parameters[0].highdm     = 21.12;
     survey -> pass_parameters[0].dmstep     = 0.01;
     survey -> pass_parameters[0].sub_dmstep = 0.24;
     survey -> pass_parameters[0].binsize    = 1;
-    survey -> pass_parameters[0].ndms       = 8192;
+    survey -> pass_parameters[0].ndms       = 2112;
     survey -> pass_parameters[0].calldms    = 24;
-    survey -> pass_parameters[0].ncalls     = 341;
-/*
+    survey -> pass_parameters[0].ncalls     = 88;
+
     survey -> pass_parameters[1].lowdm      = 21.12;
     survey -> pass_parameters[1].highdm     = 36.96;
     survey -> pass_parameters[1].dmstep     = 0.02;
@@ -48,9 +48,9 @@ SURVEY *processSurveyParameters()
     survey -> pass_parameters[2].sub_dmstep = 1.10;
     survey -> pass_parameters[2].binsize    = 4;
     survey -> pass_parameters[2].ndms       = 572;
-    survey -> pass_parameters[2].calldms    = 22;
-    survey -> pass_parameters[2].ncalls     = 26; 
-*/
+    survey -> pass_parameters[2].calldms    = 26;
+    survey -> pass_parameters[2].ncalls     = 22; 
+
     return survey;
 }
 

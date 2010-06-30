@@ -19,7 +19,7 @@ LDFLAGS 	:= -L${CUDA_PATH}/lib -L${CUDA_PATH}/lib64 -L${CUDA_SDK_PATH}/lib \
 ############################ CUDA DEDISPERSE ###################################
 
 binner:
-	$(NVCC) -o binner binner.cu $(LDFLAGS) -L/lib
+	$(NVCC) -o binner binner.cu $(LDFLAGS) $(INC) -L/lib
 	rm -f *.cu.o *.linkinfo
 
 fft:

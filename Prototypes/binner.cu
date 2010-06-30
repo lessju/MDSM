@@ -4,10 +4,10 @@
 #include <string.h>
 #include <cutil_inline.h>
 
-int nchans = 1024, nsamp = 512 * 1024, ncalls = 2, lo_bin = 1;
+int nchans = 1024, nsamp = 1, ncalls = 2, lo_bin = 1;
 
 // Temp chans store
-__shared__ float localvalue[512];
+__shared__ float localvalue[4080];
 
 // --------------------------- Data binning kernel ----------------------------
 __global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize, int inshift, int outshift)
@@ -23,10 +23,11 @@ __global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize,
         localvalue[threadIdx.x] = 0;
 
         for(b = 0; b < binsize; b++)
-            localvalue[threadIdx.x] += input[inshift + c + blockIdx.x * gridDim.y * blockDim.x * binsize + nchans * b + shift];
+            localvalue[threadIdx.x] += input[inshift + c + blockIdx.x * gridDim.y * 
+                                             blockDim.x * binsize + nchans * b + shift];
  
         // Copy data to global memory
-        input[outshift + channel + c/binsize] =  localvalue[threadIdx.x];
+        input[outshift + channel + c/binsize] = localvalue[threadIdx.x] / sqrtf(binsize);
     }
 }
 
@@ -44,10 +45,11 @@ __global__ void inplace_binning_kernel(float *input, int nsamp, int nchans, int 
         localvalue[shift] = 0;
 
         for(b = 0; b < binsize; b++)
-            localvalue[shift] += input[c + blockIdx.x * gridDim.y * blockDim.x * binsize + nchans * b + shift];
+            localvalue[shift] += input[c + blockIdx.x * gridDim.y * blockDim.x * 
+                                       binsize + nchans * b + shift];
 
         // Copy data to global memory
-        input[c +  channel] =  localvalue[shift];
+        input[c +  channel] = localvalue[shift] / sqrtf(binsize);
     }
 }
 
@@ -64,7 +66,7 @@ __global__ void inplace_memory_reorganisation(float *input, int nsamp, int nchan
         localvalue[shift] = input[c + blockIdx.x * gridDim.y * blockDim.x * binsize + shift];
  
         // Copy data to global memory
-        input[channel + c/binsize] =  localvalue[shift];
+        input[channel + c/binsize] = localvalue[shift];
     }
 }
 
@@ -124,8 +126,8 @@ int main(int argc, char *argv[])
    cudaEvent_t event_start, event_stop;
    float timestamp;
    int gridsize = 64;
-   dim3 gridDim(gridsize, nchans / 128.0 < 1 ? 1 : nchans / 128.0);
-   dim3 blockDim(min(nchans, 128), 1);
+   dim3 gridDim(gridsize, nchans / 192.0 < 1 ? 1 : nchans / 192.0);
+   dim3 blockDim(min(nchans, 192), 1);
    printf("Grid dimensions: %d x %d, block dimensions: %d x 1\n", gridDim.x, gridDim.y, blockDim.x);
 
    cudaEventCreate(&event_start); 

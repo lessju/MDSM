@@ -96,9 +96,9 @@ void process(float **buffer, FILE* output, SURVEY *survey, int loop_counter, int
                 for(l = 0; l < nsamp; l++) {
                     temp_val = buffer[thread][shift + k * nsamp + l] - mean;
 
-                    if (temp_val >= (stddev * 20) ) {
-//                          fprintf(", "%d, %f, %f\n", loop_counter * survey -> nsamp + l * survey -> pass_parameters[i].binsize, 
-//                                                          startdm + k * dmstep, temp_val);
+                    if (temp_val >= (stddev * 4) ) {
+                          fprintf(output, "%d, %f, %f\n", loop_counter * survey -> nsamp + l * survey -> pass_parameters[i].binsize, 
+                                                          startdm + k * dmstep, temp_val);
 //                          query.addBindValue(loop_counter * survey -> nsamp + l * survey -> pass_parameters[i].binsize);
 //                          query.addBindValue(startdm + k * dmstep);
 //                          query.addBindValue(temp_val);
