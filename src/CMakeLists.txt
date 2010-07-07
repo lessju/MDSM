@@ -10,6 +10,22 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE debug)
 endif(NOT CMAKE_BUILD_TYPE)
 
+if(NOT MDSM_INSTALL_DIR)
+    set(MDSM_INSTALL_DIR "mdsm")
+endif(NOT MDSM_INSTALL_DIR)
+
+if(NOT LIBRARY_INSTALL_DIR)
+    set(LIBRARY_INSTALL_DIR "${MDSM_INSTALL_DIR}/lib")
+endif(NOT LIBRARY_INSTALL_DIR)
+
+if(NOT INCLUDE_INSTALL_DIR)
+    set(INCLUDE_INSTALL_DIR "${MDSM_INSTALL_DIR}/include")
+endif(NOT INCLUDE_INSTALL_DIR)
+
+if(NOT BINARY_INSTALL_DIR)
+    set(BINARY_INSTALL_DIR "${MDSM_INSTALL_DIR}/bin")
+endif(NOT BINARY_INSTALL_DIR)
+
 
 # === Find dependencies.
 if(NOT CUDA_SDK_ROOT_DIR)
@@ -26,10 +42,15 @@ else(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
 endif(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
 
 
+include(compilerDefaults)
+
+
 find_package(Pelican REQUIRED)
 find_package(Qt4 COMPONENTS QtCore QtNetwork QtXml REQUIRED)
 find_package(PelicanLofar REQUIRED)
-# Pthreads.. !
+find_package(OpenMP REQUIRED)
+find_package(FFTW3 REQUIRED)
+# pthread ... ?!
 
 
 include_directories("${CUDA_SDK_ROOT_DIR}/common/inc")
