@@ -3,11 +3,8 @@
 #include "unistd.h"
 #include "math.h"
 
-// QT stuff
-#include <QString>
-#include <QtSql>
-
 // C++ stuff
+#include <cstdlib>
 #include <iostream>
 
 // Calaculate the mean and standard deviation for the data
@@ -99,17 +96,6 @@ void process(float **buffer, FILE* output, SURVEY *survey, int loop_counter, int
     }
 
     printf("Number of candidates: %d\n", ct);
-}
-
-// Create database connection
-bool connectDatabase(QString username, QString password, QString dbName)
-{
-    QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL7");
-    db.setHostName("localhost");
-    db.setDatabaseName(dbName);
-    db.setUserName(username);
-    db.setPassword(password);
-    return db.open();
 }
 
 // Process dedispersion output

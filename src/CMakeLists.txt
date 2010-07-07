@@ -1,0 +1,53 @@
+# === Set the project name and specify the required CMAKE version
+project(MDSM CXX C)
+cmake_minimum_required(VERSION 2.4)
+
+# === Append the local cmake directory to the module path.
+list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_SOURCE_DIR}/cmake)
+
+# === Options and defaults.
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE debug)
+endif(NOT CMAKE_BUILD_TYPE)
+
+
+# === Find dependencies.
+if(NOT CUDA_SDK_ROOT_DIR)
+    set(CUDA_SDK_ROOT_DIR /usr/local/cudaSDK/C)
+endif(NOT CUDA_SDK_ROOT_DIR)
+
+find_package(CUDA 2.3 REQUIRED)
+set(CUDA_PROPERGATE_HOST_FLAGS OFF)
+set(CUDA_BUILD_EMULATION OFF)
+if(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
+#    set(CUDA_NVCC_FLAGS --complier-options;-Wall;--compiler-options;-O2)
+else(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
+#    set(CUDA_NVCC_FLAGS --complier-options;-Wall;--compiler-options;-O0;--compiler-options;-g)
+endif(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
+
+
+find_package(Pelican REQUIRED)
+find_package(Qt4 COMPONENTS QtCore QtNetwork QtXml REQUIRED)
+find_package(PelicanLofar REQUIRED)
+# Pthreads.. !
+
+
+include_directories("${CUDA_SDK_ROOT_DIR}/common/inc")
+include_directories(${CUDA_INCLUDE_DIRS})
+include_directories(${PELICAN_LOFAR_INCLUDE_DIR})
+include_directories(${PELICAN_INCLUDE_DIR})
+
+# === Recurse into sub-directories defined in modules.cmake.
+include(modules.cmake)
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/standalone")
+add_executable(standalone-mdsm MDSM.cpp)
+target_link_libraries(standalone-mdsm
+    ${QT_QTCORE_LIBRARY}
+    ${PELICAN_LOFAR_LIBRARIES}
+    ${PELICAN_LIBRARIES}
+    standalone
+    mdsm-cuda
+    mdsm
+)
