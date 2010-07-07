@@ -43,15 +43,10 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
 {
     unsigned int i, input = 0, output = 0, chans = 0;
     for(i = 0; i < survey -> num_passes; i++) {
-        input += survey -> nsubs * survey -> pass_parameters[i].ncalls / survey -> pass_parameters[i].binsize;
-        output += survey -> pass_parameters[i].ndms / survey -> pass_parameters[i].binsize;
+        input += survey -> nsubs * (survey -> pass_parameters[i].ncalls / num_devices) / survey -> pass_parameters[i].binsize;
+        output += (((survey -> pass_parameters[i].ncalls / num_devices) * survey -> pass_parameters[i].calldms)) / survey -> pass_parameters[i].binsize;
         chans += survey -> nchans / survey -> pass_parameters[i].binsize;
     }
-
-    // Total nsamp we can process depends on the number of available devices
-    // We are splitting ndms and ncalls among the devices, so we divide by num_devices
-    output /= num_devices;
-    input /= num_devices;
 
     if (survey -> nsamp == 0) 
         survey -> nsamp = ((1024 * 1024 * 1000) / (max(input, chans) + max(output, input))) - maxshift;
@@ -60,12 +55,9 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
     if (survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
         survey -> nsamp -= survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize;
 
-    // TODO: Correct maxshift calculation (when applied to input variable)
-    *inputsize = (max(input, chans) * survey -> nsamp + maxshift * max(input, survey -> nchans)) * sizeof(float);  
+    *inputsize = (max(input, chans) * (survey -> nsamp + maxshift)) * sizeof(float);  
     *outputsize = max(output, input) * (survey -> nsamp + maxshift) * sizeof(float);
     printf("Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
-
-    printf("inputsize: %ld, outputsize: %ld\n", *inputsize, *outputsize);
 
     return survey -> nsamp;
 }

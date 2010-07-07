@@ -35,7 +35,7 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
             for(j = 0; j < mod_factor; j++)
                 total += buffer[0][shift + iters * mod_factor + j];
             mean += (total / j);
-            
+
             iters++;
             if (iters * mod_factor + j >= vals) break;
         }
@@ -52,7 +52,7 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
              iters++; 
              if (iters * mod_factor + j <= vals) break;
         }
-        stddev = sqrt(stddev / iters);
+        stddev = sqrt(stddev / iters); // Stddev for entire array
 
         // Store mean and stddev values in survey
         survey -> pass_parameters[i].mean = mean;
@@ -63,23 +63,14 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
 }
 
 // Apply mean and stddev to apply thresholding
-void process(float **buffer, FILE* output, SURVEY *survey, int loop_counter, int read_nsamp)
+void process(float **buffer, FILE* output, SURVEY *survey, int loop_counter, int read_nsamp, int samp_shift)
 {
-    int i = 0, thread, k, l, ndms, nsamp, shift = 0; 
+    int i = 0, thread, k, l, ndms, nsamp, shift = 0, ct = 0; 
     float temp_val, startdm, dmstep, mean, stddev; 
-
-   // Start database transaction
-//    QSqlDatabase::database().transaction();
-
-    // Create insert query with value placeholders
-//    QSqlQuery query;
-//    query.prepare("INSERT INTO events (sample, dm, snr) VALUES (?, ?, ?)");
 
     for(thread = 0; thread < survey -> num_threads; thread++) {
 
-        shift  = 0;  // Reset shifts for each thread buffer
-
-        for(i = 0; i < survey -> num_passes; i++) {
+        for(shift = 0, i = 0; i < survey -> num_passes; i++) {
 
             // Calaculate parameters
             nsamp   = read_nsamp / survey -> pass_parameters[i].binsize;
@@ -91,27 +82,23 @@ void process(float **buffer, FILE* output, SURVEY *survey, int loop_counter, int
             mean    = survey -> pass_parameters[i].mean;
             stddev  = survey -> pass_parameters[i].stddev;
 
+//            printf("[Output] Thread: %d, pass: %d,  ndms: %d, nsamp : %d, startdm: %f\n", thread, i, ndms, nsamp, startdm);     
+
             // Subtract dm mean from all samples and apply threshold
             for (k = 1; k < ndms; k++)
                 for(l = 0; l < nsamp; l++) {
                     temp_val = buffer[thread][shift + k * nsamp + l] - mean;
-
                     if (temp_val >= (stddev * 4) ) {
-                          fprintf(output, "%d, %f, %f\n", loop_counter * survey -> nsamp + l * survey -> pass_parameters[i].binsize, 
-                                                          startdm + k * dmstep, temp_val);
-//                          query.addBindValue(loop_counter * survey -> nsamp + l * survey -> pass_parameters[i].binsize);
-//                          query.addBindValue(startdm + k * dmstep);
-//                          query.addBindValue(temp_val);
-//                          query.exec();
+                          fprintf(output, "%d, %f, %f\n", samp_shift + l * survey -> pass_parameters[i].binsize, 
+                                                          startdm + k * dmstep, temp_val); ct++;
                     }
                 }
 
             shift += nsamp * ndms;
         }
     }
- 
-    // Commit transaction
-//    QSqlDatabase::database().commit();
+
+    printf("Number of candidates: %d\n", ct);
 }
 
 // Create database connection
@@ -129,19 +116,11 @@ bool connectDatabase(QString username, QString password, QString dbName)
 void* process_output(void* output_params)
 {
     OUTPUT_PARAMS* params = (OUTPUT_PARAMS *) output_params;
-    int i, iters = 0, ret, loop_counter = 0, pnsamp = params -> survey -> nsamp, ppnsamp = params -> survey-> nsamp;
+    int i, iters = 0, ret, loop_counter = 0, pnsamp = params -> survey -> nsamp;
+    int ppnsamp = params -> survey-> nsamp, samp_shift = 0;
     time_t start = params -> start, beg_read;
 
-    // Allocate enough stack space
     printf("%d: Started output thread\n", (int) (time(NULL) - start));
-
-    // Connect to MDSM database
-    if (connectDatabase("lessju", "arcadia10", "MDSM"))
-        printf("%d: Connected successfuly to MDSM database\n", (int) (time(NULL) - start));
-
-    // TEMPORARY: Reset database
-    QSqlQuery query;
-    query.exec("DELETE FROM events");
 
     // Processing loop
     while (1) {
@@ -157,9 +136,11 @@ void* process_output(void* output_params)
             mean_stddev(params -> output_buffer, params -> survey, ppnsamp);
             printf("%d: Calculated mean and stddev %d [output]: %d\n", (int) (time(NULL) - start), loop_counter, 
                                                                        (int) (time(NULL) - beg_read));
-            process(params -> output_buffer, params -> output_file, params -> survey, loop_counter - params -> iterations, ppnsamp);
+            process(params -> output_buffer, params -> output_file, params -> survey, 
+                    loop_counter - params -> iterations, ppnsamp, samp_shift);
             printf("%d: Processed output %d [output]: %d\n", (int) (time(NULL) - start), loop_counter, 
                                                              (int) (time(NULL) - beg_read));
+            samp_shift += ppnsamp;
         }
 
         // Wait output barrier

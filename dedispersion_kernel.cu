@@ -37,7 +37,7 @@ __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchan
 }
 
 // -------------------------- The Subband Dedispersion Loop -----------------------------------
-// TODO: Optimise (process each subband in a different thread, instead of sample per thread)
+// TODO: Optimise (process each subband in a different thread, instead of a sample per thread)
 __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int nchans, int nsubs, 
                                    float startdm, float dmstep, float tsamp, int inshift, int outshift)
 {

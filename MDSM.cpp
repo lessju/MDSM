@@ -21,7 +21,7 @@ SURVEY *processSurveyParameters()
 
     survey -> num_passes = 3;
     survey -> pass_parameters = (SUBBAND_PASSES *) malloc(3 * sizeof(SUBBAND_PASSES)) ;
-    survey -> tdms = 8192 + 792 + 572;
+    survey -> tdms = 2112 + 792 + 572;
     survey -> fp = NULL;
 
     survey -> pass_parameters[0].lowdm      = 0;
@@ -34,22 +34,23 @@ SURVEY *processSurveyParameters()
     survey -> pass_parameters[0].ncalls     = 88;
 
     survey -> pass_parameters[1].lowdm      = 21.12;
-    survey -> pass_parameters[1].highdm     = 36.96;
+    survey -> pass_parameters[1].highdm     = 36.47;
     survey -> pass_parameters[1].dmstep     = 0.02;
     survey -> pass_parameters[1].sub_dmstep = 0.48;
     survey -> pass_parameters[1].binsize    = 2;
     survey -> pass_parameters[1].ndms       = 792;
     survey -> pass_parameters[1].calldms    = 24;
-    survey -> pass_parameters[1].ncalls     = 33;
+    survey -> pass_parameters[1].ncalls     = 32; 
 
-    survey -> pass_parameters[2].lowdm      = 36.96;
-    survey -> pass_parameters[2].highdm     = 65.56;
+    survey -> pass_parameters[2].lowdm      = 36.47;
+    survey -> pass_parameters[2].highdm     = 65.08;
     survey -> pass_parameters[2].dmstep     = 0.05;
     survey -> pass_parameters[2].sub_dmstep = 1.10;
     survey -> pass_parameters[2].binsize    = 4;
     survey -> pass_parameters[2].ndms       = 572;
     survey -> pass_parameters[2].calldms    = 26;
-    survey -> pass_parameters[2].ncalls     = 22; 
+    survey -> pass_parameters[2].ncalls     = 20; 
+
 
     return survey;
 }
@@ -104,7 +105,6 @@ void lofar_process_arguments(int argc, char *argv[], SURVEY* survey)
     survey -> fch1 = 240;
     survey -> foff = -0.000369;
 
-    printf("argc: %d\n", argc);
     while(i < argc) {  
        if (!strcmp(argv[i], "-nsamp"))
            survey -> nsamp = atoi(argv[++i]);  
@@ -143,7 +143,9 @@ int main(int argc, char *argv[])
     SURVEY *survey = processSurveyParameters();
 
     #if USING_PELICAN_LOFAR == 1
+        // Initialiase Pelican Lofar client if using it
         lofar_process_arguments(argc, argv, survey);
+        PelicanLofarClient lofarClient("ChannelisedStreamData", "127.0.0.1", 6969);
     #else
         file_process_arguments(argc, argv, survey);
     #endif
@@ -152,11 +154,6 @@ int main(int argc, char *argv[])
     // NOTE: survey will be updated with MDSM parameters
     float *input_buffer = NULL;
     input_buffer = initialiseMDSM(argc, argv, survey);
-
-    // Initialiase Pelican Lofar client if using it
-    #if USING_PELICAN_LOFAR == 1
-        PelicanLofarClient lofarClient("ChannelisedStreamData", "127.0.0.1", 6969);
-    #endif
 
     // Process current chunk
     int counter = 0, data_read = 0;
@@ -169,11 +166,11 @@ int main(int argc, char *argv[])
             else
                 data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp);
         #else
-            // READING FROM FILE
+            // READING DATA FROM FILE
             if (counter == 0)    // First read, read in maxshift (TODO: need to be changed to handle maxshift internally
                 data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp + survey -> maxshift, 
                                            survey -> nchans) - survey -> maxshift;
-            else                 // Read in normally
+            else                 // Read in normally 
                 data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
         #endif
     
