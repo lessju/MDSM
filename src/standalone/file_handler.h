@@ -28,6 +28,6 @@ typedef struct {
 } FILE_HEADER;
 
 FILE_HEADER *read_header(FILE *inputfile);
-int read_block(FILE *input, int nbits, float *block, int nread);
+unsigned long read_block(FILE *input, int nbits, float *block, unsigned long nread);
 
 #endif // FILE_HANDLER_H

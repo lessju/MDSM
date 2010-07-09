@@ -114,7 +114,7 @@ __global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize,
                                              blockDim.x * binsize + nchans * b + shift];
  
         // Copy data to global memory
-        input[outshift + channel + c/binsize] = localvalue[threadIdx.x] / sqrtf(binsize);
+        input[outshift + channel + c/binsize] = localvalue[threadIdx.x] / binsize;// sqrtf(binsize);
     }
 }
 
@@ -136,7 +136,7 @@ __global__ void inplace_binning_kernel(float *input, int nsamp, int nchans, int 
                                        binsize + nchans * b + shift];
 
         // Copy data to global memory
-        input[c +  channel] = localvalue[shift] / sqrtf(binsize);
+        input[c +  channel] = localvalue[shift] / binsize;//sqrtf(binsize);
     }
 }
 

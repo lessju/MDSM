@@ -35,7 +35,7 @@ DEVICE_INFO** initialise_devices(int *num_devices)
         }
     }
 
-//    *num_devices = 2;  // TEMPORARY TESTING HACK
+    *num_devices = 1;  // TEMPORARY TESTING HACK
 
     if (*num_devices == 0)
         { fprintf(stderr,"No CUDA-capable device found"); exit(0); }

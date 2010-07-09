@@ -13,126 +13,91 @@
 
 #define USING_PELICAN_LOFAR 0
 
-// To make configurable
-SURVEY *processSurveyParameters()
+// Process command-line parameters (when reading from file)
+SURVEY* file_process_arguments(int argc, char *argv[])
 {
-    // Hard code survey parameters, for now
-    SURVEY *survey = (SURVEY *) malloc(sizeof(SURVEY));
+    FILE_HEADER* header;
+    SURVEY* survey;
+    int i = 1, file = 0;
 
-    survey -> num_passes = 3;
-    survey -> pass_parameters = (SUBBAND_PASSES *) malloc(3 * sizeof(SUBBAND_PASSES)) ;
-    survey -> tdms = 2112 + 792 + 572;
-    survey -> fp = NULL;
+    if (argc < 3){
+        fprintf(stderr, "Need at least data and observation files!\n");
+        exit(0);
+    }
+    
+    // Read in file to be processed from argument list
+    if ((fopen(argv[i], "rb")) != NULL) 
+        file = i;
+    else {
+        fprintf(stderr, "Invalid data file!\n");
+        exit(0);
+    }
+      
+    i++;
 
-    survey -> pass_parameters[0].lowdm      = 0;
-    survey -> pass_parameters[0].highdm     = 21.12;
-    survey -> pass_parameters[0].dmstep     = 0.01;
-    survey -> pass_parameters[0].sub_dmstep = 0.24;
-    survey -> pass_parameters[0].binsize    = 1;
-    survey -> pass_parameters[0].ndms       = 2112;
-    survey -> pass_parameters[0].calldms    = 24;
-    survey -> pass_parameters[0].ncalls     = 88;
+    // Load observation file and generate survey 
+    if (!strcmp(argv[i], "-obs"))
+           survey = processSurveyParameters(QString(argv[++i])); 
+    else {
+        fprintf(stderr, "Second argument must be observation file! [-obs filepath]\n");
+        exit(0);
+    }
 
-    survey -> pass_parameters[1].lowdm      = 21.12;
-    survey -> pass_parameters[1].highdm     = 36.47;
-    survey -> pass_parameters[1].dmstep     = 0.02;
-    survey -> pass_parameters[1].sub_dmstep = 0.48;
-    survey -> pass_parameters[1].binsize    = 2;
-    survey -> pass_parameters[1].ndms       = 792;
-    survey -> pass_parameters[1].calldms    = 24;
-    survey -> pass_parameters[1].ncalls     = 32; 
+    i++;
+    
+    // Set file to be processed    
+    survey -> fp = fopen(argv[file], "rb");
+    header = read_header(survey -> fp);
+    survey -> nbits = header -> nbits;
 
-    survey -> pass_parameters[2].lowdm      = 36.47;
-    survey -> pass_parameters[2].highdm     = 65.08;
-    survey -> pass_parameters[2].dmstep     = 0.05;
-    survey -> pass_parameters[2].sub_dmstep = 1.10;
-    survey -> pass_parameters[2].binsize    = 4;
-    survey -> pass_parameters[2].ndms       = 572;
-    survey -> pass_parameters[2].calldms    = 26;
-    survey -> pass_parameters[2].ncalls     = 20; 
-
+    // Load in additional parameters
+    while(i < argc) {  
+       if (!strcmp(argv[i], "-nsamp"))
+           survey -> nsamp = atoi(argv[++i]);  
+       else { printf("Invalid parameter\n"); exit(0); }
+       i++;
+    }
 
     return survey;
 }
 
-// Process command-line parameters (when reading from file)
-void file_process_arguments(int argc, char *argv[], SURVEY* survey)
-{
-    unsigned j = 0;
-    int i = 1;
-    
-    while((fopen(argv[i], "rb")) != NULL) {
-        if (survey -> fp != NULL) {
-            fprintf(stderr, "Only one file can be processed!\n");
-            exit(0);
-        }
-        
-        survey -> fp = fopen(argv[i], "rb");
-        FILE_HEADER *header = read_header(survey -> fp);
-
-        survey -> nsamp = 0;
-        survey -> nchans = header -> nchans;
-        survey -> tsamp = header -> tsamp;
-        survey -> fch1 = header -> fch1;
-        survey -> foff = header -> foff;
-        survey -> nbits = header -> nbits;
-        survey -> nsubs = 32;
-        survey -> tdms = 0;        
-        i++;
-    }
-
-    while(i < argc) {  
-       if (!strcmp(argv[i], "-nsamp"))
-           survey -> nsamp = atoi(argv[++i]);  
-       else if (!strcmp(argv[i], "-nsubs"))
-           survey -> nsubs = atoi(argv[++i]); 
-       else { printf("Invalid parameter\n"); exit(0); }
-       i++;
-    }
-
-    for(j = 0; j < survey -> num_passes; j++)
-        survey -> tdms += survey -> pass_parameters[j].ndms;
-}
-
 // Process command-line parameters (when receiving data from lofar)
-void lofar_process_arguments(int argc, char *argv[], SURVEY* survey)
+SURVEY* lofar_process_arguments(int argc, char *argv[])
 {
-    unsigned j = 0;
+    SURVEY* survey;
     int i = 1;
-    
-    survey -> nsamp = 0;
-    survey -> nsubs = 32;
-    survey -> nchans = 16384;
-    survey -> tsamp = 0.00264;
-    survey -> fch1 = 240;
-    survey -> foff = -0.000369;
+
+    if (argc < 2){
+        fprintf(stderr, "Need at least observation file!\n");
+        exit(0);
+    }
+
+   // Load observation file and generate survey 
+    if (!strcmp(argv[i], "-obs"))
+           survey = processSurveyParameters(QString(argv[++i])); 
+    else {
+        fprintf(stderr, "First argument must be observation file! [-survey filepath]\n");
+        exit(0);
+    }
 
     while(i < argc) {  
        if (!strcmp(argv[i], "-nsamp"))
            survey -> nsamp = atoi(argv[++i]);  
-       else if (!strcmp(argv[i], "-nchans"))
-           survey -> nsubs = atoi(argv[++i]); 
-       else if (!strcmp(argv[i], "-tsamp"))
-           survey -> nsamp = atof(argv[++i]);  
-       else if (!strcmp(argv[i], "-fch1"))
-           survey -> nsubs = atof(argv[++i]); 
-       else if (!strcmp(argv[i], "-foff"))
-           survey -> nsamp = atof(argv[++i]);  
        else if (!strcmp(argv[i], "-nsubs"))
            survey -> nsubs = atoi(argv[++i]); 
+       else if (!strcmp(argv[i], "-survey")) // Survey file, process
+           survey = processSurveyParameters(QString(argv[++i])); 
        else { printf("Invalid parameter\n"); exit(0); }
        i++;
     }
 
-    survey -> tdms = 0;
-    for(j = 0; j < survey -> num_passes; j++)
-        survey -> tdms += survey -> pass_parameters[i].ndms;
+    return survey;
 }
 
 // Load data from binary file
-int readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans)
-{
-    return read_block(fp, nbits, buffer, nsamp * nchans) / nchans;
+unsigned long readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans)
+{  
+    return read_block(fp, nbits, buffer, (unsigned long) nsamp * nchans) / nchans;
 }
 
 // MDSM entry point
@@ -140,16 +105,15 @@ int main(int argc, char *argv[])
 {
     // Create mait QCoreApplication instance
     QCoreApplication app(argc, argv);
-
-    // Process arguments
-    SURVEY *survey = processSurveyParameters();
+    
+    SURVEY* survey = NULL;
 
     #if USING_PELICAN_LOFAR == 1
         // Initialiase Pelican Lofar client if using it
-        lofar_process_arguments(survey);
+        survey = lofar_process_arguments();
         PelicanLofarClient lofarClient("ChannelisedStreamData", "127.0.0.1", 6969);
     #else
-        file_process_arguments(argc, argv, survey);
+        survey = file_process_arguments(argc, argv);
     #endif
 
     // Initialise Dedispersion code
@@ -158,7 +122,7 @@ int main(int argc, char *argv[])
     input_buffer = initialiseMDSM(survey);
 
     // Process current chunk
-    int counter = 0, data_read = 0;
+    unsigned int counter = 0, data_read = 0;
     while (TRUE) {
 
         #if USING_PELICAN_LOFAR == 1
@@ -169,13 +133,20 @@ int main(int argc, char *argv[])
                 data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp);
         #else
             // READING DATA FROM FILE
-            if (counter == 0)    // First read, read in maxshift (TODO: need to be changed to handle maxshift internally
+            if (counter == 0) {   // First read, read in maxshift (TODO: need to be changed to handle maxshift internally
+
                 data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp + survey -> maxshift, 
-                                           survey -> nchans) - survey -> maxshift;
+                                           survey -> nchans);
+                if (data_read < survey -> maxshift) {
+                    fprintf(stderr, "Not enough samples in file to perform dediseprsion\n");
+                    data_read = 0;
+                }
+                else
+                    data_read -= survey -> maxshift;
+            }
             else                 // Read in normally 
                 data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
         #endif
-    
         if (!process_chunk(data_read)) break;
 
         counter++;

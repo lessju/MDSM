@@ -22,7 +22,7 @@ DEVICE_INFO** devices;
 pthread_t* threads;
 THREAD_PARAMS* threads_params;
 float *dmshifts;
-size_t *inputsize, *outputsize;
+unsigned long *inputsize, *outputsize;
 float* input_buffer;
 float** output_buffer;
 pthread_rwlock_t rw_lock = PTHREAD_RWLOCK_INITIALIZER;
@@ -142,9 +142,12 @@ SURVEY* processSurveyParameters(QString filepath)
     for(i = 0; i < survey -> num_passes; i++)
         survey -> tdms += survey -> pass_parameters[i].ndms;
 
-    // Assign filename;
+    // TODO: Survey parameter checks
+
+    // Assign default values;
     survey -> nsamp = 0;
     survey -> fp = NULL;
+    survey -> nbits = 0;
 
     return survey;
 }
@@ -160,10 +163,17 @@ inline int max(int a, int b) {
 int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
 {
     unsigned int i, input = 0, output = 0, chans = 0;
+
     for(i = 0; i < survey -> num_passes; i++) {
         input += survey -> nsubs * (survey -> pass_parameters[i].ncalls / num_devices) / survey -> pass_parameters[i].binsize;
         output += (((survey -> pass_parameters[i].ncalls / num_devices) * survey -> pass_parameters[i].calldms)) / survey -> pass_parameters[i].binsize;
         chans += survey -> nchans / survey -> pass_parameters[i].binsize;
+    }
+
+    // First pass's binsize is greater than 1, override input
+    if (survey -> pass_parameters[0].binsize > 1) {
+        input = survey -> nsubs * (survey -> pass_parameters[0].ncalls / num_devices);
+        chans = survey -> nchans;
     }
 
     if (survey -> nsamp == 0) 
@@ -173,7 +183,7 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
     if (survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
         survey -> nsamp -= survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize;
 
-    *inputsize = (max(input, chans) * (survey -> nsamp + maxshift)) * sizeof(float);  
+    *inputsize = max(input, chans) * (survey -> nsamp + maxshift) * sizeof(float);  
     *outputsize = max(output, input) * (survey -> nsamp + maxshift) * sizeof(float);
     printf("Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
 

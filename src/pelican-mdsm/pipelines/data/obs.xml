@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pelican>
+
+<observation>
+    <frequencies center="240" offset="-0.000369" />
+    <channels number="16384" subbands="32" />
+    <timing  tsamp="0.00264" />
+    <dm />
+
+    <passes>
+        <pass>
+            <lowDm>0</lowDm>
+            <highDm>21.12</highDm>
+            <deltaDm>0.01</deltaDm>
+            <downsample>1</downsample>
+            <subDm>0.24</subDm>
+            <numDms>2112</numDms>
+            <dmsPerCall>24</dmsPerCall>
+            <ncalls>88</ncalls>
+        </pass>
+
+        <pass>
+            <lowDm>21.12</lowDm>
+            <highDm>36.47</highDm>
+            <deltaDm>0.02</deltaDm>
+            <downsample>2</downsample>
+            <subDm>0.48</subDm>
+            <numDms>792</numDms>
+            <dmsPerCall>24</dmsPerCall>
+            <ncalls>32</ncalls>
+        </pass>
+
+        <pass>
+            <lowDm>36.47</lowDm>
+            <highDm>65.08</highDm>
+            <deltaDm>0.05</deltaDm>
+            <downsample>4</downsample>
+            <subDm>01.10</subDm>
+            <numDms>572</numDms>
+            <dmsPerCall>26</dmsPerCall>
+            <ncalls>20</ncalls>
+        </pass>
+    </passes>
+
+</observation>
+

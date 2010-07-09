@@ -13,7 +13,7 @@ typedef struct {
 typedef struct {
 
     // Data parameters
-    unsigned nsamp, nchans, tdms, maxshift, nbits;
+    unsigned int nsamp, nchans, tdms, maxshift, nbits;
     float tsamp, foff, fch1;
     
     // subband dedispersion paramters

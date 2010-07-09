@@ -185,11 +185,12 @@ FILE_HEADER *read_header(FILE *inputfile)
 // Read data from file
 // ================================================
 
-int read_block(FILE *input, int nbits, float *block, int nread)
+unsigned long read_block(FILE *input, int nbits, float *block, unsigned long nread)
 {
-  int i, j, k, s1, s2, s3, s4, iread;
+  int i, j, k, s1, s2, s3, s4;
   unsigned short *shortblock;
   unsigned char *charblock;
+  unsigned long iread;
 
   /* decide how to read the data based on the number of bits per sample */
   switch(nbits) {
@@ -250,7 +251,6 @@ int read_block(FILE *input, int nbits, float *block, int nread)
           /* read n bytes into character block containing n 1-byte numbers */
           charblock = (unsigned char *) malloc(nread);
           iread = fread(charblock, 1, nread, input);
-      
           /* copy numbers into datablock */
           for (i = 0; i < iread; i++)
               block[i] = (float) charblock[i];

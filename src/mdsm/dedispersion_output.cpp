@@ -11,7 +11,7 @@
 // NOTE: Performed only on output of first thread
 void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
 {
-    unsigned int i, j, iters, vals, mod_factor = 32 * 1024, shift = 0;
+    unsigned int i, j, iters, vals, mod_factor, shift = 0;
     double total;
     float mean = 0, stddev = 0;
 
@@ -21,6 +21,7 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
         vals = read_nsamp / survey -> pass_parameters[i].binsize 
                * (survey -> pass_parameters[i].ncalls / survey -> num_threads) 
                * survey -> pass_parameters[i].calldms;
+        mod_factor = vals < 32 * 1024 ? vals : 32 * 1024;
 
         // Split value calculation in "kernels" to avoid overflows      
         // TODO: Join mean and stddev kernel in one loop  
@@ -41,20 +42,21 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
         // Calculate standard deviation
         iters = 0;
         while(1) {
+
             total = 0;
             for(j = 0; j < mod_factor; j++)
                 total += pow(buffer[0][shift + iters * mod_factor + j] - mean, 2);
              stddev += (total / j);
 
              iters++; 
-             if (iters * mod_factor + j <= vals) break;
+             if (iters * mod_factor + j >= vals) break;
         }
         stddev = sqrt(stddev / iters); // Stddev for entire array
 
         // Store mean and stddev values in survey
         survey -> pass_parameters[i].mean = mean;
         survey -> pass_parameters[i].stddev = stddev;
-        printf("mean: %f, stddev: %f\n", mean, stddev);
+//        printf("mean: %f, stddev: %f\n", mean, stddev);
         shift += vals;
     }
 }
@@ -79,10 +81,8 @@ void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, int s
             mean    = survey -> pass_parameters[i].mean;
             stddev  = survey -> pass_parameters[i].stddev;
 
-//            printf("[Output] Thread: %d, pass: %d,  ndms: %d, nsamp : %d, startdm: %f\n", thread, i, ndms, nsamp, startdm);     
-
             // Subtract dm mean from all samples and apply threshold
-            for (k = 1; k < ndms; k++)
+            for (k = 0; k < ndms; k++)
                 for(l = 0; l < nsamp; l++) {
                     temp_val = buffer[thread][shift + k * nsamp + l] - mean;
                     if (temp_val >= (stddev * 4) ) {
@@ -94,8 +94,6 @@ void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, int s
             shift += nsamp * ndms;
         }
     }
-
-    printf("Number of candidates: %d\n", ct);
 }
 
 // Process dedispersion output
