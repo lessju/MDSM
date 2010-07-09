@@ -1,10 +1,12 @@
 #ifndef DEDISPERSION_MANAGER_H_
 #define DEDISPERSION_MANAGER_H_
 
+#include <QString>
 #include "survey.h"
 
-float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey);
-int process_chunk(int data_read);
+SURVEY *processSurveyParameters(QString filepath);
+float* initialiseMDSM(SURVEY* input_survey);
+int process_chunk(unsigned int data_read);
 void tearDownMDSM();
 
 #endif // DEDISPERSION_MANAGER_H_

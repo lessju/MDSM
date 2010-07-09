@@ -19,7 +19,7 @@ class PelicanLofarClient
         ~PelicanLofarClient() { }
 
     public:
-        int getNextBuffer(float *input_buffer, int nsamp);       
+        int getNextBuffer(float *input_buffer, unsigned int nsamp);       
 
     private:
         QHash<QString, DataBlob*> dataHash;

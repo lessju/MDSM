@@ -1,12 +1,13 @@
 set(mdsm_modules_SRC
-    MDSMModule.cpp
+    MdsmModule.cpp
 )
 
 add_library(mdsm-modules ${mdsm_modules_SRC})
 
-target_link_libraries(
-    mdsm-modules
-    ${PELICAN_LIBRARIES}
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}../../mdsm")
+target_link_libraries(mdsm-modules
     ${PELICAN_LOFAR_LIBRARIES}
+    ${PELICAN_LIBRARIES}
+    mdsm
 )
 

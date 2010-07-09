@@ -4,30 +4,19 @@
 
 #include "pelican/core/AbstractPipeline.h"
 #include "pelican/data/DataBlob.h"
-#include "pelican/output/PelicanTCPBlobServer.h"
 #include "ChanneliserPolyphase.h"
 #include "PolyphaseCoefficients.h"
 #include "ChannelisedStreamData.h"
+#include "TimeStreamData.h"
+#include "MdsmModule.h"
 
-/**
- * @file MdsmPipeline.h
- */
+using namespace pelican;
+using namespace pelican::lofar;
 
-namespace pelican {
-namespace lofar {
-
-/**
- * @class MdsmPipeline
- *  
- * @brief
- * 
- * @details
- * 
- */
 class MdsmPipeline : public AbstractPipeline
 {
     public:
-        MdsmPipeline(  );
+        MdsmPipeline();
         ~MdsmPipeline();
 
         /// Initialises the pipeline.
@@ -39,7 +28,7 @@ class MdsmPipeline : public AbstractPipeline
     private:
         /// Module pointers
         ChanneliserPolyphase* channeliser;
-//        PelicanTCPBlobServer* tcpBlobServer;
+        MdsmModule*           mdsm;
 
         /// Local data blob
         PolyphaseCoefficients* polyphaseCoeff;
@@ -47,8 +36,5 @@ class MdsmPipeline : public AbstractPipeline
 
         unsigned _iteration;
 };
-
-} // namespace lofar
-} // namespace pelican
 
 #endif // MDSMPIPELINE_H 

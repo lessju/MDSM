@@ -58,6 +58,7 @@ SURVEY *processSurveyParameters()
 // Process command-line parameters (when reading from file)
 void file_process_arguments(int argc, char *argv[], SURVEY* survey)
 {
+    unsigned j = 0;
     int i = 1;
     
     while((fopen(argv[i], "rb")) != NULL) {
@@ -89,13 +90,14 @@ void file_process_arguments(int argc, char *argv[], SURVEY* survey)
        i++;
     }
 
-    for(i = 0; i < survey -> num_passes; i++)
-        survey -> tdms += survey -> pass_parameters[i].ndms;
+    for(j = 0; j < survey -> num_passes; j++)
+        survey -> tdms += survey -> pass_parameters[j].ndms;
 }
 
 // Process command-line parameters (when receiving data from lofar)
 void lofar_process_arguments(int argc, char *argv[], SURVEY* survey)
 {
+    unsigned j = 0;
     int i = 1;
     
     survey -> nsamp = 0;
@@ -123,7 +125,7 @@ void lofar_process_arguments(int argc, char *argv[], SURVEY* survey)
     }
 
     survey -> tdms = 0;
-    for(i = 0; i < survey -> num_passes; i++)
+    for(j = 0; j < survey -> num_passes; j++)
         survey -> tdms += survey -> pass_parameters[i].ndms;
 }
 
@@ -144,7 +146,7 @@ int main(int argc, char *argv[])
 
     #if USING_PELICAN_LOFAR == 1
         // Initialiase Pelican Lofar client if using it
-        lofar_process_arguments(argc, argv, survey);
+        lofar_process_arguments(survey);
         PelicanLofarClient lofarClient("ChannelisedStreamData", "127.0.0.1", 6969);
     #else
         file_process_arguments(argc, argv, survey);
@@ -153,7 +155,7 @@ int main(int argc, char *argv[])
     // Initialise Dedispersion code
     // NOTE: survey will be updated with MDSM parameters
     float *input_buffer = NULL;
-    input_buffer = initialiseMDSM(argc, argv, survey);
+    input_buffer = initialiseMDSM(survey);
 
     // Process current chunk
     int counter = 0, data_read = 0;

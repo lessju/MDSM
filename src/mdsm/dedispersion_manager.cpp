@@ -2,6 +2,10 @@
 #include "dedispersion_thread.h"
 #include "unistd.h"
 
+// QT stuff
+#include <QDomElement>
+#include <QFile>
+
 // Forward declarations
 extern "C" void* call_dedisperse(void* thread_params);
 extern "C" DEVICE_INFO** call_initialise_devices(int *num_devices);
@@ -10,7 +14,7 @@ extern "C" DEVICE_INFO** call_initialise_devices(int *num_devices);
 SURVEY *survey;
 
 // Parameters extracted from main
-int i, ret, ndms, maxshift, num_devices;
+unsigned i, ndms, maxshift;
 time_t start = time(NULL), begin;
 pthread_attr_t thread_attr;
 pthread_t output_thread;
@@ -24,18 +28,132 @@ float** output_buffer;
 pthread_rwlock_t rw_lock = PTHREAD_RWLOCK_INITIALIZER;
 pthread_barrier_t input_barrier, output_barrier;
 OUTPUT_PARAMS output_params;
-int loop_counter = 0;
+int loop_counter = 0, num_devices, ret;
+
+#include <iostream>
+
+// ================================== C++ Stuff =================================
+// Process observation parameters
+SURVEY* processSurveyParameters(QString filepath)
+{
+    QDomDocument document("observation");
+
+    QFile file(filepath);
+    if (!file.open(QFile::ReadOnly | QFile::Text))
+        throw QString("Cannot open observation file '%1'").arg(filepath);
+
+    // Read the XML configuration file into the QDomDocument.
+    QString error;
+    int line, column;
+    if (!document.setContent(&file, true, &error, &line, &column)) {
+        throw QString("Config::read(): Parse error "
+                "(Line: %1 Col: %2): %3.").arg(line).arg(column).arg(error);
+    }
+
+    QDomElement root = document.documentElement();
+    if( root.tagName() != "observation" )
+        throw QString("Invalid root elemenent observation parameter xml file, should be 'observation'");
+
+    // Get the root element of the observation file
+    QDomNode n = root.firstChild();
+
+    // Initalise survey object
+    survey = (SURVEY *) malloc(sizeof(SURVEY));
+
+    // Count number of pass tags
+    int passes = 0;
+    while(!n.isNull()) {
+        if (QString::compare(n.nodeName(), QString("passes"), Qt::CaseInsensitive) == 0) {
+            n = n.firstChild();
+            while(!n.isNull()) {
+                passes++;
+                n = n.nextSibling();
+            }
+        }
+        n = n.nextSibling();
+    }
+
+    survey -> num_passes = passes;
+    survey -> pass_parameters = (SUBBAND_PASSES *) malloc(passes * sizeof(SUBBAND_PASSES));
+    passes = 0;
+
+    // Start parsing observation file and generate survey parameters
+    n = root.firstChild();
+    while( !n.isNull() )
+    {
+        QDomElement e = n.toElement();
+        if( !e.isNull() )
+        {
+            if (QString::compare(e.tagName(), QString("frequencies"), Qt::CaseInsensitive) == 0) {
+                survey -> fch1 = e.attribute("center").toFloat();
+                survey -> foff = e.attribute("offset").toFloat();
+            }
+            else if (QString::compare(e.tagName(), QString("dm"), Qt::CaseInsensitive) == 0) ;
+            else if (QString::compare(e.tagName(), QString("channels"), Qt::CaseInsensitive) == 0) {
+                survey -> nchans = e.attribute("number").toUInt();
+                survey -> nsubs = e.attribute("subbands").toUInt();
+            }
+            else if (QString::compare(e.tagName(), QString("timing"), Qt::CaseInsensitive) == 0)
+                survey -> tsamp = e.attribute("tsamp").toFloat();
+
+            // Refers to a new pass subsection
+            else if (QString::compare(e.tagName(), QString("passes"), Qt::CaseInsensitive) == 0) {
+
+                // Process list of passes
+                if (survey -> num_passes == 0)
+                    continue;
+
+                QDomNode pass = n.firstChild();
+                
+                while (!pass.isNull()) {
+                    QDomNode pass_params = pass.firstChild();
+
+                    while (!pass_params.isNull()) {
+                        e = pass_params.toElement();
+                        if (QString::compare(e.tagName(), QString("lowDm"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].lowdm = e.text().toFloat();
+                        else if (QString::compare(e.tagName(), QString("highDm"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].highdm = e.text().toFloat();            
+                        else if (QString::compare(e.tagName(), QString("deltaDm"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].dmstep = e.text().toFloat();            
+                        else if (QString::compare(e.tagName(), QString("downsample"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].binsize = e.text().toUInt();            
+                        else if (QString::compare(e.tagName(), QString("subDm"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].sub_dmstep = e.text().toFloat();            
+                        else if (QString::compare(e.tagName(), QString("numDms"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].ndms = e.text().toUInt();            
+                        else if (QString::compare(e.tagName(), QString("dmsPerCall"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].calldms = e.text().toUInt();            
+                        else if (QString::compare(e.tagName(), QString("ncalls"), Qt::CaseInsensitive) == 0)
+                                survey -> pass_parameters[passes].ncalls = e.text().toUInt();            
+
+                        pass_params = pass_params.nextSibling();
+                    }
+
+                    passes++;
+                    pass = pass.nextSibling();    // Go to next pass element
+                }
+            }
+        }
+        n = n.nextSibling();
+    }
+
+    survey -> tdms = 0;
+    for(i = 0; i < survey -> num_passes; i++)
+        survey -> tdms += survey -> pass_parameters[i].ndms;
+
+    // Assign filename;
+    survey -> nsamp = 0;
+    survey -> fp = NULL;
+
+    return survey;
+}
+
+// ==================================  C Stuff ==================================
 
 // Return the maximum of two numbers
 inline int max(int a, int b) {
   return a > b ? a : b;
-}
-
-// Report any fatal errors and exit MDSM
-void report_error(char* description)
-{
-   fprintf(stderr, description);
-   exit(0);
 }
 
 // Calculate number of samples which can be loaded at once
@@ -68,10 +186,12 @@ float dmdelay(float f1, float f2)
   return(4148.741601 * ((1.0 / f1 / f1) - (1.0 / f2 / f2)));
 }
 
-// Initliase MDSM parameters, return pointer to input buffer where
+// Initliase MDSM parameters, return poi/home/lessju/Code/MDSM/src/mdsm/dedispersion_manager.cpp: In function ‘float* inter to input buffer where
 // input data will be stored
-float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
+float* initialiseMDSM(SURVEY* input_survey)
 {
+    int k;
+
     // Initialise survey
     survey = input_survey;
 
@@ -103,18 +223,19 @@ float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
     // Initialise buffers and create output buffer (a separate buffer for each GPU output)
     input_buffer = (float *) malloc(*inputsize);
     output_buffer = (float **) malloc(num_devices * sizeof(float *));
-    for(i = 0; i < num_devices; i++)
-        output_buffer[i] = (float *) malloc(*outputsize);
+    for(k = 0; k < num_devices; k++)
+        output_buffer[k] = (float *) malloc(*outputsize);
 
     // Log parameters
-    printf("nchans: %d, nsamp: %d, tsamp: %f, foff: %f\n", survey -> nchans, survey -> nsamp, survey -> tsamp, survey -> foff);
+    printf("nchans: %d, nsamp: %d, tsamp: %f, foff: %f, fch1: %f\n", survey -> nchans, 
+           survey -> nsamp, survey -> tsamp, survey -> foff, survey -> fch1);
     printf("ndms: %d, max dm: %f, maxshift: %d\n", survey -> tdms, survey -> pass_parameters[survey -> num_passes - 1].highdm, maxshift);
 
     if (pthread_barrier_init(&input_barrier, NULL, num_devices + 2))
-        report_error("Unable to initialise input barrier\n");
+        { fprintf(stderr, "Unable to i nitialise input barrier\n"); exit(0); }
 
     if (pthread_barrier_init(&output_barrier, NULL, num_devices + 2))
-        report_error("Unable to initialise output barrier\n");
+        { fprintf (stderr, "Unable to initialise output barrier\n"); exit(0); }
 
     // Create output params and output file
     output_params.nthreads = num_devices;
@@ -131,40 +252,40 @@ float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
 
     // Create output thread 
     if (pthread_create(&output_thread, &thread_attr, process_output, (void *) &output_params))
-        report_error("Error occured while creating output thread\n");
+        { fprintf(stderr, "Error occured while creating output thread\n"); exit(0); }
 
     // Create threads and assign devices
-    for(i = 0; i < num_devices; i++) {
+    for(k = 0; k < num_devices; k++) {
 
         // Create THREAD_PARAMS for thread, based on input data and DEVICE_INFO
-        threads_params[i].iterations = 1;
-        threads_params[i].maxiters = 2;
-        threads_params[i].stop = 0;
-        threads_params[i].maxshift = maxshift;
-        threads_params[i].binsize = 1;
-        threads_params[i].output = output_buffer[i];
-        threads_params[i].input = input_buffer;
-        threads_params[i].dmshifts = dmshifts;
-        threads_params[i].thread_num = i;
-        threads_params[i].num_threads = num_devices;
-        threads_params[i].device_id = devices[i] -> device_id;
-        threads_params[i].rw_lock = &rw_lock;
-        threads_params[i].input_barrier = &input_barrier;
-        threads_params[i].output_barrier = &output_barrier;
-        threads_params[i].start = start;
-        threads_params[i].survey = survey;
-        threads_params[i].inputsize = *inputsize;
-        threads_params[i].outputsize = *outputsize;
+        threads_params[k].iterations = 1;
+        threads_params[k].maxiters = 2;
+        threads_params[k].stop = 0;
+        threads_params[k].maxshift = maxshift;
+        threads_params[k].binsize = 1;
+        threads_params[k].output = output_buffer[k];
+        threads_params[k].input = input_buffer;
+        threads_params[k].dmshifts = dmshifts;
+        threads_params[k].thread_num = k;
+        threads_params[k].num_threads = num_devices;
+        threads_params[k].device_id = devices[k] -> device_id;
+        threads_params[k].rw_lock = &rw_lock;
+        threads_params[k].input_barrier = &input_barrier;
+        threads_params[k].output_barrier = &output_barrier;
+        threads_params[k].start = start;
+        threads_params[k].survey = survey;
+        threads_params[k].inputsize = *inputsize;
+        threads_params[k].outputsize = *outputsize;
 
          // Create thread (using function in dedispersion_thread)
-         if (pthread_create(&threads[i], &thread_attr, call_dedisperse, (void *) &threads_params[i]))
-             report_error("Error occured while creating thread\n");
+         if (pthread_create(&threads[k], &thread_attr, call_dedisperse, (void *) &threads_params[k]))
+            { fprintf(stderr, "Error occured while creating thread\n"); exit(0); }
     }
 
     // Wait input barrier (for dedispersion_manager, first time)
     ret = pthread_barrier_wait(&input_barrier);
     if (!(ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD))
-        report_error("Error during barrier synchronisation\n"); 
+        { fprintf(stderr, "Error during barrier synchronisation\n");  exit(0); }
 
     return input_buffer;
 }
@@ -172,11 +293,13 @@ float* initialiseMDSM(int argc, char *argv[], SURVEY* input_survey)
 // Cleanup MDSM
 void tearDownMDSM()
 {
+    int k;
+
     // Join all threads, making sure they had a clean cleanup
     void *status;
-    for(i = 0; i < num_devices; i++)
-        if (pthread_join(threads[i], &status))
-            report_error("Error while joining threads\n");
+    for(k = 0; k < num_devices; k++)
+        if (pthread_join(threads[k], &status))
+            { fprintf(stderr, "Error while joining threads\n"); exit(0); }
     pthread_join(output_thread, &status);
     
     // Destroy attributes and synchronisation objects
@@ -186,9 +309,9 @@ void tearDownMDSM()
     pthread_barrier_destroy(&output_barrier);
     
     // Free memory
-    for(i = 0; i < num_devices; i++) {
-       free(output_buffer[i]);
-       free(devices[i]);
+    for(k = 0; k < num_devices; k++) {
+       free(output_buffer[k]);
+       free(devices[k]);
     }
 
     free(output_buffer);
@@ -202,28 +325,30 @@ void tearDownMDSM()
 }
 
 // Process one data chunk
-int process_chunk(int data_read)
+int process_chunk(unsigned int data_read)
 {   
+    int k;
+
     printf("%d: Read %d * 1024 samples [%d]\n", (int) (time(NULL) - start), data_read / 1024, loop_counter);  
 
     // Lock thread params through rw_lock
     if (pthread_rwlock_wrlock(&rw_lock))
-        report_error("Error acquiring rw lock");
+        { fprintf(stderr, "Error acquiring rw lock"); exit(0); }
 
     // Wait output barrier
     ret = pthread_barrier_wait(&output_barrier);
     if (!(ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD))
-        report_error("Error during barrier synchronisation\n");  
+        { fprintf(stderr, "Error during barrier synchronisation\n"); exit(0); }
 
     // Stopping clause (handled internally)
     if (data_read == 0) { 
         output_params.stop = 1;
-        for(i = 0; i < num_devices; i++) 
-            threads_params[i].stop = 1;
+        for(k = 0; k < num_devices; k++) 
+            threads_params[k].stop = 1;
 
         // Release rw_lock
         if (pthread_rwlock_unlock(&rw_lock))
-            report_error("Error releasing rw_lock\n");
+            { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
         // Reach barriers maxiters times to wait for rest to process
         for(i = 0; i < 2 - 1; i++) {
@@ -240,18 +365,18 @@ int process_chunk(int data_read)
           data_read -= data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize;
 
         output_params.survey -> nsamp = data_read;
-        for(i = 0; i < num_devices; i++)
-            threads_params[i].survey -> nsamp = data_read;
+        for(k = 0; k < num_devices; k++)
+            threads_params[k].survey -> nsamp = data_read;
     }
 
     // Release rw_lock
     if (pthread_rwlock_unlock(&rw_lock))
-        report_error("Error releasing rw_lock\n");
+        { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
     // Wait input barrier (since input is being handled by the calling host code
     ret = pthread_barrier_wait(&input_barrier);
     if (!(ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD))
-        report_error("Error during barrier synchronisation\n");    
+        { fprintf(stderr, "Error during barrier synchronisation\n"); exit(0); }
 
     return ++loop_counter;
 }

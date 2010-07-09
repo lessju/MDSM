@@ -23,12 +23,6 @@
            </LofarChunker>
         </chunkers>
 
-        <clients>
-            <LofarStreamDataClient>
-                <data type="TimeStreamData" adapter="AdapterTimeStream" />
-            </LofarStreamDataClient>
-        </clients>
-
         <adapters>
             <AdapterTimeStream>
                 <packetsPerChunk number="16"/>
@@ -40,23 +34,23 @@
             </AdapterTimeStream>
         </adapters>
 
+        <clients>
+            <LofarStreamDataClient>
+                <data type="TimeStreamData" adapter="AdapterTimeStream" />
+            </LofarStreamDataClient>
+        </clients>
+
         <modules>
             <ChanneliserPolyphase>
                 <channels number="512" />
                 <processingThreads number="2" />
             </ChanneliserPolyphase>
+            <MdsmModule>
+                <observationfile filepath="data/obs.xml" />
+            </MdsmModule>
         </modules>
 
-        <output>
-          <streamers>
-             <PelicanTCPBlobServer active="true" >
-                 <connection port="6969" />
-             </PelicanTCPBlobServer>
-          </streamers>
-          <dataStreams>
-             <stream name="ChannelisedStreamData" listeners="PelicanTCPBlobServer" />
-          </dataStreams>
-        </output>
+        <output />
 
     </pipeline>
 </configuration>

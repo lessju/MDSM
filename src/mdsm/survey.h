@@ -13,18 +13,18 @@ typedef struct {
 typedef struct {
 
     // Data parameters
-    int nsamp, nchans, tdms, maxshift, nbits;
+    unsigned nsamp, nchans, tdms, maxshift, nbits;
     float tsamp, foff, fch1;
     
     // subband dedispersion paramters
     SUBBAND_PASSES *pass_parameters;
-    int num_passes, nsubs;
+    unsigned num_passes, nsubs;
 
     // File pointer (to be substitued with QIODevice)
     FILE *fp;
 
     // Number of GPUs which
-    int num_threads;
+    unsigned num_threads;
 
 } SURVEY;
 

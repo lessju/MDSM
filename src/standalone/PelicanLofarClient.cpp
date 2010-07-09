@@ -11,7 +11,7 @@ PelicanLofarClient::PelicanLofarClient(QString blobType, QString server, unsigne
 {
     // Create the PelicanBlobClient instance, which will connect to the
     // TCPBlobServer and register this client to receive the requested blob type
-    client = new PelicanBlobClient("ChannelisedStreamData", "127.0.0.1", port);
+    client = new PelicanBlobClient(blobType, server, port);
     dataHash.insert("ChannelisedStreamData", &blob);
 
     //TODO: Set TCP socket buffer to a large enough size to store packets
@@ -21,9 +21,9 @@ PelicanLofarClient::PelicanLofarClient(QString blobType, QString server, unsigne
 // Fills in input_buffer with nsamp samples by reading data off pelican-lofar
 // ASSUMPTION: requested nchans == expected nchans
 // NOTE: this will block until all data is available...
-int PelicanLofarClient::getNextBuffer(float *input_buffer, int nsamp)
+int PelicanLofarClient::getNextBuffer(float *input_buffer, unsigned int nsamp)
 {
-    int i, samples = 0;
+    unsigned int i, samples = 0;
 
     // We need to repeatedly get data until we fill up the buffer
     while (samples < nsamp) {

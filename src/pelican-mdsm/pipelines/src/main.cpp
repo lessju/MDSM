@@ -26,6 +26,7 @@ int main(int argc, char* argv[])
 
         // Start the pipeline driver.
         pApp.start();
+
     } catch (const QString& error) {
         std::cout << "Error: " << error.toStdString() << std::endl;
     }

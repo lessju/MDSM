@@ -22,9 +22,10 @@ set(dedispersion_SRC
 add_library(mdsm STATIC ${dedispersion_SRC})
 
 target_link_libraries(mdsm
+    ${QT_QTCORE_LIBRARY}
     mdsm-cuda
 )
-
+ 
 set_target_properties(mdsm PROPERTIES
     LINK_FLAGS "-lpthread"
 )

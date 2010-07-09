@@ -11,7 +11,7 @@
 // NOTE: Performed only on output of first thread
 void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
 {
-    int i, j, iters, vals, mod_factor = 32 * 1024, shift = 0;
+    unsigned int i, j, iters, vals, mod_factor = 32 * 1024, shift = 0;
     double total;
     float mean = 0, stddev = 0;
 
@@ -60,9 +60,9 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
 }
 
 // Apply mean and stddev to apply thresholding
-void process(float **buffer, FILE* output, SURVEY *survey, int loop_counter, int read_nsamp, int samp_shift)
+void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, int samp_shift)
 {
-    int i = 0, thread, k, l, ndms, nsamp, shift = 0, ct = 0; 
+    unsigned int i = 0, thread, k, l, ndms, nsamp, shift = 0, ct = 0; 
     float temp_val, startdm, dmstep, mean, stddev; 
 
     for(thread = 0; thread < survey -> num_threads; thread++) {
@@ -122,8 +122,7 @@ void* process_output(void* output_params)
             mean_stddev(params -> output_buffer, params -> survey, ppnsamp);
             printf("%d: Calculated mean and stddev %d [output]: %d\n", (int) (time(NULL) - start), loop_counter, 
                                                                        (int) (time(NULL) - beg_read));
-            process(params -> output_buffer, params -> output_file, params -> survey, 
-                    loop_counter - params -> iterations, ppnsamp, samp_shift);
+            process(params -> output_buffer, params -> output_file, params -> survey,  ppnsamp, samp_shift);
             printf("%d: Processed output %d [output]: %d\n", (int) (time(NULL) - start), loop_counter, 
                                                              (int) (time(NULL) - beg_read));
             samp_shift += ppnsamp;
