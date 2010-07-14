@@ -335,7 +335,7 @@ void tearDownMDSM()
 }
 
 // Process one data chunk
-int process_chunk(unsigned int data_read)
+int process_chunk(unsigned int data_read, long long timestamp = 0, long blockRate = 0)
 {   
     int k;
 
@@ -368,15 +368,21 @@ int process_chunk(unsigned int data_read)
         return 0;
 
     // Update thread params
-    } else if (data_read < survey -> nsamp) {
+    } else {
 
-      // Round down nsamp to multiple of the largest binsize
-      if (data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
-          data_read -= data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize;
+      if (data_read < survey -> nsamp) {
+          // Round down nsamp to multiple of the largest binsize
+          if (data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
+              data_read -= data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize;
 
-        output_params.survey -> nsamp = data_read;
-        for(k = 0; k < num_devices; k++)
-            threads_params[k].survey -> nsamp = data_read;
+            output_params.survey -> nsamp = data_read;
+            for(k = 0; k < num_devices; k++)
+                threads_params[k].survey -> nsamp = data_read;
+      }
+
+      //  Update timing parameters
+      survey -> timestamp = timestamp;
+      survey -> blockRate = blockRate;
     }
 
     // Release rw_lock

@@ -1,6 +1,7 @@
 #include "pelican/core/PipelineApplication.h"
 #include "AdapterTimeStream.h"
 #include "LofarStreamDataClient.h"
+#include "SigprocWriter.h"
 #include "MdsmPipeline.h"
 #include <QtCore/QCoreApplication>
 #include <iostream>

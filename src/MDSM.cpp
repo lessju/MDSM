@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
     input_buffer = initialiseMDSM(survey);
 
     // Process current chunk
-    unsigned int counter = 0, data_read = 0;
+    unsigned int counter = 0, data_read = 0, total = 0;
     while (TRUE) {
 
         #if USING_PELICAN_LOFAR == 1
@@ -147,8 +147,9 @@ int main(int argc, char *argv[])
             else                 // Read in normally 
                 data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
         #endif
-        if (!process_chunk(data_read)) break;
-
+        if (!process_chunk(data_read, total, 1)) break;
+       
+        total += data_read;
         counter++;
     }
 

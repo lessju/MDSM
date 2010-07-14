@@ -39,7 +39,16 @@ MdsmModule::~MdsmModule()
 // Run MDSM
 void MdsmModule::run(ChannelisedStreamData* streamData)
 {
+
     unsigned i;
+
+    // We need the timestamp of the first packet in the first blob (assuming that we don't
+    // lose any packets), and the sampling time. This will give each sample a unique timestamp
+    if (_samples == 0) {
+        _timestamp = streamData -> getLofarTimestamp();
+        _blockRate = streamData -> getBlockRate();
+        printf("timestamp: %lld, blockRate: %ld\n", _timestamp, _blockRate);
+    }   
 
     std::complex<double> *data = streamData -> data();
     for(i = 0; i < streamData -> size(); i++) {

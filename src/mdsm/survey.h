@@ -19,6 +19,10 @@ typedef struct {
     // subband dedispersion paramters
     SUBBAND_PASSES *pass_parameters;
     unsigned num_passes, nsubs;
+    
+    // Timing parameters
+    long long timestamp;
+    long blockRate;
 
     // File pointer (to be substitued with QIODevice)
     FILE *fp;

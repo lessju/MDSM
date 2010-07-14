@@ -50,7 +50,21 @@
             </MdsmModule>
         </modules>
 
-        <output />
+        <output>
+            <streamers>
+                <SigprocWriter>
+                    <file filepath="/home/lessju/Code/MDSM/build/pelican-mdsm/pipelines/sigproc.dat" />
+                    <params channelOneFrequency="120" 
+                            frequencyOffset="0.0195" 
+                            numberOfChannels="21504"
+                            samplingTime="0.001" 
+                            telescope="LOFAR"/>
+                </SigprocWriter>
+            </streamers>
+            <dataStreams>
+               <stream name="ChannelisedStreamData" listeners="SigprocWriter" />
+            </dataStreams>
+        </output>
 
     </pipeline>
 </configuration>

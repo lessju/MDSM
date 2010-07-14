@@ -62,7 +62,7 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
 }
 
 // Apply mean and stddev to apply thresholding
-void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, int samp_shift)
+void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, long long timestamp, long blockRate)
 {
     unsigned int i = 0, thread, k, l, ndms, nsamp, shift = 0, ct = 0; 
     float temp_val, startdm, dmstep, mean, stddev; 
@@ -85,9 +85,10 @@ void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, int s
             for (k = 0; k < ndms; k++)
                 for(l = 0; l < nsamp; l++) {
                     temp_val = buffer[thread][shift + k * nsamp + l] - mean;
-                    if (temp_val >= (stddev * 4) ) {
-                          fprintf(output, "%d, %f, %f\n", samp_shift + l * survey -> pass_parameters[i].binsize, 
-                                                          startdm + k * dmstep, temp_val); ct++;
+                    if (temp_val >= (stddev * 5) ) {
+                          fprintf(output, "%lld, %f, %f\n", timestamp + (l * survey -> pass_parameters[i].binsize)  
+                                                            * blockRate, startdm + k * dmstep, temp_val + mean); 
+                          ct++;
                     }
                 }
 
@@ -103,6 +104,8 @@ void* process_output(void* output_params)
     int i, iters = 0, ret, loop_counter = 0, pnsamp = params -> survey -> nsamp;
     int ppnsamp = params -> survey-> nsamp, samp_shift = 0;
     time_t start = params -> start, beg_read;
+    long long pptimestamp = 0, ptimestamp = 0;
+    long ppblockRate = 0, pblockRate = 0;
 
     printf("%d: Started output thread\n", (int) (time(NULL) - start));
 
@@ -120,7 +123,7 @@ void* process_output(void* output_params)
             mean_stddev(params -> output_buffer, params -> survey, ppnsamp);
             printf("%d: Calculated mean and stddev %d [output]: %d\n", (int) (time(NULL) - start), loop_counter, 
                                                                        (int) (time(NULL) - beg_read));
-            process(params -> output_buffer, params -> output_file, params -> survey,  ppnsamp, samp_shift);
+            process(params -> output_buffer, params -> output_file, params -> survey,  ppnsamp, pptimestamp, ppblockRate);
             printf("%d: Processed output %d [output]: %d\n", (int) (time(NULL) - start), loop_counter, 
                                                              (int) (time(NULL) - beg_read));
             samp_shift += ppnsamp;
@@ -137,7 +140,11 @@ void* process_output(void* output_params)
 
         // Update params
         ppnsamp = pnsamp;
-        pnsamp = params -> survey -> nsamp;         
+        pnsamp = params -> survey -> nsamp;     
+        pptimestamp = ptimestamp;
+        ptimestamp = params -> survey -> timestamp;
+        ppblockRate = pblockRate;
+        pblockRate = params -> survey -> blockRate;    
 
         // Stopping clause
         if (((OUTPUT_PARAMS *) output_params) -> stop) {

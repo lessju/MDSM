@@ -1,7 +1,6 @@
 #ifndef MDSMPIPELINE_H
 #define MDSMPIPELINE_H
 
-
 #include "pelican/core/AbstractPipeline.h"
 #include "pelican/data/DataBlob.h"
 #include "ChanneliserPolyphase.h"

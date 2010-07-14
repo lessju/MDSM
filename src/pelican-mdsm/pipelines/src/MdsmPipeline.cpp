@@ -15,7 +15,7 @@ void MdsmPipeline::init()
 {
     // Create modules
     channeliser = (ChanneliserPolyphase *) createModule("ChanneliserPolyphase");
-    mdsm = (MdsmModule *) createModule("MdsmModule");
+ //   mdsm = (MdsmModule *) createModule("MdsmModule");
 
     // Create local datablobs
     polyphaseCoeff = (PolyphaseCoefficients*) createBlob("PolyphaseCoefficients");
@@ -44,8 +44,11 @@ void MdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
     // Run the polyphase channeliser.
     channeliser -> run(timeData, polyphaseCoeff, channelisedData);
 
+    // Output channelised data
+    dataOutput( channelisedData, "ChannelisedStreamData" );
+
     // Run the polyphase channeliser.
-    mdsm -> run(channelisedData);
+//    mdsm -> run(channelisedData);
 
     _iteration++;
 }
