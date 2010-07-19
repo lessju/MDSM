@@ -39,7 +39,7 @@ SURVEY* file_process_arguments(int argc, char *argv[])
     if (!strcmp(argv[i], "-obs"))
            survey = processSurveyParameters(QString(argv[++i])); 
     else {
-        fprintf(stderr, "Second argument must be observation file! [-obs filepath]\n");
+        fprintf(stderr, "Second argument must be observation file! [-obs filepath] \n");
         exit(0);
     }
 

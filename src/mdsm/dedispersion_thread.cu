@@ -19,7 +19,7 @@ DEVICE_INFO** initialise_devices(int *num_devices)
         if (deviceProp.major == 9999 && deviceProp.minor == 9999)
             { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
         else {
-            if (deviceProp.totalGlobalMem < (long) 2 * 1024 * 1024 * 1024)
+            if (deviceProp.totalGlobalMem < (long) 3.5 * 1024 * 1024 * 1024)
                 *num_devices = *num_devices - 1;
             else {
                 info[counter] = (DEVICE_INFO *) malloc(sizeof(DEVICE_INFO));
