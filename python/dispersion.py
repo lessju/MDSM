@@ -7,7 +7,7 @@ import sys
 class DispersionPlot(Qwt.QwtPlot):
     """ Dispersion plot widget, containing dipersion parameters """
 
-    def __init__(self, highFreq, freqOffset, nchans, pulseWidth = 1, dms = []):
+    def __init__(self, highFreq, freqOffset, nchans, pulseWidth = 1, maximumSmearing = 100):
         """ Class constructor """
 
         # Call base class chain constructors
@@ -17,8 +17,8 @@ class DispersionPlot(Qwt.QwtPlot):
         self.highFreq = highFreq
         self.freqOffset = freqOffset
         self.nchans = nchans
-        self.dms = dms
         self.pulseWidth = pulseWidth
+        self.maximumSmearing = maximumSmearing
 
         # Initialise class
         self._reset_ploting_area()
@@ -27,8 +27,8 @@ class DispersionPlot(Qwt.QwtPlot):
     highFreq = property(lambda self: self._highFreq, lambda self, val: setattr(self, "_highFreq", float(val)))
     freqOffset = property(lambda self: self._freqOffset, lambda self, val: setattr(self, "_freqOffset", float(val)))
     nchans = property(lambda self: self._nchans, lambda self, val: setattr(self, "_nchans", val))
-    dms = property(lambda self: self._dms, lambda self, val: setattr(self, "_dms", val))
     pulseWidth = property(lambda self: self._pulseWidth, lambda self, val: setattr(self, "_pulseWidth", float(val)))
+    maximumSmearing = property(lambda self: self._maximumSmearing, lambda self, val: setattr(self, "_maximumSmearing", float(val)))
 
     def total_dispersion(self):
         """ Calculate the total dispersion within the bandwidth for a DM of 0 """
@@ -36,11 +36,11 @@ class DispersionPlot(Qwt.QwtPlot):
 
     def channel_dispersion(self):
         """ Calculate the dispersion smearing within a channel for a DM of 0"""
-        return 8.3e6 * self.freqOffset *  self.highFreq**-3
+        return 8.3e6 * self.freqOffset *  (self.highFreq - self.freqOffset * self.nchans / 2.0)**-3
 
     def _reset_ploting_area(self):
         """" Resets the plotting area """
-
+        
         # Clear any existing curves and markers
         self.clear()
 

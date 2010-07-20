@@ -8,7 +8,7 @@ import sys
 class ScatteringPlot(Qwt.QwtPlot):
     """ Dispersion plot widget, containing dipersion parameters """
 
-    def __init__(self, freq, pulseWidth):
+    def __init__(self, freq, bandwidth, pulseWidth, allowedScattering = 500):
         """ Class constructor 
             freq = Frequency in MHz
             pulseWidth = minimum pulse widths in ms """
@@ -19,16 +19,21 @@ class ScatteringPlot(Qwt.QwtPlot):
         # Input parameters
         self.freq = freq
         self.pulseWidth = pulseWidth
+        self.bandwidth = bandwidth
+        self.allowedScattering = allowedScattering
 
         # Initialise class
         self._reset_ploting_area()
 
     # Define class properties (getters and setter are defined in the lambda functions)
     freq = property(lambda self: self._freq, lambda self, val: setattr(self, "_freq", val / 1000.0))
+    bandwidth = property(lambda self: self._bandwidth, lambda self, val: setattr(self, "_bandwidth", val))
     pulseWidth = property(lambda self: self._pulseWidth, lambda self, val: setattr(self, "_pulseWidth", float(val)))
+    allowedScattering = property(lambda self: self._allowedScattering, lambda self, val: setattr(self, "_allowedScattering", val / 100.0))
 
     def __calculate_dm(self, delay, frequency):
         """ Calculate the empirical DM associated with a givan frequency and tolerated delay """
+        freq = self.freq - self.bandwidth / 2.0
         try:
             b = log10(delay)
             c = -6.46 - 3.86 * log10(frequency) - b
@@ -40,7 +45,7 @@ class ScatteringPlot(Qwt.QwtPlot):
 
     def calculate_dm(self):
         """ Calculate empirical DM associated with initialised parameters """
-        return self.__calculate_dm(self.freq, self.pulseWidth)
+        return self.__calculate_dm(self.pulseWidth * self.allowedScattering, self.freq)
 
     def _reset_ploting_area(self):
         """" Resets the plotting area """
@@ -71,7 +76,7 @@ class ScatteringPlot(Qwt.QwtPlot):
         """ Create the dispersion plot """
 
         # Calculate curve
-        x = np.linspace(0.01, self.pulseWidth * 5, 100)
+        x = np.linspace(0.01, max(self.pulseWidth * 5, self.pulseWidth * self.allowedScattering), 100)
         y = np.array([max(self.__calculate_dm(xval, self.freq)) for xval in x])
 
         # Attach a curve

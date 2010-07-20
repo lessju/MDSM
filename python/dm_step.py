@@ -67,7 +67,7 @@ class DispersionStepPlot(Qwt.QwtPlot):
 
         dmSpacing, percentage = 100, 0
         while percentage < 0.5:        
-            x = np.linspace(self.centerDm - dmSpacing, self.centerDm + dmSpacing, 1000)
+            x = np.linspace(self.centerDm - dmSpacing, self.centerDm + dmSpacing, 500)
             y = np.array([self.effective_snr(self.effective_width(self.pulseWidth, self.centerDm - dm_val, self.bandwidth, self.freq), self.pulseWidth * 20) for dm_val in x])
             y = (y / (np.max(y) * 1.0)) if np.max(y) > 0 else y
             percentage = np.size(np.where(y > 0)) / 1000.0
@@ -75,7 +75,7 @@ class DispersionStepPlot(Qwt.QwtPlot):
     
         return x, y
 
-    def calculate_optimal_dmstep(self, acceptedSNR= 5):
+    def calculate_optimal_dmstep(self, acceptedSNR= 95):
         """ Calculate the optimal DM step, within the specified accepted SNR percentage """
 
         if not self.useSNR:
