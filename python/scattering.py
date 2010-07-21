@@ -90,7 +90,7 @@ class ScatteringPlot(Qwt.QwtPlot):
 if __name__ == "__main__":
     """ Executing as a main script """
     app = Qt.QApplication(sys.argv)
-    scat = ScatteringPlot(40, 1)
+    scat = ScatteringPlot(40, 6, 1)
     scat.plot_scattering()
     scat.resize(600, 500)
     scat.show()

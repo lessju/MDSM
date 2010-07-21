@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>883</width>
-    <height>555</height>
+    <width>821</width>
+    <height>583</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,8 +18,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>881</width>
-     <height>551</height>
+     <width>821</width>
+     <height>581</height>
     </rect>
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout">
@@ -265,7 +265,17 @@
           </property>
          </widget>
         </item>
-        <item row="1" column="0" colspan="2">
+        <item row="0" column="2">
+         <widget class="QPushButton" name="saveButton">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>Save File</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0" colspan="3">
          <widget class="QTabWidget" name="textTabWidget">
           <property name="currentIndex">
            <number>1</number>
@@ -283,7 +293,7 @@
               <x>-10</x>
               <y>10</y>
               <width>381</width>
-              <height>181</height>
+              <height>221</height>
              </rect>
             </property>
             <property name="alternatingRowColors">
@@ -422,9 +432,15 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>381</width>
-              <height>201</height>
+              <width>321</width>
+              <height>231</height>
              </rect>
+            </property>
+            <property name="alternatingRowColors">
+             <bool>true</bool>
+            </property>
+            <property name="cornerButtonEnabled">
+             <bool>false</bool>
             </property>
            </widget>
           </widget>

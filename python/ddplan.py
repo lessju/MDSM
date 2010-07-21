@@ -1,4 +1,5 @@
 import sys
+from math import pow
 from numpy import *
 
 class observation:
@@ -9,6 +10,7 @@ class observation:
         self.BW = BW
         self.numchan = numchan
         self.chanwidth = BW/numchan
+        
     def guess_dDM(self, DM):
         """
         guess_dDM(self, DM):
@@ -57,6 +59,7 @@ class dedisp_method:
             self.numDMs = numDMs
         self.hiDM = loDM + self.numDMs*dDM
         self.DMs = arange(self.numDMs, dtype='d')*dDM + loDM
+        
     def chan_smear(self, DM):
         """
         Return the smearing (in ms) in each channel at the specified DM
@@ -78,6 +81,7 @@ class dedisp_method:
                     self.BW_smearing**2.0 +
                     self.sub_smearing**2.0 +
                     self.chan_smear(DM)**2.0)
+    
     def DM_for_smearfact(self, smearfact):
         """
         Return the DM where the smearing in a single channel is a factor smearfact
@@ -88,6 +92,7 @@ class dedisp_method:
                            self.BW_smearing**2.0 +
                            self.sub_smearing**2.0)
         return smearfact*0.001*other_smear/self.obs.chanwidth*0.0001205*self.obs.f_ctr**3.0
+    
     def DM_for_newparams(self, dDM, downsamp):
         """
         Return the DM where the smearing in a single channel is causes the same smearing
@@ -171,7 +176,7 @@ def dm_steps(loDM, hiDM, obs, numsub=0, ok_smearing=0.0):
     allow_dDMs = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0,
                   2.0, 3.0, 5.0, 10.0, 20.0, 30.0, 50.0, 100.0, 200.0, 300.0]
     # Allowable number of downsampling factors
-    allow_downsamps = [1, 2, 4, 8, 16, 32, 64]
+    allow_downsamps = [pow(2, i) for i in range(0, 20)]
 
     # Initial values
     index_downsamps = index_dDMs = 0
@@ -211,6 +216,7 @@ def dm_steps(loDM, hiDM, obs, numsub=0, ok_smearing=0.0):
     # Calculate the appropriate initial dDM 
     dDM = guess_DMstep(loDM, obs.dt*downsamp, obs.BW, obs.f_ctr)
     while (allow_dDMs[index_dDMs+1] < ff*dDM):
+        print allow_dDMs[index_dDMs+1]
         index_dDMs += 1
 
     # Create the first method
@@ -254,14 +260,6 @@ def dm_steps(loDM, hiDM, obs, numsub=0, ok_smearing=0.0):
     # The optimal smearing
     tot_smear = total_smear(DMs, allow_dDMs[0], obs.dt, obs.f_ctr,
                             obs.BW, obs.numchan, allow_dDMs[0], 0)
-    if (numsub):
-        print "\n  Low DM    High DM     dDM  DownSamp  dsubDM   #DMs  DMs/call  calls  WorkFract"
-    else:
-        print "\n  Low DM    High DM     dDM  DownSamp   #DMs  WorkFract"
-
-    for method, fract in zip(methods, work_fracts):
-        print method, "  %.4g" % fract
-    
     return methods  
 
 def calculateParams(loDM, hiDM, fctr, BW, numchan, numsubbands, dt, ok_smearing):

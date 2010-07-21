@@ -1,3 +1,4 @@
+import elementtree.ElementTree as ET
 from math import ceil, log, pow
 import PyQt4
 import PyQt4.QtGui as gui
@@ -23,12 +24,13 @@ class MainWindow(gui.QMainWindow):
         self.mainWidget = uic.loadUi(uiFile)
         self.setCentralWidget(self.mainWidget)
         self.setWindowTitle("MDSM Parameters")
-        self.resize(890, 560)
+        self.resize(890, 585)
         self.show()
 
         # Connect signals and slots 
         core.QObject.connect(self.mainWidget.resetButton, core.SIGNAL('clicked()'), self.reset)
         core.QObject.connect(self.mainWidget.calcButton, core.SIGNAL('clicked()'), self.calculate)
+        core.QObject.connect(self.mainWidget.saveButton, core.SIGNAL('clicked()'), self.saveFile)
 
         self.dispersion = self.scattering = self.dmstep = None
         self.reset()
@@ -58,8 +60,9 @@ class MainWindow(gui.QMainWindow):
         [ self.mainWidget.tabWidget.removeTab(0) for i in range(self.mainWidget.tabWidget.count()) ]
         [ self.mainWidget.tableWidget.setCellWidget(i, 1, gui.QLabel("")) for i in range(7) ]
 
+        self.mainWidget.saveButton.setEnabled(False)
         self.statusBar().showMessage("Awaiting user input")
-
+        
     def calculate(self):
         """ Calculates MDSM parameters """
 
@@ -115,7 +118,8 @@ class MainWindow(gui.QMainWindow):
         self.mainWidget.tableWidget.setCellWidget(6, 1, gui.QLabel("%.4f ms" % sRate))
 
         # Call Presto's DDPlan.py script 
-        methods = presto.calculateParams(0, maxDm, highFreq - bandwidth / 2.0, bandwidth, numChans, 32, sRate / 1000, 0)
+        methods = presto.calculateParams(0, maxDm, highFreq - bandwidth / 2.0, bandwidth, 
+                                         numChans, 32, sRate / 1000, pulseWidth * (smearing / 100))
         
         # Add the presto result to a separate tab
         table = self.mainWidget.prestoTableWidget
@@ -124,8 +128,6 @@ class MainWindow(gui.QMainWindow):
         header = ["Pass %d" % i for i in range(len(methods))]
         table.setHorizontalHeaderLabels(header)
         table.setVerticalHeaderLabels(["Low DM", "High DM", "dDM", "DownSamp", "dsubDM", "#DMs", "DMs/call", "calls"])
-        table.setAlternatingRowColors(True)
-        table.setShowGrid(False)
         
         for i, method in enumerate(methods):
             table.setCellWidget(0, i, gui.QLabel(" %.4f" % method.loDM))
@@ -136,8 +138,51 @@ class MainWindow(gui.QMainWindow):
             table.setCellWidget(5, i, gui.QLabel(" %d" % method.numDMs))
             table.setCellWidget(6, i, gui.QLabel(" %d" % method.DMs_per_prepsub))
             table.setCellWidget(7, i, gui.QLabel(" %d" % method.numprepsub))
+            
+        self.mainWidget.saveButton.setEnabled(True)
+        self.statusBar().showMessage("Calculated MDSM Parameters")
+        
+        # Save item in class instance
+        for key, value in locals().iteritems():
+            self.__dict__[key] = value
+                
+    def saveFile(self):
+        """ Saves the MDSM xml observation file """
+        
+        self.statusBar().showMessage("Generating MDSM observation file")  
+        root = ET.Element("observation")
 
-        self.statusBar().showMessage("Calculated MDSM Parameters")     
+        freq = ET.SubElement(root, "frequencies")
+        freq.set("center", str(self.highFreq))
+        freq.set("offset", str(-self.bandwidth / self.numChans))
+    
+        dm = ET.SubElement(root, "dm")
+    
+        channels = ET.SubElement(root, "channels")
+        channels.set("number", str(self.numChans))
+        channels.set("subbands", str(32))
+    
+        timing = ET.SubElement(root, "timing")
+        timing.set("tsamp", str(self.sRate))
+    
+        passes = ET.SubElement(root, "passes")
+        for item in self.methods:
+            currpass = ET.SubElement(passes, "pass")
+            ET.SubElement(currpass, "lowDm").text = str(item.loDM)
+            ET.SubElement(currpass, "highDm").text = str(item.hiDM)
+            ET.SubElement(currpass, "deltaDm").text = str(item.dDM)
+            ET.SubElement(currpass, "downsample").text = str(item.downsamp)
+            ET.SubElement(currpass, "subDm").text = str(item.dsubDM)
+            ET.SubElement(currpass, "numDms").text = str(item.numDMs)
+            ET.SubElement(currpass, "dmsPerCall").text = str(item.DMs_per_prepsub)
+            ET.SubElement(currpass, "ncalls").text = str(item.numprepsub)
+    
+        # wrap it in an ElementTree instance, and save as XML
+        tree = ET.ElementTree(root)
+        tree.write("observation.xml")
+        
+        self.statusBar().showMessage("Generated and saved XML Observation File")     
+     
 
 if __name__ == "__main__":
     app = gui.QApplication(sys.argv)
