@@ -1,8 +1,9 @@
 #include "pelican/core/PipelineApplication.h"
 #include "AdapterTimeStream.h"
-#include "LofarStreamDataClient.h"
+#include "MedicinaStreamDataClient.h"
 #include "SigprocWriter.h"
 #include "MdsmPipeline.h"
+#include "MedicinaChunker.h"
 #include <QtCore/QCoreApplication>
 #include <iostream>
 #include <map>
@@ -23,7 +24,7 @@ int main(int argc, char* argv[])
         pApp.registerPipeline(new MdsmPipeline);
 
         // Set the data client.
-        pApp.setDataClient("LofarStreamDataClient");
+        pApp.setDataClient("MedicinaStreamDataClient");
 
         // Start the pipeline driver.
         pApp.start();

@@ -11,22 +11,22 @@
         </buffers>
 
         <chunkers>
-           <LofarChunker>
+           <MedicinaChunker>
                <data type="TimeStreamData"/>
                <connection host="127.0.0.1" port="8090"/>
                <params samplesPerPacket="1"
                        nrPolarisation="1"
-                       subbandsPerPacket="1024"
-                       packets="16"
-                       clock="200"/>
+                       subbandsPerPacket="2048" 
+                       packets="32"
+                       clock="160"/>  <!-- 2048 = #Channles * #Beams -->
                <samples type="8" />
-           </LofarChunker>
+           </MedicinaChunker>
         </chunkers>
 
         <adapters>
             <AdapterTimeStream>
-                <packetsPerChunk number="16"/>
-                <subbands number="1024" />
+                <packetsPerChunk number="32"/>
+                <subbands number="2048" />
                 <polarisations number="1" />
                 <samplesPerPacket number="1" />
                 <sampleSize bits="8" />
@@ -35,29 +35,25 @@
         </adapters>
 
         <clients>
-            <LofarStreamDataClient>
+            <MedicinaStreamDataClient>
                 <data type="TimeStreamData" adapter="AdapterTimeStream" />
-            </LofarStreamDataClient>
+            </MedicinaStreamDataClient>
         </clients>
 
         <modules>
-<!--            <ChanneliserPolyphase>
-                <channels number="512" />
-                <processingThreads number="2" />
-            </ChanneliserPolyphase>
             <MdsmModule>
                 <observationfile filepath="data/obs.xml" />
-            </MdsmModule> -->
+            </MdsmModule>
         </modules>
 
         <output>
             <streamers>
                 <SigprocWriter>
-                    <file filepath="/home/lessju/Code/MDSM/build/pelican-mdsm/pipelines/sigproc.dat" />
-                    <params channelOneFrequency="120" 
-                            frequencyOffset="0.0195" 
+                    <file filepath="medicina_beamformed_data.dat" />
+                    <params channelOneFrequency="408" 
+                            frequencyOffset="0.0015625"
                             numberOfChannels="1024"
-                            samplingTime="0.001" 
+                            samplingTime="0.001"
                             telescope="MEDICINA"/>
                 </SigprocWriter>
             </streamers>

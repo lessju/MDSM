@@ -3,9 +3,6 @@
 
 #include "pelican/core/AbstractPipeline.h"
 #include "pelican/data/DataBlob.h"
-#include "ChanneliserPolyphase.h"
-#include "PolyphaseCoefficients.h"
-#include "ChannelisedStreamData.h"
 #include "TimeStreamData.h"
 #include "MdsmModule.h"
 
@@ -26,12 +23,7 @@ class MdsmPipeline : public AbstractPipeline
 
     private:
         /// Module pointers
-        ChanneliserPolyphase* channeliser;
         MdsmModule*           mdsm;
-
-        /// Local data blob
-        PolyphaseCoefficients* polyphaseCoeff;
-        ChannelisedStreamData* channelisedData;
 
         unsigned _iteration;
 };
