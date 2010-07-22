@@ -1,7 +1,12 @@
 #include <cutil_inline.h>
 
 // Stores output value computed in inner loop for each thread
-__shared__ float localvalue[4008];
+#define FERMI
+#ifdef FERMI
+    __shared__ float localvalue[5000];
+#else
+    __shared__ float localvalue[4002];
+#endif
 
 // Stores temporary shift values and the list of dm values
 __constant__ float dm_shifts[4096];
@@ -20,7 +25,7 @@ __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int n
     for (samp = 0; s + samp < nsamp; samp += blockDim.x * gridDim.x) {
         soffset = (s + samp);       
 
-        /* clear array elements for storing dedispersed subband */
+//        /* clear array elements for storing dedispersed subband */
         for (sband = 0; sband < nsubs; sband++)
             localvalue[threadIdx.x * nsubs + sband] = 0.0;
 
@@ -33,13 +38,13 @@ __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int n
             }
         }
 
-        // Sync threads and store values in global memory
+//        // Sync threads and store values in global memory
         for (sband = 0; sband < nsubs; sband++)
             outbuff[blockIdx.y * nsamp * nsubs + soffset * nsubs + sband] = localvalue[threadIdx.x * nsubs + sband];
     }
 }
 
-int nsamp = 128 * 1024, nchans = 2048, sdm = 5, nsubs = 32;
+int nsamp = 8 * 1024, nchans = 4096, sdm = 5, nsubs = 32;
 float tsamp = 0.005, fch1 = 120, foff = -0.0059;
 
 // DM delay calculation
@@ -72,7 +77,9 @@ void process_arguments(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     float *input, *output, *d_input, *d_output;
-    int i, j, startdm = 0, dmstep = 1, ndms = 88;
+    int i, j, startdm = 0, dmstep = 1, ndms = 64;
+
+    printf("hagu: %d\n", nsubs * 128);
 
     process_arguments(argc, argv);
     printf("nsamp: %d, nchans: %d, nsubs: %d, fch1: %f, foff: %f, tsamp: %f\n", nsamp, nchans, nsubs, fch1, foff, tsamp);
@@ -94,7 +101,7 @@ int main(int argc, char *argv[])
         for (j = 0; j < nchans; j++)
             input[i * nchans + j] = i;
 
-//    cutilSafeCall( cudaSetDevice(0));
+    cutilSafeCall( cudaSetDevice(0));
     cudaEvent_t event_start, event_stop;
     float timestamp;
     int gridsize = 64;

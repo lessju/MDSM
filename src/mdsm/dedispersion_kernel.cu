@@ -3,11 +3,17 @@
 
 #include <cutil_inline.h>
 
-// Stores output value computed in inner loop for each sample
-__shared__ float localvalue[4008];
+//#define FERMI
 
 // Stores temporary shift values
-__constant__ float dm_shifts[16384];
+__device__ __constant__ float dm_shifts[16384];
+
+// Stores output value computed in inner loop for each sample
+#ifdef FERMI
+	__device__ __shared__ float localvalue[8192];
+#else
+	__device__ __shared__ float localvalue[4008];
+#endif
 
 // -------------------------- The Dedispersion Loop -----------------------------------
 __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchans, float tsamp,

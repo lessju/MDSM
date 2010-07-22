@@ -1,17 +1,23 @@
 #include "dedispersion_kernel.cu"
 #include "dedispersion_thread.h"
 
-DEVICE_INFO** initialise_devices(int *num_devices)
+DEVICES* initialise_devices()
 {
-    // Enumerate devices and create DEVICE_INFO list, storing device capabilities
-    cutilSafeCall(cudaGetDeviceCount(num_devices));
+	int num_devices;
 
-    if (*num_devices <= 0) 
+    // Enumerate devices and create DEVICE_INFO list, storing device capabilities
+    cutilSafeCall(cudaGetDeviceCount(&num_devices));
+
+    if (num_devices <= 0)
         { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
 
-    DEVICE_INFO **info = (DEVICE_INFO **) malloc( *num_devices * sizeof(DEVICE_INFO *));
+    // Create and populate devices object
+    DEVICES* devices = (DEVICES *) malloc(sizeof(DEVICES));
+    devices -> devices = (DEVICE_INFO *) malloc(num_devices * sizeof(DEVICE_INFO));
+    devices -> num_devices = num_devices;
+    devices -> minTotalGlobalMem = (1024 * 1024 * 16);
 
-    int orig_num = *num_devices, counter = 0;
+    int orig_num = num_devices, counter = 0;
     for(int i = 0; i < orig_num; i++) {
         cudaDeviceProp deviceProp;
         cutilSafeCall(cudaGetDeviceProperties(&deviceProp, i));
@@ -19,29 +25,24 @@ DEVICE_INFO** initialise_devices(int *num_devices)
         if (deviceProp.major == 9999 && deviceProp.minor == 9999)
             { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
         else {
-            if (deviceProp.totalGlobalMem < (long) 3.5 * 1024 * 1024 * 1024)
-                *num_devices = *num_devices - 1;
-            else {
-                info[counter] = (DEVICE_INFO *) malloc(sizeof(DEVICE_INFO));
-                info[counter] -> multiprocessor_count = deviceProp.multiProcessorCount;
-                info[counter] -> constant_memory = deviceProp.totalConstMem;
-                info[counter] -> shared_memory = deviceProp.sharedMemPerBlock;
-                info[counter] -> register_count = deviceProp.regsPerBlock;
-                info[counter] -> thread_count = deviceProp.maxThreadsPerBlock;
-                info[counter] -> clock_rate = deviceProp.clockRate;
-                info[counter] -> device_id = i;
-                counter++;
-            }
+			(devices -> devices)[counter].multiprocessor_count = deviceProp.multiProcessorCount;
+			(devices -> devices)[counter].constant_memory = deviceProp.totalConstMem;
+			(devices -> devices)[counter].shared_memory = deviceProp.sharedMemPerBlock;
+			(devices -> devices)[counter].register_count = deviceProp.regsPerBlock;
+			(devices -> devices)[counter].thread_count = deviceProp.maxThreadsPerBlock;
+			(devices -> devices)[counter].clock_rate = deviceProp.clockRate;
+			(devices -> devices)[counter].device_id = i;
+
+			if (deviceProp.totalGlobalMem / 1024 < devices -> minTotalGlobalMem)
+				devices -> minTotalGlobalMem = deviceProp.totalGlobalMem / 1024;
+
+			counter++;
         }
     }
 
-    *num_devices = 1;  // TEMPORARY TESTING HACK
+//    devices -> num_devices = 1;  // TEMPORARY TESTING HACK
 
-    if (*num_devices == 0)
-        { fprintf(stderr,"No CUDA-capable device found"); exit(0); }
-
-    // OPTIONAL: Perform load-balancing calculations
-    return info;
+    return devices;
 }
 
 // Dedispersion algorithm
@@ -64,7 +65,7 @@ void* dedisperse(void* thread_params)
 
     cutilSafeCall( cudaMalloc((void **) &d_input, params -> inputsize));
     cutilSafeCall( cudaMalloc((void **) &d_output, params -> outputsize));
-    cutilSafeCall( cudaMemcpyToSymbol(dm_shifts, params -> dmshifts, nchans * sizeof(float)) );
+    cutilSafeCall( cudaMemcpyToSymbol(dm_shifts, params -> dmshifts, nchans * sizeof(nchans)) );
 
     // Temporary store for maxshift
     float *tempshift = (float *) malloc(maxshift * nchans * sizeof(float));
@@ -177,13 +178,17 @@ void* dedisperse(void* thread_params)
                 startdm = survey -> pass_parameters[i].lowdm + survey -> pass_parameters[i].sub_dmstep * ncalls * tid;
  
                 // Perform subband dedispersion
-                dedisperse_subband <<< dim3(gridsize_dedisp, ncalls), blocksize_dedisp >>>
-                    (d_output, d_input, (nsamp + tempval) / binsize, nchans, survey -> nsubs, 
-                     startdm, survey -> pass_parameters[i].sub_dmstep,
-                     tsamp * binsize, inshift, outshift); 
+                for (int j = 0; j < ncalls; j++) {
+					dedisperse_subband <<< dim3(gridsize_dedisp, 1), blocksize_dedisp >>>
+						(d_output, d_input, (nsamp + tempval) / binsize, nchans, survey -> nsubs,
+						 startdm, survey -> pass_parameters[i].sub_dmstep,
+						 tsamp * binsize, inshift, outshift);
+
+					startdm += survey -> pass_parameters[i].sub_dmstep;
+					outshift += (nsamp + tempval) * survey -> nsubs / binsize ;
+                }
 
                 inshift += (nsamp + maxshift) * nchans / binsize;
-                outshift += (nsamp + tempval) * survey -> nsubs * ncalls / binsize ;
             }
 
             cudaEventRecord(event_stop, 0);

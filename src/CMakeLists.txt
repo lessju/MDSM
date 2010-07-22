@@ -26,6 +26,10 @@ if(NOT BINARY_INSTALL_DIR)
     set(BINARY_INSTALL_DIR "${MDSM_INSTALL_DIR}/bin")
 endif(NOT BINARY_INSTALL_DIR)
 
+if(NOT GPU_VERSION_ARCHITECTURE)
+    set(GPU_ARCHITECTURE "sm_13")
+endif(NOT GPU_VERSION_ARCHITECTURE)
+
 
 # === Find dependencies.
 if(NOT CUDA_SDK_ROOT_DIR)
@@ -36,9 +40,9 @@ find_package(CUDA 2.3 REQUIRED)
 set(CUDA_PROPERGATE_HOST_FLAGS OFF)
 set(CUDA_BUILD_EMULATION OFF)
 if(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
-#    set(CUDA_NVCC_FLAGS --complier-options;-Wall;--compiler-options;-O2)
+    set(CUDA_NVCC_FLAGS --gpu-architecture ${GPU_ARCHITECTURE})
 else(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
-#    set(CUDA_NVCC_FLAGS --complier-options;-Wall;--compiler-options;-O0;--compiler-options;-g)
+    set(CUDA_NVCC_FLAGS --gpu-architecture sm_20 ${GPU_ARCHITECTURE})
 endif(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
 
 

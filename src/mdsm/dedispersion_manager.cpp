@@ -8,7 +8,7 @@
 
 // Forward declarations
 extern "C" void* call_dedisperse(void* thread_params);
-extern "C" DEVICE_INFO** call_initialise_devices(int *num_devices);
+extern "C" DEVICES* call_initialise_devices();
 
 // Global parameters
 SURVEY *survey;
@@ -18,7 +18,7 @@ unsigned i, ndms, maxshift;
 time_t start = time(NULL), begin;
 pthread_attr_t thread_attr;
 pthread_t output_thread;
-DEVICE_INFO** devices;
+DEVICES* devices;
 pthread_t* threads;
 THREAD_PARAMS* threads_params;
 float *dmshifts;
@@ -160,7 +160,7 @@ inline int max(int a, int b) {
 }
 
 // Calculate number of samples which can be loaded at once
-int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
+int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigned long int memory)
 {
     unsigned int i, input = 0, output = 0, chans = 0;
 
@@ -177,7 +177,7 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize)
     }
 
     if (survey -> nsamp == 0) 
-        survey -> nsamp = ((1024 * 1024 * 1000) / (max(input, chans) + max(output, input))) - maxshift;
+        survey -> nsamp = ((memory * 256 * 0.8) / (max(input, chans) + max(output, input))) - maxshift;
 
     // Round down nsamp to multiple of the largest binsize
     if (survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
@@ -209,7 +209,8 @@ float* initialiseMDSM(SURVEY* input_survey)
     pthread_attr_init(&thread_attr);
     pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
 
-    devices = call_initialise_devices(&num_devices);
+    devices = call_initialise_devices();
+    num_devices = devices -> num_devices;
     survey -> num_threads = num_devices;
     threads = (pthread_t *) calloc(sizeof(pthread_t), num_devices);
     threads_params = (THREAD_PARAMS *) malloc(num_devices * sizeof(THREAD_PARAMS));
@@ -228,7 +229,7 @@ float* initialiseMDSM(SURVEY* input_survey)
     inputsize = (size_t *) malloc(sizeof(size_t));
     outputsize = (size_t *) malloc(sizeof(size_t));
    
-    survey -> nsamp = calculate_nsamp(maxshift, inputsize, outputsize);
+    survey -> nsamp = calculate_nsamp(maxshift, inputsize, outputsize, devices -> minTotalGlobalMem);
 
     // Initialise buffers and create output buffer (a separate buffer for each GPU output)
     input_buffer = (float *) malloc(*inputsize);
@@ -278,7 +279,7 @@ float* initialiseMDSM(SURVEY* input_survey)
         threads_params[k].dmshifts = dmshifts;
         threads_params[k].thread_num = k;
         threads_params[k].num_threads = num_devices;
-        threads_params[k].device_id = devices[k] -> device_id;
+        threads_params[k].device_id = devices -> devices[k].device_id;
         threads_params[k].rw_lock = &rw_lock;
         threads_params[k].input_barrier = &input_barrier;
         threads_params[k].output_barrier = &output_barrier;
@@ -319,14 +320,14 @@ void tearDownMDSM()
     pthread_barrier_destroy(&output_barrier);
     
     // Free memory
-    for(k = 0; k < num_devices; k++) {
+    for(k = 0; k < num_devices; k++)
        free(output_buffer[k]);
-       free(devices[k]);
-    }
+
+    free(devices -> devices);
+    free(devices);
 
     free(output_buffer);
     free(threads_params);
-    free(devices);
     free(input_buffer);
     free(dmshifts);
     free(threads);

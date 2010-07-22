@@ -20,6 +20,15 @@ typedef struct {
 } DEVICE_INFO;
 
 typedef struct {
+	// Overall specs
+	int num_devices;
+	unsigned long int minTotalGlobalMem; // When assuming homogeneous devics
+
+	DEVICE_INFO* devices;
+
+} DEVICES;
+
+typedef struct {
     // Input parameters
     int iterations, maxiters;
 
