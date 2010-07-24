@@ -126,6 +126,11 @@ FILE_HEADER *read_header(FILE *inputfile)
     } else if (strings_equal(string, "machine_id")) {
           fread(&(header -> machine_id), sizeof(header -> machine_id), 1, inputfile);
           totalbytes += sizeof(header -> machine_id);
+    } else if (strings_equal(string, "Telescope")) {
+//          fread(&(header -> fch1), sizeof(header -> fch1), 1, inputfile);
+//          totalbytes += sizeof(header -> fch1);
+            get_string(inputfile,&nbytes,string);
+;
     } else if (strings_equal(string, "data_type")) {
           fread(&(header -> data_type), sizeof(header -> data_type), 1, inputfile);
           totalbytes += sizeof(header -> data_type);

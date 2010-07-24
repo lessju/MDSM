@@ -129,7 +129,6 @@ SURVEY* processSurveyParameters(QString filepath)
 
                         pass_params = pass_params.nextSibling();
                     }
-
                     passes++;
                     pass = pass.nextSibling();    // Go to next pass element
                 }
@@ -137,13 +136,11 @@ SURVEY* processSurveyParameters(QString filepath)
         }
         n = n.nextSibling();
     }
-
     survey -> tdms = 0;
     for(i = 0; i < survey -> num_passes; i++)
         survey -> tdms += survey -> pass_parameters[i].ndms;
 
     // TODO: Survey parameter checks
-
     // Assign default values;
     survey -> nsamp = 0;
     survey -> fp = NULL;
@@ -176,8 +173,8 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigne
         chans = survey -> nchans;
     }
 
-    if (survey -> nsamp == 0) 
-        survey -> nsamp = ((memory * 256 * 0.8) / (max(input, chans) + max(output, input))) - maxshift;
+    if (survey -> nsamp == 0)
+        survey -> nsamp = ((memory * 256 * 0.95) / (max(input, chans) + max(output, input))) - maxshift;
 
     // Round down nsamp to multiple of the largest binsize
     if (survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
@@ -228,7 +225,6 @@ float* initialiseMDSM(SURVEY* input_survey)
     // Calculate nsamp
     inputsize = (size_t *) malloc(sizeof(size_t));
     outputsize = (size_t *) malloc(sizeof(size_t));
-   
     survey -> nsamp = calculate_nsamp(maxshift, inputsize, outputsize, devices -> minTotalGlobalMem);
 
     // Initialise buffers and create output buffer (a separate buffer for each GPU output)

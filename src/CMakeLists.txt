@@ -42,7 +42,7 @@ set(CUDA_BUILD_EMULATION OFF)
 if(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
     set(CUDA_NVCC_FLAGS --gpu-architecture ${GPU_ARCHITECTURE})
 else(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
-    set(CUDA_NVCC_FLAGS --gpu-architecture sm_20 ${GPU_ARCHITECTURE})
+    set(CUDA_NVCC_FLAGS --gpu-architecture ${GPU_ARCHITECTURE})
 endif(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
 
 

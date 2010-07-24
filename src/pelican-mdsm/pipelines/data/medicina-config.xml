@@ -14,11 +14,11 @@
            <MedicinaChunker>
                <data type="TimeStreamData"/>
                <connection host="127.0.0.1" port="8090"/>
-               <params samplesPerPacket="1"
+               <params samplesPerPacket="2"
                        nrPolarisation="1"
-                       subbandsPerPacket="2048" 
+                       subbandsPerPacket="1024" 
                        packets="32"
-                       clock="160"/>  <!-- 2048 = #Channles * #Beams -->
+                       clock="0.05"/>  <!-- 2048 = #Channles * #Beams -->
                <samples type="8" />
            </MedicinaChunker>
         </chunkers>
@@ -26,9 +26,9 @@
         <adapters>
             <AdapterTimeStream>
                 <packetsPerChunk number="32"/>
-                <subbands number="2048" />
+                <subbands number="1024" />
                 <polarisations number="1" />
-                <samplesPerPacket number="1" />
+                <samplesPerPacket number="2" />
                 <sampleSize bits="8" />
                 <fixedSizePackets value="false" />
             </AdapterTimeStream>
@@ -42,7 +42,7 @@
 
         <modules>
             <MdsmModule>
-                <observationfile filepath="data/obs.xml" />
+                <observationfile filepath="/home/lessju/Code/MDSM/Tests/Medicina/observation.xml" />
             </MdsmModule>
         </modules>
 
@@ -51,7 +51,7 @@
                 <SigprocWriter>
                     <file filepath="medicina_beamformed_data.dat" />
                     <params channelOneFrequency="408" 
-                            frequencyOffset="0.0015625"
+                            frequencyOffset="-0.0015625"
                             numberOfChannels="1024"
                             samplingTime="0.001"
                             telescope="MEDICINA"/>

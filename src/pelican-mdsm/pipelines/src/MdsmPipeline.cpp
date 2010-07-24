@@ -15,7 +15,7 @@ MdsmPipeline::~MdsmPipeline()
 void MdsmPipeline::init()
 {
     // Create modules
-//    mdsm = (MdsmModule *) createModule("MdsmModule");
+    mdsm = (MdsmModule *) createModule("MdsmModule");
 
     // Request remote data
     requestRemoteData("TimeStreamData");
@@ -27,8 +27,12 @@ void MdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
     // Get pointer to the remote TimeStreamData data blob
     TimeStreamData* timeData = (TimeStreamData *) remoteData["TimeStreamData"];
 
+    // Run MDSM
+    mdsm -> run(timeData);
+
     // Output channelised data
     dataOutput( timeData, "TimeStreamData" );
 
-    if (_iteration++ % 500 == 0) std::cout << "Iteration: " << _iteration << std::endl;
+//    if (_iteration % 1000 == 0) std::cout << "Iteration: " << _iteration << std::endl;
+    _iteration++;
 }

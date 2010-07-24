@@ -105,9 +105,7 @@ int main(int argc, char *argv[])
 {
     // Create mait QCoreApplication instance
     QCoreApplication app(argc, argv);
-    
     SURVEY* survey = NULL;
-
     #if USING_PELICAN_LOFAR == 1
         // Initialiase Pelican Lofar client if using it
         survey = lofar_process_arguments();
@@ -115,7 +113,6 @@ int main(int argc, char *argv[])
     #else
         survey = file_process_arguments(argc, argv);
     #endif
-
     // Initialise Dedispersion code
     // NOTE: survey will be updated with MDSM parameters
     float *input_buffer = NULL;

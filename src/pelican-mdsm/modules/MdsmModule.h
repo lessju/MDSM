@@ -3,6 +3,7 @@
 
 #include "pelican/modules/AbstractModule.h"
 #include "ChannelisedStreamData.h"
+#include "TimeStreamData.h"
 #include "survey.h"
 
 using namespace pelican;
@@ -17,8 +18,9 @@ class MdsmModule : public AbstractModule
         /// Destroys the channeliser module.
         ~MdsmModule();
 
-        /// Method converting the time stream to a spectrum.
+        /// Perofrm Dedispersion
         void run(ChannelisedStreamData* timeData);
+        void run(TimeStreamData* timeData);
 
     private:
         SURVEY       *_survey;

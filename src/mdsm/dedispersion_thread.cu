@@ -40,7 +40,9 @@ DEVICES* initialise_devices()
         }
     }
 
-//    devices -> num_devices = 1;  // TEMPORARY TESTING HACK
+    // TEMPORARY TESTING HACKS
+//    devices -> num_devices = 1;
+//    devices -> minTotalGlobalMem = 1024 * 1024 * 4;
 
     return devices;
 }
@@ -178,16 +180,12 @@ void* dedisperse(void* thread_params)
                 startdm = survey -> pass_parameters[i].lowdm + survey -> pass_parameters[i].sub_dmstep * ncalls * tid;
  
                 // Perform subband dedispersion
-                for (int j = 0; j < ncalls; j++) {
-					dedisperse_subband <<< dim3(gridsize_dedisp, 1), blocksize_dedisp >>>
-						(d_output, d_input, (nsamp + tempval) / binsize, nchans, survey -> nsubs,
-						 startdm, survey -> pass_parameters[i].sub_dmstep,
-						 tsamp * binsize, inshift, outshift);
+				dedisperse_subband <<< dim3(gridsize_dedisp, ncalls), blocksize_dedisp >>>
+					(d_output, d_input, (nsamp + tempval) / binsize, nchans, survey -> nsubs,
+					 startdm, survey -> pass_parameters[i].sub_dmstep,
+					 tsamp * binsize, inshift, outshift);
 
-					startdm += survey -> pass_parameters[i].sub_dmstep;
-					outshift += (nsamp + tempval) * survey -> nsubs / binsize ;
-                }
-
+            	outshift += (nsamp + tempval) * survey -> nsubs * ncalls / binsize ;
                 inshift += (nsamp + maxshift) * nchans / binsize;
             }
 

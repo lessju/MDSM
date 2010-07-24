@@ -19,6 +19,7 @@ SigprocWriter::SigprocWriter(const ConfigNode& configNode )
 
     // Open file
     _file.open(_filepath.toUtf8().data(), std::ios::out | std::ios::binary);
+    std::cout << _filepath.toStdString() << std::endl;
 
     // Write header
     WriteString("HEADER_START");
@@ -97,11 +98,13 @@ void SigprocWriter::send(const QString& streamName, const DataBlob* incoming)
 
     float *buffer = (float *) malloc(size * sizeof(float));
 
-    // Calculate total power in complex values
-    for(i = 0; i < size; i++)
+    // Calculate total power in complex values (for channels in reverse order)
+    for(i = 0; i < size; i--)
         buffer[i] = sqrt(pow(data[i].real(), 2) + pow(data[i].imag(), 2));
 
     // Write data to file
     _file.write(reinterpret_cast<char *> (buffer), size * sizeof(float));
     _file.flush();
+
+    free(buffer);
 }

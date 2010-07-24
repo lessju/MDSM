@@ -21,7 +21,6 @@ MdsmModule::MdsmModule(const ConfigNode& config)
 { 
     // Configure MDSM Module
 	QString _filepath = config.getOption("observationfile", "filepath");
-    _filepath = QString("/home/lessju/Code/MDSM/build/pelican-mdsm/pipelines/data/obs.xml");
 
     // Process Survey parameters (through observation file)
     _survey = processSurveyParameters(_filepath);
@@ -39,7 +38,6 @@ MdsmModule::~MdsmModule()
 // Run MDSM
 void MdsmModule::run(ChannelisedStreamData* streamData)
 {
-
     unsigned i;
 
     // We need the timestamp of the first packet in the first blob (assuming that we don't
@@ -66,5 +64,46 @@ void MdsmModule::run(ChannelisedStreamData* streamData)
     }
 
     if (_samples % 1000 == 0) std::cout << "Received: " << _samples << "\tNeed: " << _survey -> nsamp + _survey -> maxshift << std::endl;
+}
+
+// Run MDSM - method overload
+void MdsmModule::run(TimeStreamData* streamData)
+{
+    unsigned i;
+
+    // We need the timestamp of the first packet in the first blob (assuming that we don't
+    // lose any packets), and the sampling time. This will give each sample a unique timestamp
+    if (_samples == 0) {
+        _timestamp = streamData -> getLofarTimestamp();
+        _blockRate = streamData -> getBlockRate();
+    }   
+
+    std::complex<double> *data = streamData -> data();
+
+    // Calculate number of required samples
+    unsigned int reqSamp = _counter == 0 ? _survey -> nsamp + _survey -> maxshift : _survey -> nsamp;
+    
+    // Check to see whether all samples will fit in memory
+    unsigned int copySamp = streamData -> nSamples() <= reqSamp - _samples ? streamData -> nSamples() : reqSamp - _samples; 
+
+    for(i = 0; i < copySamp * streamData -> nSubbands(); i++) {
+        _input_buffer[_samples * streamData -> nSubbands() + i] = sqrt(pow(data -> real(), 2) + pow(data -> imag(), 2));
+        data++;
+    }
+    _samples += copySamp;
+
+    if (_samples == reqSamp) {
+        if (!process_chunk(_samples))  throw QString("MDSM error while processing chunk");
+        _counter++;
+        _samples = 0;
+    }
+
+    // Check if there are leftover samples to copy
+    for(i = 0; i < (streamData -> nSamples() - copySamp) * streamData -> nSubbands(); i++) {
+        _input_buffer[i] = sqrt(pow(data -> real(), 2) + pow(data -> imag(), 2));
+        data++;
+    }
+
+    if (_samples % 10000 == 0) std::cout << "Received: " << _samples << ", Need: " << _survey -> nsamp + _survey -> maxshift << std::endl;
 }
 
