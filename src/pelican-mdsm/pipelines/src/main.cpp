@@ -1,5 +1,4 @@
 #include "pelican/core/PipelineApplication.h"
-#include "AdapterTimeStream.h"
 #include "MedicinaStreamDataClient.h"
 #include "SigprocWriter.h"
 #include "MdsmPipeline.h"

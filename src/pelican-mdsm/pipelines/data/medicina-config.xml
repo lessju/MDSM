@@ -5,61 +5,76 @@
     <pipeline>
 
         <buffers>
-           <TimeStreamData>
+           <SubbandTimeSeriesC32>
                <buffer maxSize="100000000" maxChunkSize="100000000"/>
-           </TimeStreamData>
+           </SubbandTimeSeriesC32>
         </buffers>
 
         <chunkers>
            <MedicinaChunker>
-               <data type="TimeStreamData"/>
+               <data type="SubbandTimeSeriesC32"/>
                <connection host="127.0.0.1" port="8090"/>
-               <params samplesPerPacket="2"
+               <params samplesPerPacket="1"
                        nrPolarisation="1"
                        subbandsPerPacket="1024" 
-                       packets="32"
+                       packets="128"
                        clock="0.05"/>  <!-- 2048 = #Channles * #Beams -->
                <samples type="8" />
            </MedicinaChunker>
         </chunkers>
 
         <adapters>
-            <AdapterTimeStream>
-                <packetsPerChunk number="32"/>
+            <AdapterSubbandTimeSeries>
+                <packetsPerChunk number="128"/>
                 <subbands number="1024" />
                 <polarisations number="1" />
-                <samplesPerPacket number="2" />
+                <samplesPerPacket number="1" />
                 <sampleSize bits="8" />
                 <fixedSizePackets value="false" />
-            </AdapterTimeStream>
+                <samplesPerTimeBlock number="128"/>
+            </AdapterSubbandTimeSeries>
         </adapters>
 
         <clients>
             <MedicinaStreamDataClient>
-                <data type="TimeStreamData" adapter="AdapterTimeStream" />
+                <data type="SubbandTimeSeriesC32" adapter="AdapterSubbandTimeSeries" />
             </MedicinaStreamDataClient>
         </clients>
 
         <modules>
+            <PPFChanneliser>
+                <channels number="32" />
+                <processingThreads number="2" />
+                <filter nTaps="8" filterWindow="kaiser"/>
+            </PPFChanneliser>
+
+            <StokesGenerator>
+            </StokesGenerator>
+
             <MdsmModule>
-                <observationfile filepath="/home/lessju/Code/MDSM/Tests/Medicina/observation.xml" />
+                <observationfile filepath="data/medicina_observation.xml" />
             </MdsmModule>
         </modules>
 
         <output>
-            <streamers>
-                <SigprocWriter>
-                    <file filepath="medicina_beamformed_data.dat" />
-                    <params channelOneFrequency="408" 
-                            frequencyOffset="-0.0015625"
-                            numberOfChannels="1024"
-                            samplingTime="0.001"
-                            telescope="MEDICINA"/>
-                </SigprocWriter>
-            </streamers>
             <dataStreams>
-               <stream name="TimeStreamData" listeners="SigprocWriter" />
+                <stream name="SubbandSpectraStokes" listeners="PelicanTCPBlobServer" />  
+<!--                <stream name="SubbandSpectraStokes" listeners="SigprocStokesWriter"/>-->
             </dataStreams>
+            <streamers>
+<!--                <SigprocStokesWriter>-->
+<!--                    <file filepath="medicina_beamformed_data.dat" />-->
+<!--                    <params channelOneFrequency="406"-->
+<!--                            frequencyOffset="-0.0015625"-->
+<!--                            numberOfChannels="1024"-->
+<!--                            samplingTime="0.001"-->
+<!--                            telescope="MEDICINA"-->
+<!--                            nPols="1"/>-->
+<!--                </SigprocStokesWriter>-->
+                <PelicanTCPBlobServer>
+                    <connection port="6969" />
+                </PelicanTCPBlobServer>
+            </streamers>
         </output>
 
     </pipeline>

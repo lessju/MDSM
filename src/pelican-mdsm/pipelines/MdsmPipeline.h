@@ -4,6 +4,10 @@
 #include "pelican/core/AbstractPipeline.h"
 #include "pelican/data/DataBlob.h"
 #include "TimeStreamData.h"
+#include "PPFChanneliser.h"
+#include "StokesGenerator.h"
+#include "SubbandSpectra.h"
+#include "SubbandTimeSeries.h"
 #include "MdsmModule.h"
 
 using namespace pelican;
@@ -23,7 +27,14 @@ class MdsmPipeline : public AbstractPipeline
 
     private:
         /// Module pointers
-        MdsmModule*           mdsm;
+        MdsmModule* mdsm;
+        PPFChanneliser* ppfChanneliser;
+        StokesGenerator* stokesGenerator;
+
+        /// Local data blobs
+        SubbandSpectraC32* spectra;
+        SubbandTimeSeriesC32* timeSeries;
+        SubbandSpectraStokes* stokes;
 
         unsigned _iteration;
 };

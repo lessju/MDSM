@@ -124,7 +124,7 @@ void MedicinaChunker::next(QIODevice* device)
             unsigned totBlocks = _clock * 1e6;
             unsigned lostPackets = 0, diff = 0;
 
-            diff =  (blockid >= prevBlockid) ? (blockid - prevBlockid) : (blockid + totBlocks - prevBlockid);
+/*            diff =  (blockid >= prevBlockid) ? (blockid - prevBlockid) : (blockid + totBlocks - prevBlockid);
 
             if (diff < _samplesPerPacket) {      // Duplicated packets... ignore
                 ++_packetsRejected;
@@ -154,7 +154,7 @@ void MedicinaChunker::next(QIODevice* device)
                 if (i == _nPackets) {
                     break;
                 }
-            }
+            }*/
 
             // Write received packet
             // FIXME: Packet will be lost if we fill up the buffer with sufficient empty packets...

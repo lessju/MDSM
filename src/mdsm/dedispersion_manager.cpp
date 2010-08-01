@@ -176,6 +176,8 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigne
     if (survey -> nsamp == 0)
         survey -> nsamp = ((memory * 256 * 0.95) / (max(input, chans) + max(output, input))) - maxshift;
 
+    survey -> nsamp = 128 * 1024; // Temporary hack
+
     // Round down nsamp to multiple of the largest binsize
     if (survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
         survey -> nsamp -= survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize;

@@ -142,7 +142,7 @@ class MainWindow(gui.QMainWindow):
         self.mainWidget.saveButton.setEnabled(True)
         self.statusBar().showMessage("Calculated MDSM Parameters")
         
-        # Save item in class instance
+        # Save items in class instance
         for key, value in locals().iteritems():
             self.__dict__[key] = value
                 

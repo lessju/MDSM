@@ -216,7 +216,6 @@ def dm_steps(loDM, hiDM, obs, numsub=0, ok_smearing=0.0):
     # Calculate the appropriate initial dDM 
     dDM = guess_DMstep(loDM, obs.dt*downsamp, obs.BW, obs.f_ctr)
     while (allow_dDMs[index_dDMs+1] < ff*dDM):
-        print allow_dDMs[index_dDMs+1]
         index_dDMs += 1
 
     # Create the first method

@@ -11,7 +11,7 @@ MedicinaStreamDataClient::MedicinaStreamDataClient(const ConfigNode& configNode,
         const DataTypes& types, const Config* config)
 : DirectStreamDataClient(configNode, types, config)
 {
-    addChunker( "TimeStreamData", "MedicinaChunker" );
+    addChunker( "SubbandTimeSeriesC32", "MedicinaChunker" );
 }
 
 /**

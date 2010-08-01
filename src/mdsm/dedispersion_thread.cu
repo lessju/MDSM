@@ -41,8 +41,8 @@ DEVICES* initialise_devices()
     }
 
     // TEMPORARY TESTING HACKS
-//    devices -> num_devices = 1;
-//    devices -> minTotalGlobalMem = 1024 * 1024 * 4;
+    devices -> num_devices = 1;
+    devices -> minTotalGlobalMem = 1024 * 1024 * 4;
 
     return devices;
 }
@@ -62,7 +62,7 @@ void* dedisperse(void* thread_params)
     printf("%d: Started thread %d\n", (int) (time(NULL) - start), tid);
 
     // Initialise device, allocate device memory and copy dmshifts and dmvalues to constant memory
-    cutilSafeCall( cudaSetDevice(params -> device_id));
+    cutilSafeCall( cudaSetDevice(0));//params -> device_id));
     cudaSetDeviceFlags( cudaDeviceBlockingSync );
 
     cutilSafeCall( cudaMalloc((void **) &d_input, params -> inputsize));

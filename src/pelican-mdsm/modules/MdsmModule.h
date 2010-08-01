@@ -3,6 +3,7 @@
 
 #include "pelican/modules/AbstractModule.h"
 #include "ChannelisedStreamData.h"
+#include "SubbandSpectra.h"
 #include "TimeStreamData.h"
 #include "survey.h"
 
@@ -18,8 +19,9 @@ class MdsmModule : public AbstractModule
         /// Destroys the channeliser module.
         ~MdsmModule();
 
-        /// Perofrm Dedispersion
+        /// Perform Dedispersion (with overloads)
         void run(ChannelisedStreamData* timeData);
+        void run(SubbandSpectraStokes* timeData);
         void run(TimeStreamData* timeData);
 
     private:
@@ -29,6 +31,7 @@ class MdsmModule : public AbstractModule
         unsigned int _counter;
         long long    _timestamp;
         long         _blockRate;
+        long         _iteration;
 };
 
 // Declare this class as a pelican module.
