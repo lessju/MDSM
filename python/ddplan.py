@@ -1,3 +1,4 @@
+import elementtree.ElementTree as ET
 import sys
 from math import pow
 from numpy import *
@@ -174,7 +175,7 @@ def dm_steps(loDM, hiDM, obs, numsub=0, ok_smearing=0.0):
     """
     # Allowable DM stepsizes
     allow_dDMs = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0,
-                  2.0, 3.0, 5.0, 10.0, 20.0, 30.0, 50.0, 100.0, 200.0, 300.0]
+                  2.0, 3.0, 5.0, 10.0, 20.0, 30.0, 50.0, 100.0, 200.0, 300.0, 500.0, 1000.0]
     # Allowable number of downsampling factors
     allow_downsamps = [pow(2, i) for i in range(0, 20)]
 
@@ -259,6 +260,46 @@ def dm_steps(loDM, hiDM, obs, numsub=0, ok_smearing=0.0):
     # The optimal smearing
     tot_smear = total_smear(DMs, allow_dDMs[0], obs.dt, obs.f_ctr,
                             obs.BW, obs.numchan, allow_dDMs[0], 0)
+
+    if (numsub):
+        print "\n  Low DM    High DM     dDM  DownSamp  dsubDM   #DMs  DMs/call  calls  WorkFract"
+    else:
+        print "\n  Low DM    High DM     dDM  DownSamp   #DMs  WorkFract"
+    for method, fract in zip(methods, work_fracts):
+        print method, "  %.4g" % fract
+    print "\n\n"
+
+#    root = ET.Element("observation")
+
+#    freq = ET.SubElement(root, "frequencies")
+#    freq.set("center", str(0))
+#    freq.set("offset", str(0))
+
+#    dm = ET.SubElement(root, "dm")
+
+#    channels = ET.SubElement(root, "channels")
+#    channels.set("number", str(0))
+#    channels.set("subbands", str(4))
+
+#    timing = ET.SubElement(root, "timing")
+#    timing.set("tsamp", str(0))
+
+#    passes = ET.SubElement(root, "passes")
+#    for item in methods:
+#        currpass = ET.SubElement(passes, "pass")
+#        ET.SubElement(currpass, "lowDm").text = str(item.loDM)
+#        ET.SubElement(currpass, "highDm").text = str(item.hiDM)
+#        ET.SubElement(currpass, "deltaDm").text = str(item.dDM)
+#        ET.SubElement(currpass, "downsample").text = str(item.downsamp)
+#        ET.SubElement(currpass, "subDm").text = str(item.dsubDM)
+#        ET.SubElement(currpass, "numDms").text = str(item.numDMs)
+#        ET.SubElement(currpass, "dmsPerCall").text = str(item.DMs_per_prepsub)
+#        ET.SubElement(currpass, "ncalls").text = str(item.numprepsub)
+
+#    # wrap it in an ElementTree instance, and save as XML
+#    tree = ET.ElementTree(root)
+#    tree.write("observation.xml")
+
     return methods  
 
 def calculateParams(loDM, hiDM, fctr, BW, numchan, numsubbands, dt, ok_smearing):
@@ -267,5 +308,74 @@ def calculateParams(loDM, hiDM, fctr, BW, numchan, numsubbands, dt, ok_smearing)
     obs = observation(dt, fctr, BW, numchan)
 
     return dm_steps(loDM, hiDM, obs, numsub=numsubbands,
+             ok_smearing=ok_smearing)
+
+    
+def usage():
+    print """
+    usage:  DDplan.py [options]
+      [-h, --help]                    : Display this help
+      [-o outfile, --outfile=outfile] : Output .eps plot file (default is xwin)
+      [-l loDM, --loDM=loDM]          : Low DM to search   (default = 0 pc cm-3)
+      [-d hiDM, --hiDM=HIDM]          : High DM to search  (default = 1000 pc cm-3)
+      [-f fctr, --fctr=fctr]          : Center frequency   (default = 1400MHz)
+      [-b BW, --bw=bandwidth]         : Bandwidth in MHz   (default = 300MHz)
+      [-n #chan, --numchan=#chan]     : Number of channels (default = 1024)
+      [-t dt, --dt=dt]                : Sample time (s)    (default = 0.000064 s)
+      [-s subbands, --subbands=nsub]  : Number of subbands (default = #chan) 
+      [-r resolution, --res=res]      : Acceptable time resolution (ms)
+      The program generates a good plan for de-dispersing raw data.  It
+      trades a small amount of sensitivity in order to save computation costs.
+
+    """    
+
+if __name__=='__main__':
+    import getopt, sys
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "ho:l:d:f:b:n:t:s:r:",
+                                   ["help", "output=", "loDM=", "hiDM=",
+                                    "fctr=", "bw=", "numchan=", "dt=",
+                                    "subbands=", "res="])
+
+    except getopt.GetoptError:
+        # print help information and exit:
+        usage()
+        sys.exit(2)
+    if len(sys.argv)==1:
+        usage()
+        sys.exit(2)
+    # The defaults are close to the future ALFA survey
+    loDM, hiDM = 0.0, 1000.0
+    fctr = 1400.0
+    BW = 300.0
+    numchan = 1024
+    numsubbands = 0
+    dt = 0.000064
+    ok_smearing = 0.0
+
+    for o, a in opts:
+        if o in ("-h", "--help"):
+            usage()
+            sys.exit()
+        if o in ("-l", "--loDM"):
+            loDM = float(a)
+        if o in ("-d", "--hiDM"):
+            hiDM = float(a)
+        if o in ("-f", "--fctr"):
+            fctr = float(a)
+        if o in ("-b", "--bw"):
+            BW = float(a)
+        if o in ("-n", "--numchan"):
+            numchan = int(a)
+        if o in ("-t", "--dt"):
+            dt = float(a)
+        if o in ("-s", "--subbands"):
+            numsubbands = int(a)
+        if o in ("-r", "--res"):
+            ok_smearing = float(a)
+
+    obs = observation(dt, fctr, BW, numchan)
+    dm_steps(loDM, hiDM, obs, numsub=numsubbands,
              ok_smearing=ok_smearing)
     

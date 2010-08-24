@@ -2,68 +2,80 @@
 <!DOCTYPE pelican>
 
 <configuration version="1.0">
-    <pipeline>
 
+	<nodesets>
+	    <nodeset name="FixedParameters">
+	        <samplesPerPacket value="1"/>
+	        <nRawPolarisations value="1"/>
+	        <dataBitSize value="16"/>
+	        <totalComplexSubbands value="1"/>
+	    </nodeset>
+	    
+	    <nodeset name="ChangeParameters">
+	        <clock value="200"/>
+	        <subbandsPerPacket value="1"/>
+	        <outputChannelsPerSubband value="64"/>
+	        <udpPacketsPerIteration value="64"/>
+	        <integrateTimeBins value="1"/>
+	        <topChannelFrequency value="1420"/>
+	    </nodeset>
+	</nodesets>
+
+    <pipeline>
         <buffers>
-           <TimeStreamData>
+           <SubbandTimeSeriesC32>
                <buffer maxSize="100000000" maxChunkSize="100000000"/>
-           </TimeStreamData>
+           </SubbandTimeSeriesC32>
         </buffers>
 
-        <chunkers>
-           <LofarChunker>
-               <data type="TimeStreamData"/>
-               <connection host="127.0.0.1" port="8090"/>
-               <params samplesPerPacket="1"
-                       nrPolarisation="1"
-                       subbandsPerPacket="1024"
-                       packets="16"
-                       clock="200"/>
-               <samples type="8" />
-           </LofarChunker>
-        </chunkers>
-
         <adapters>
-            <AdapterTimeStream>
-                <packetsPerChunk number="16"/>
-                <subbands number="1024" />
+            <RawVoltageAdapter>
+                <sampleSize bits="16"/>
+                <subbands number="1" />
                 <polarisations number="1" />
-                <samplesPerPacket number="1" />
-                <sampleSize bits="8" />
-                <fixedSizePackets value="false" />
-            </AdapterTimeStream>
+                <samplesPerRead number="64" />
+                <hasTotalPower value="0" />
+            </RawVoltageAdapter>
         </adapters>
 
         <clients>
-            <LofarStreamDataClient>
-                <data type="TimeStreamData" adapter="AdapterTimeStream" />
-            </LofarStreamDataClient>
+            <FileDataClient>
+                <data type="SubbandTimeSeriesC32" adapter="RawVoltageAdapter" file="/home/lessju/Code/MDSM/Tests/ATA/ataCrab.dat"/>
+            </FileDataClient>
         </clients>
 
         <modules>
-<!--            <ChanneliserPolyphase>
-                <channels number="512" />
-                <processingThreads number="2" />
-            </ChanneliserPolyphase>
+            <PPFChanneliser>
+				<import nodeset="FixedParameters"/>
+				<import nodeset="ChangeParameters"/>
+        		<processingThreads value="1" />
+                <filter nTaps="8" filterWindow="kaiser"/>
+            </PPFChanneliser>
+
+            <StokesGenerator>
+            	<import nodeset="FixedParameters"/>
+				<import nodeset="ChangeParameters"/>
+            </StokesGenerator>
+
             <MdsmModule>
                 <observationfile filepath="data/obs.xml" />
-            </MdsmModule> -->
+            </MdsmModule>
         </modules>
 
         <output>
-            <streamers>
-                <SigprocWriter>
-                    <file filepath="/home/lessju/Code/MDSM/build/pelican-mdsm/pipelines/sigproc.dat" />
-                    <params channelOneFrequency="120" 
-                            frequencyOffset="0.0195" 
-                            numberOfChannels="1024"
-                            samplingTime="0.001" 
-                            telescope="MEDICINA"/>
-                </SigprocWriter>
-            </streamers>
             <dataStreams>
-               <stream name="TimeStreamData" listeners="SigprocWriter" />
+                <stream name="SubbandSpectraStokes" listeners="SigprocStokesWriter"/> 
             </dataStreams>
+            <streamers>
+                <SigprocStokesWriter>
+                    <file filepath="ataData.dat" />
+                    <params channelOneFrequency="1420"
+                            frequencyOffset="-0.0015625"
+                            numberOfChannels="128"
+                            samplingTime="0.001"
+                            nPols="1"/>
+                </SigprocStokesWriter>
+            </streamers>
         </output>
 
     </pipeline>

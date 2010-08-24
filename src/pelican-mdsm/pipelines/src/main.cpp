@@ -1,8 +1,7 @@
 #include "pelican/core/PipelineApplication.h"
-#include "MedicinaStreamDataClient.h"
-#include "SigprocWriter.h"
+#include "LofarTypes.h"
 #include "MdsmPipeline.h"
-#include "MedicinaChunker.h"
+#include "RawVoltageAdapter.h"
 #include <QtCore/QCoreApplication>
 #include <iostream>
 #include <map>
@@ -23,7 +22,7 @@ int main(int argc, char* argv[])
         pApp.registerPipeline(new MdsmPipeline);
 
         // Set the data client.
-        pApp.setDataClient("MedicinaStreamDataClient");
+        pApp.setDataClient("FileDataClient");
 
         // Start the pipeline driver.
         pApp.start();

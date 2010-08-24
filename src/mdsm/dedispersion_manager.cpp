@@ -94,7 +94,7 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> nsubs = e.attribute("subbands").toUInt();
             }
             else if (QString::compare(e.tagName(), QString("timing"), Qt::CaseInsensitive) == 0)
-                survey -> tsamp = e.attribute("tsamp").toFloat();
+                survey -> tsamp = e.attribute("tsamp").toFloat() * 1000;
 
             // Refers to a new pass subsection
             else if (QString::compare(e.tagName(), QString("passes"), Qt::CaseInsensitive) == 0) {
@@ -175,8 +175,7 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigne
 
     if (survey -> nsamp == 0)
         survey -> nsamp = ((memory * 256 * 0.95) / (max(input, chans) + max(output, input))) - maxshift;
-
-    survey -> nsamp = 128 * 1024; // Temporary hack
+//    survey -> nsamp = 2048 * 1024;
 
     // Round down nsamp to multiple of the largest binsize
     if (survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
@@ -192,7 +191,7 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigne
 // DM delay calculation
 float dmdelay(float f1, float f2)
 {
-  return(4148.741601 * ((1.0 / f1 / f1) - (1.0 / f2 / f2)));
+  return(4148741.601 * ((1.0 / f1 / f1) - (1.0 / f2 / f2)));
 }
 
 // Initliase MDSM parameters, return poi/home/lessju/Code/MDSM/src/mdsm/dedispersion_manager.cpp: In function ‘float* inter to input buffer where
@@ -221,7 +220,7 @@ float* initialiseMDSM(SURVEY* input_survey)
 
     // Calculate maxshift (maximum for all threads)
     // TODO: calculate proper maxshift
-    maxshift = dmshifts[survey -> nchans - 1] * survey -> pass_parameters[survey -> num_passes - 1].highdm / survey -> tsamp;  
+    maxshift = dmshifts[survey -> nchans - 1] * survey -> pass_parameters[survey -> num_passes - 1].highdm / survey -> tsamp;
     survey -> maxshift = maxshift;
 
     // Calculate nsamp

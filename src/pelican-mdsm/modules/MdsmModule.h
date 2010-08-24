@@ -2,9 +2,7 @@
 #define MDSM_MODULE_H
 
 #include "pelican/modules/AbstractModule.h"
-#include "ChannelisedStreamData.h"
 #include "SubbandSpectra.h"
-#include "TimeStreamData.h"
 #include "survey.h"
 
 using namespace pelican;
@@ -19,10 +17,8 @@ class MdsmModule : public AbstractModule
         /// Destroys the channeliser module.
         ~MdsmModule();
 
-        /// Perform Dedispersion (with overloads)
-        void run(ChannelisedStreamData* timeData);
+        /// Perform Dedispersion;
         void run(SubbandSpectraStokes* timeData);
-        void run(TimeStreamData* timeData);
 
     private:
         SURVEY       *_survey;

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <cutil_inline.h>
 
-int nchans = 1024, nsamp = 1, ncalls = 2, lo_bin = 1;
+int nchans = 64, nsamp = 4096, ncalls = 1, lo_bin = 64;
 
 // Temp chans store
 __shared__ float localvalue[4080];
@@ -49,7 +49,7 @@ __global__ void inplace_binning_kernel(float *input, int nsamp, int nchans, int 
                                        binsize + nchans * b + shift];
 
         // Copy data to global memory
-        input[c +  channel] = localvalue[shift] / sqrtf(binsize);
+        input[c +  channel] = localvalue[shift] / binsize;
     }
 }
 
@@ -126,8 +126,8 @@ int main(int argc, char *argv[])
    cudaEvent_t event_start, event_stop;
    float timestamp;
    int gridsize = 64;
-   dim3 gridDim(gridsize, nchans / 192.0 < 1 ? 1 : nchans / 192.0);
-   dim3 blockDim(min(nchans, 192), 1);
+   dim3 gridDim(gridsize, nchans / 128.0 < 1 ? 1 : nchans / 128.0);
+   dim3 blockDim(min(nchans, 128), 1);
    printf("Grid dimensions: %d x %d, block dimensions: %d x 1\n", gridDim.x, gridDim.y, blockDim.x);
 
    cudaEventCreate(&event_start); 
@@ -171,22 +171,22 @@ int main(int argc, char *argv[])
     cutilSafeCall( cudaMemcpy(input, d_input, memory, cudaMemcpyDeviceToHost) );
 
   //  int total_samp = memory / sizeof(float) / nchans;
-/*    int total_samp = nsamp;
+    int total_samp = nsamp;
     for(i = 0; i < total_samp; i++) {
         for(j = 0; j < nchans; j++)
            printf("%.0f ", input[i * nchans + j]);
          printf("\n");
         } 
-*/
-    int offset = 0, bin = lo_bin;
-    for(i = 0; i < ncalls; i++) {
-        for(j = 0; j < nsamp * nchans / bin; j++)
-            if (input[offset + j] != bin) {
-                printf("Invalid: %d, %d, %d, %d, %.0f\n", i, bin, offset + j, j, input[offset + j]);
-                exit(0);
-            }
-        offset += (nsamp * nchans) / bin;
-        bin *= 2;
-    } 
+
+//    int offset = 0, bin = lo_bin;
+//    for(i = 0; i < ncalls; i++) {
+//        for(j = 0; j < nsamp * nchans / bin; j++)
+//            if (input[offset + j] != bin) {
+//                printf("Invalid: %d, %d, %d, %d, %.0f\n", i, bin, offset + j, j, input[offset + j]);
+//                exit(0);
+//            }
+//        offset += (nsamp * nchans) / bin;
+//        bin *= 2;
+//    } 
 
 }

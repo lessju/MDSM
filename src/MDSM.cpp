@@ -1,6 +1,5 @@
 // MDSM stuff
 #include "dedispersion_manager.h"
-#include "PelicanLofarClient.h"
 #include "file_handler.h"
 #include "survey.h"
 
@@ -108,8 +107,8 @@ int main(int argc, char *argv[])
     SURVEY* survey = NULL;
     #if USING_PELICAN_LOFAR == 1
         // Initialiase Pelican Lofar client if using it
-        survey = lofar_process_arguments();
-        PelicanLofarClient lofarClient("ChannelisedStreamData", "127.0.0.1", 6969);
+//        survey = lofar_process_arguments();
+//        PelicanLofarClient lofarClient("ChannelisedStreamData", "127.0.0.1", 6969);
     #else
         survey = file_process_arguments(argc, argv);
     #endif
@@ -124,10 +123,10 @@ int main(int argc, char *argv[])
 
         #if USING_PELICAN_LOFAR == 1
             //  RECEIVING DATA FROM LOFAR (OR LOFAR EMULATOR)
-            if (counter == 0)
-                data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp + survey -> maxshift) - survey -> maxshift;
-            else
-                data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp);
+//            if (counter == 0)
+//                data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp + survey -> maxshift) - survey -> maxshift;
+//            else
+//                data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp);
         #else
             // READING DATA FROM FILE
             if (counter == 0) {   // First read, read in maxshift (TODO: need to be changed to handle maxshift internally

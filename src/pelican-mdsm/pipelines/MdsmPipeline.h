@@ -30,8 +30,8 @@ class MdsmPipeline : public AbstractPipeline
         MdsmModule* mdsm;
         PPFChanneliser* ppfChanneliser;
         StokesGenerator* stokesGenerator;
-
-        /// Local data blobs
+//
+//        /// Local data blobs
         SubbandSpectraC32* spectra;
         SubbandTimeSeriesC32* timeSeries;
         SubbandSpectraStokes* stokes;

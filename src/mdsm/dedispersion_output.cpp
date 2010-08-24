@@ -64,7 +64,7 @@ void mean_stddev(float **buffer, SURVEY *survey, int read_nsamp)
 // Apply mean and stddev to apply thresholding
 void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, long long timestamp, long blockRate)
 {
-    unsigned int i = 0, thread, k, l, ndms, nsamp, shift = 0, ct = 0; 
+    unsigned int i = 0, thread, k, l, ndms, nsamp, shift = 0;
     float temp_val, startdm, dmstep, mean, stddev; 
 
     for(thread = 0; thread < survey -> num_threads; thread++) {
@@ -85,11 +85,9 @@ void process(float **buffer, FILE* output, SURVEY *survey, int read_nsamp, long 
             for (k = 0; k < ndms; k++)
                 for(l = 0; l < nsamp; l++) {
                     temp_val = buffer[thread][shift + k * nsamp + l] - mean;
-                    if (temp_val >= (stddev * 5) ) {
+                    if (temp_val >= (stddev * 4) )
                           fprintf(output, "%lld, %f, %f\n", timestamp + (l * survey -> pass_parameters[i].binsize)  
                                                             * blockRate, startdm + k * dmstep, temp_val + mean); 
-                          ct++;
-                    }
                 }
 
             shift += nsamp * ndms;

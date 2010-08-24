@@ -1,8 +1,8 @@
 set(mdsm_modules_SRC
     MdsmModule.cpp
-    SigprocWriter.cpp
     MedicinaChunker.cpp
     MedicinaStreamDataClient.cpp
+    RawVoltageAdapter.cpp
 )
 
 add_library(mdsm-modules ${mdsm_modules_SRC})

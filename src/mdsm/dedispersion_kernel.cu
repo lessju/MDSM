@@ -6,7 +6,7 @@
 //#define FERMI
 
 // Stores temporary shift values
-__device__ __constant__ float dm_shifts[16384];
+__device__ __constant__ float dm_shifts[8192];
 
 // Stores output value computed in inner loop for each sample
 //#ifdef FERMI
@@ -120,7 +120,7 @@ __global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize,
                                              blockDim.x * binsize + nchans * b + shift];
  
         // Copy data to global memory
-        input[outshift + channel + c/binsize] = localvalue[threadIdx.x] / binsize;// sqrtf(binsize);
+        input[outshift + channel + c/binsize] = localvalue[threadIdx.x] / binsize;
     }
 }
 
@@ -142,7 +142,7 @@ __global__ void inplace_binning_kernel(float *input, int nsamp, int nchans, int 
                                        binsize + nchans * b + shift];
 
         // Copy data to global memory
-        input[c +  channel] = localvalue[shift] / binsize;//sqrtf(binsize);
+        input[c +  channel] = localvalue[shift] / binsize;
     }
 }
 
