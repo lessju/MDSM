@@ -3,7 +3,7 @@
 
 #include "pelican/core/AbstractPipeline.h"
 #include "pelican/data/DataBlob.h"
-#include "SubbandSpectra.h"
+#include "SpectrumDataSet.h"
 #include "DedispersedTimeSeries.h"
 #include "DedispersedDataWriter.h"
 #include "MdsmModule.h"
@@ -28,7 +28,7 @@ class SigprocMdsmPipeline : public AbstractPipeline
         MdsmModule* mdsm;
 
         /// Local data blobs
-        SubbandSpectraStokes* stokes;
+        SpectrumDataSetStokes* stokes;
         DedispersedTimeSeriesF32* dedispersedData;
 
         unsigned _iteration;

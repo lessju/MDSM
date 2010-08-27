@@ -5,9 +5,9 @@
 
     <pipeline>
         <buffers>
-           <SubbandSpectraStokes>
+           <SpectrumDataSetStokes>
                <buffer maxSize="100000000" maxChunkSize="100000000"/>
-           </SubbandSpectraStokes>
+           </SpectrumDataSetStokes>
         </buffers>
 
         <adapters>
@@ -20,7 +20,7 @@
 
         <clients>
             <FileDataClient>
-                <data type="SubbandSpectraStokes" adapter="SigprocAdapter" file="/home/lessju/Code/lofarTest.fil"/>
+                <data type="SpectrumDataSetStokes" adapter="SigprocAdapter" file="/home/lessju/Code/lofarTest.fil"/>
             </FileDataClient>
         </clients>
 
@@ -33,7 +33,7 @@
 
         <output>
             <dataStreams>
-                <stream name="DedispersedTimeSeries" listeners="DedispersedDataWriter"/> 
+                <stream name="DedispersedTimeSeries" listeners="DedispersedDataWriter"/>
             </dataStreams>
             <streamers>
                 <DedispersedDataWriter>

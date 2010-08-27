@@ -3,10 +3,10 @@
 
 #include "pelican/core/AbstractPipeline.h"
 #include "pelican/data/DataBlob.h"
-#include "TimeStreamData.h"
 #include "PPFChanneliser.h"
 #include "StokesGenerator.h"
-#include "SubbandSpectra.h"
+#include "TimeSeriesDataSet.h"
+#include "SpectrumDataSet.h"
 #include "DedispersedTimeSeries.h"
 #include "MdsmModule.h"
 
@@ -32,12 +32,12 @@ class MdsmPipeline : public AbstractPipeline
         StokesGenerator* stokesGenerator;
 
         /// Local data blobs
-        SubbandSpectraC32* spectra;
-        SubbandTimeSeriesC32* timeSeries;
-        SubbandSpectraStokes* stokes;
+        SpectrumDataSetC32* spectra;
+        TimeSeriesDataSetC32* timeSeries;
+        SpectrumDataSetStokes* stokes;
         DedispersedTimeSeriesF32* dedispersedData;
 
         unsigned _iteration;
 };
 
-#endif // MDSMPIPELINE_H 
+#endif // MDSMPIPELINE_H

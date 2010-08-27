@@ -20,30 +20,30 @@ void SigprocMdsmPipeline::init()
     dedispersedData = (DedispersedTimeSeriesF32*) createBlob("DedispersedTimeSeriesF32");
 
     // Request remote data
-    requestRemoteData("SubbandSpectraStokes");
+    requestRemoteData("SpectrumDataSetStokes");
 }
 
 // Run the pipeline
 void SigprocMdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
 {
     // Get pointer to the remote TimeStreamData data blob
-	stokes = (SubbandSpectraStokes*) remoteData["SubbandSpectraStokes"];
+    stokes = (SpectrumDataSetStokes*) remoteData["SpectrumDataSetStokes"];
 
     if (stokes -> nSpectra() == 0) {
-    	std::cout << "Reached end of file" << std::endl;
-    	for (unsigned i = 0; i < 2; i++) { // NOTE: Too dependent on MDSM's internal state
-    		std::cout << "Processing extra step " << i << std::endl;
-    		mdsm->run(stokes, dedispersedData);
-    		dataOutput(dedispersedData, "DedispersedTimeSeries");
-    		stop();
-    	}
+        std::cout << "Reached end of file" << std::endl;
+        for (unsigned i = 0; i < 2; i++) { // NOTE: Too dependent on MDSM's internal state
+            std::cout << "Processing extra step " << i << std::endl;
+            mdsm->run(stokes, dedispersedData);
+            dataOutput(dedispersedData, "DedispersedTimeSeries");
+            stop();
+        }
     }
 
     // Run modules
     mdsm->run(stokes, dedispersedData);
 
     // Output channelised data
-	dataOutput(dedispersedData, "DedispersedTimeSeries");
+    dataOutput(dedispersedData, "DedispersedTimeSeries");
 
     _iteration++;
 }

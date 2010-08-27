@@ -2,14 +2,12 @@
 #define SigprocAdapter_H
 
 #include "pelican/core/AbstractStreamAdapter.h"
-#include "SubbandSpectra.h"
+#include "SpectrumDataSet.h"
 #include "file_handler.h"
 #include <complex>
 
 using namespace pelican;
 using namespace pelican::lofar;
-
-//class AdapterSubbandTimeSeries
 
 class SigprocAdapter: public AbstractStreamAdapter
 {
@@ -29,7 +27,7 @@ class SigprocAdapter: public AbstractStreamAdapter
         void _checkData();
 
     private:
-        SubbandSpectraStokes* _stokesData;
+        SpectrumDataSetStokes* _stokesData;
         FILE_HEADER* _header;
         FILE *_fp;
 

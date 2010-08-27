@@ -3,7 +3,7 @@
 
 #include "pelican/modules/AbstractModule.h"
 #include "DedispersedTimeSeries.h"
-#include "SubbandSpectra.h"
+#include "SpectrumDataSet.h"
 #include "survey.h"
 
 using namespace pelican;
@@ -11,7 +11,7 @@ using namespace pelican::lofar;
 
 class MdsmModule : public AbstractModule
 {
-	public:
+    public:
         /// Constructs the channeliser module.
         MdsmModule(const ConfigNode& config);
 
@@ -19,7 +19,7 @@ class MdsmModule : public AbstractModule
         ~MdsmModule();
 
         /// Perform Dedispersion;
-        void run(SubbandSpectraStokes* timeData, DedispersedTimeSeriesF32* dedispersedData);
+        void run(SpectrumDataSetStokes* timeData, DedispersedTimeSeriesF32* dedispersedData);
 
     private:
         SURVEY       *_survey;

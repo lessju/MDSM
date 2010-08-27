@@ -1,10 +1,14 @@
 #include "pelican/core/PipelineApplication.h"
-#include "LofarTypes.h"
+
 #include "MdsmPipeline.h"
-#include "AdapterSubbandTimeSeries.h"
-#include "SubbandTimeSeries.h"
+
+#include "LofarTypes.h"
+#include "AdapterTimeSeriesDataSet.h"
+#include "TimeSeriesDataSet.h"
 #include "LofarChunker.h"
+
 #include <QtCore/QCoreApplication>
+
 #include <iostream>
 #include <map>
 

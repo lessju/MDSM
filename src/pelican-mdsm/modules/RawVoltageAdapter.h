@@ -2,13 +2,12 @@
 #define RawVoltageAdapter_H
 
 #include "pelican/core/AbstractStreamAdapter.h"
-#include "SubbandTimeSeries.h"
+#include "TimeSeriesDataSet.h"
 #include <complex>
 
 using namespace pelican;
 using namespace pelican::lofar;
 
-//class AdapterSubbandTimeSeries
 
 class RawVoltageAdapter: public AbstractStreamAdapter
 {
@@ -28,7 +27,7 @@ class RawVoltageAdapter: public AbstractStreamAdapter
         void _checkData();
 
     private:
-        SubbandTimeSeriesC32* _timeData;
+        TimeSeriesDataSetC32* _timeData;
         unsigned _nSamples;
         unsigned _nSubbands;
         unsigned _nPolarisations;

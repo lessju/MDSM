@@ -5,18 +5,18 @@
     <pipeline>
 
         <buffers>
-           <SubbandTimeSeriesC32>
+           <TimeSeriesDataSetC32>
                <buffer maxSize="100000000" maxChunkSize="100000000"/>
-           </SubbandTimeSeriesC32>
+           </TimeSeriesDataSetC32>
         </buffers>
 
         <chunkers>
            <MedicinaChunker>
-               <data type="SubbandTimeSeriesC32"/>
+               <data type="TimeSeriesDataSetC32"/>
                <connection host="127.0.0.1" port="8090"/>
                <params samplesPerPacket="1"
                        nrPolarisation="1"
-                       subbandsPerPacket="1024" 
+                       subbandsPerPacket="1024"
                        packets="128"
                        clock="0.05"/>  <!-- 2048 = #Channles * #Beams -->
                <samples type="8" />
@@ -24,7 +24,7 @@
         </chunkers>
 
         <adapters>
-            <AdapterSubbandTimeSeries>
+            <AdapterTimeSeriesDataSet>
                 <packetsPerChunk number="128"/>
                 <subbands number="1024" />
                 <polarisations number="1" />
@@ -32,12 +32,12 @@
                 <sampleSize bits="8" />
                 <fixedSizePackets value="false" />
                 <samplesPerTimeBlock number="128"/>
-            </AdapterSubbandTimeSeries>
+            </AdapterTimeSeriesDataSet>
         </adapters>
 
         <clients>
             <MedicinaStreamDataClient>
-                <data type="SubbandTimeSeriesC32" adapter="AdapterSubbandTimeSeries" />
+                <data type="TimeSeriesDataSetC32" adapter="AdapterTimeSeriesDataSet" />
             </MedicinaStreamDataClient>
         </clients>
 
@@ -58,8 +58,8 @@
 
         <output>
             <dataStreams>
-                <stream name="SubbandSpectraStokes" listeners="PelicanTCPBlobServer" />  
-<!--                <stream name="SubbandSpectraStokes" listeners="SigprocStokesWriter"/>-->
+                <stream name="SpectrumDataSetStokes" listeners="PelicanTCPBlobServer" />
+<!--                <stream name="SpectrumDataSetStokes" listeners="SigprocStokesWriter"/>-->
             </dataStreams>
             <streamers>
 <!--                <SigprocStokesWriter>-->
