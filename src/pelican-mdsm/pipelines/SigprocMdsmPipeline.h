@@ -1,23 +1,21 @@
-#ifndef MDSMPIPELINE_H
-#define MDSMPIPELINE_H
+#ifndef SigprocMdsmPipeline_H
+#define SigprocMdsmPipeline_H
 
 #include "pelican/core/AbstractPipeline.h"
 #include "pelican/data/DataBlob.h"
-#include "TimeStreamData.h"
-#include "PPFChanneliser.h"
-#include "StokesGenerator.h"
 #include "SubbandSpectra.h"
 #include "DedispersedTimeSeries.h"
+#include "DedispersedDataWriter.h"
 #include "MdsmModule.h"
 
 using namespace pelican;
 using namespace pelican::lofar;
 
-class MdsmPipeline : public AbstractPipeline
+class SigprocMdsmPipeline : public AbstractPipeline
 {
     public:
-        MdsmPipeline();
-        ~MdsmPipeline();
+        SigprocMdsmPipeline();
+        ~SigprocMdsmPipeline();
 
         /// Initialises the pipeline.
         void init();
@@ -28,16 +26,12 @@ class MdsmPipeline : public AbstractPipeline
     private:
         /// Module pointers
         MdsmModule* mdsm;
-        PPFChanneliser* ppfChanneliser;
-        StokesGenerator* stokesGenerator;
 
         /// Local data blobs
-        SubbandSpectraC32* spectra;
-        SubbandTimeSeriesC32* timeSeries;
         SubbandSpectraStokes* stokes;
         DedispersedTimeSeriesF32* dedispersedData;
 
         unsigned _iteration;
 };
 
-#endif // MDSMPIPELINE_H 
+#endif // SigprocMdsmPipeline_H

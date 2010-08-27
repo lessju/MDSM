@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pelican>
+
+<configuration version="1.0">
+
+    <pipeline>
+        <buffers>
+           <SubbandSpectraStokes>
+               <buffer maxSize="100000000" maxChunkSize="100000000"/>
+           </SubbandSpectraStokes>
+        </buffers>
+
+        <adapters>
+            <SigprocAdapter>
+                <sampleSize bits="8"/>
+                <subbands number="2048" />
+                <samplesPerRead number="2048" />
+            </SigprocAdapter>
+        </adapters>
+
+        <clients>
+            <FileDataClient>
+                <data type="SubbandSpectraStokes" adapter="SigprocAdapter" file="/home/lessju/Code/lofarTest.fil"/>
+            </FileDataClient>
+        </clients>
+
+        <modules>
+            <MdsmModule>
+                <observationfile filepath="/home/lessju/Code/lofarTest.xml" />
+                <createOutputBlob value="1" />
+            </MdsmModule>
+        </modules>
+
+        <output>
+            <dataStreams>
+                <stream name="DedispersedTimeSeries" listeners="DedispersedDataWriter"/> 
+            </dataStreams>
+            <streamers>
+                <DedispersedDataWriter>
+                    <file prefix="lofaTest" />
+                    <params channelOneFrequency="126"
+                            frequencyOffset="-0.002954"
+                            numberOfChannels="1"
+                            samplingTime="330" />
+                    <DMs values="40,50,60" />
+                </DedispersedDataWriter>
+            </streamers>
+        </output>
+
+    </pipeline>
+</configuration>

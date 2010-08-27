@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pelican>
+
+<configuration version="1.0">
+    <pipeline>
+
+        <buffers>
+           <SubbandTimeSeriesC32>
+               <buffer maxSize="100000000" maxChunkSize="100000000"/>
+           </SubbandTimeSeriesC32>
+        </buffers>
+
+        <chunkers>
+           <LofarChunker>
+               <data type="SubbandTimeSeriesC32"/>
+               <connection host="127.0.0.1" port="8090"/>
+               <params samplesPerPacket="32"
+                       nrPolarisation="2"
+                       subbandsPerPacket="31"
+                       packets="16"
+                       clock="200"/> <!-- packets = packets in a chunk -->
+               <samples type="8" />
+           </LofarChunker>
+        </chunkers>
+        
+        <adapters>
+            <AdapterSubbandTimeSeries>
+                <fixedSizePackets value="false" />
+                <sampleSize bits="8" />
+                <packetsPerChunk number="16"/>
+                <samplesPerPacket number="32"/>
+                <samplesPerTimeBlock number="64"/>
+                <subbands number="31"/> <!-- number of subbands -->
+                <polarisations number="2"/>
+            </AdapterSubbandTimeSeries>
+        </adapters>
+
+        <clients>
+            <LofarStreamDataClient>
+                <data type="SubbandTimeSeriesC32" adapter="AdapterSubbandTimeSeries" />
+            </LofarStreamDataClient>
+        </clients>
+
+        <modules>
+            <PPFChanneliser>
+                <channels number="64" />
+                <processingThreads number="2" />
+                <filter nTaps="8" filterWindow="kaiser"/>
+            </PPFChanneliser>
+
+            <StokesGenerator>
+            </StokesGenerator>
+            
+            <MdsmModule>
+                <observationfile filepath="/home/lessju/Code/lofarTest.xml" />
+                <createOutputBlob value="1" />
+            </MdsmModule>
+        </modules>
+
+        <output>
+            <dataStreams>
+                <stream name="DedispersedTimeSeries" listeners="DedispersedDataWriter"/> 
+            </dataStreams>
+            <streamers>
+                <DedispersedDataWriter>
+                    <file prefix="lofaTest" />
+                    <params channelOneFrequency="126"
+                            frequencyOffset="-0.002954"
+                            numberOfChannels="1"
+                            samplingTime="330" />
+                    <DMs values="40,50,60" />
+                </DedispersedDataWriter>
+            </streamers>
+        </output>
+
+    </pipeline>
+</configuration>
+
+

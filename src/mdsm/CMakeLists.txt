@@ -17,6 +17,7 @@ target_link_libraries(mdsm-cuda
 set(dedispersion_SRC
     dedispersion_manager.cpp
     dedispersion_output.cpp
+    file_handler.cpp
 )
 
 add_library(mdsm STATIC ${dedispersion_SRC})

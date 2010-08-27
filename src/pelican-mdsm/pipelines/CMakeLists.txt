@@ -2,6 +2,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(pipeline_lib_src
     src/MdsmPipeline.cpp
+    src/SigprocMdsmPipeline.cpp
 )
 add_library(pelicanMdsm ${pipeline_lib_src} )
 target_link_libraries(pelicanMdsm
@@ -20,6 +21,11 @@ set_target_properties(mdsmPipeline PROPERTIES
 )
 
 target_link_libraries(mdsmPipeline
+    pelicanMdsm
+)
+
+add_executable(sigprocPipeline src/sigprocMain.cpp)
+target_link_libraries(sigprocPipeline
     pelicanMdsm
 )
 

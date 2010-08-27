@@ -6,7 +6,8 @@
 
 SURVEY *processSurveyParameters(QString filepath);
 float* initialiseMDSM(SURVEY* input_survey);
-int process_chunk(unsigned int data_read, long long timestamp = 0, long blockRate = 0);
+float* next_chunk(unsigned int data_read, unsigned &samples, long long timestamp = 0, long blockRate = 0);
+int start_processing(unsigned int data_read);
 void tearDownMDSM();
 
 #endif // DEDISPERSION_MANAGER_H_

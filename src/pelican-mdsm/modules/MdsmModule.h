@@ -2,6 +2,7 @@
 #define MDSM_MODULE_H
 
 #include "pelican/modules/AbstractModule.h"
+#include "DedispersedTimeSeries.h"
 #include "SubbandSpectra.h"
 #include "survey.h"
 
@@ -18,10 +19,11 @@ class MdsmModule : public AbstractModule
         ~MdsmModule();
 
         /// Perform Dedispersion;
-        void run(SubbandSpectraStokes* timeData);
+        void run(SubbandSpectraStokes* timeData, DedispersedTimeSeriesF32* dedispersedData);
 
     private:
         SURVEY       *_survey;
+        bool		 _createOutputBlob;
         float        *_input_buffer;
         unsigned int _samples;
         unsigned int _counter;

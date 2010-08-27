@@ -3,13 +3,15 @@
 
 #include "pthread.h"
 #include "survey.h"
+#include "unistd.h"
 
 typedef struct {
     // Input parameters
     int nthreads, iterations, maxiters;
 
     // Input and output buffers memory pointers
-    float** output_buffer;
+    float* output_buffer;
+    size_t dedispersed_size;
    
     // Thread-specific info + synchronisation objects
     unsigned short stop;

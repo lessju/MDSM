@@ -24,11 +24,13 @@ THREAD_PARAMS* threads_params;
 float *dmshifts;
 unsigned long *inputsize, *outputsize;
 float* input_buffer;
-float** output_buffer;
+float* output_buffer;
 pthread_rwlock_t rw_lock = PTHREAD_RWLOCK_INITIALIZER;
 pthread_barrier_t input_barrier, output_barrier;
 OUTPUT_PARAMS output_params;
 int loop_counter = 0, num_devices, ret;
+bool outSwitch = true;
+unsigned pnsamp, ppnsamp;
 
 #include <iostream>
 
@@ -77,6 +79,12 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> pass_parameters = (SUBBAND_PASSES *) malloc(passes * sizeof(SUBBAND_PASSES));
     passes = 0;
 
+    // Assign default values;
+    survey -> useBruteForce = 0;
+    survey -> nsamp = 0;
+    survey -> fp = NULL;
+    survey -> nbits = 0;
+
     // Start parsing observation file and generate survey parameters
     n = root.firstChild();
     while( !n.isNull() )
@@ -88,13 +96,20 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> fch1 = e.attribute("center").toFloat();
                 survey -> foff = e.attribute("offset").toFloat();
             }
-            else if (QString::compare(e.tagName(), QString("dm"), Qt::CaseInsensitive) == 0) ;
+            else if (QString::compare(e.tagName(), QString("dm"), Qt::CaseInsensitive) == 0) {
+                survey -> lowdm = e.attribute("lowDM").toFloat();
+                survey -> tdms = e.attribute("numDMs").toUInt();
+                survey -> dmstep = e.attribute("dmStep").toFloat();
+                survey -> useBruteForce = (bool) e.attribute("useBruteForce").toInt();
+            }
             else if (QString::compare(e.tagName(), QString("channels"), Qt::CaseInsensitive) == 0) {
                 survey -> nchans = e.attribute("number").toUInt();
                 survey -> nsubs = e.attribute("subbands").toUInt();
             }
             else if (QString::compare(e.tagName(), QString("timing"), Qt::CaseInsensitive) == 0)
-                survey -> tsamp = e.attribute("tsamp").toFloat() * 1000;
+                survey -> tsamp = e.attribute("tsamp").toFloat();
+            else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0)
+			   survey -> nsamp = e.attribute("number").toUInt();
 
             // Refers to a new pass subsection
             else if (QString::compare(e.tagName(), QString("passes"), Qt::CaseInsensitive) == 0) {
@@ -136,15 +151,14 @@ SURVEY* processSurveyParameters(QString filepath)
         }
         n = n.nextSibling();
     }
-    survey -> tdms = 0;
-    for(i = 0; i < survey -> num_passes; i++)
-        survey -> tdms += survey -> pass_parameters[i].ndms;
+
+    if (!(survey -> useBruteForce)) {
+		survey -> tdms = 0;
+		for(i = 0; i < survey -> num_passes; i++)
+			survey -> tdms += survey -> pass_parameters[i].ndms;
+    }
 
     // TODO: Survey parameter checks
-    // Assign default values;
-    survey -> nsamp = 0;
-    survey -> fp = NULL;
-    survey -> nbits = 0;
 
     return survey;
 }
@@ -156,8 +170,8 @@ inline int max(int a, int b) {
   return a > b ? a : b;
 }
 
-// Calculate number of samples which can be loaded at once
-int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigned long int memory)
+// Calculate number of samples which can be loaded at once for subband dedispersion
+int calculate_nsamp_subband(int maxshift, size_t *inputsize, size_t* outputsize, unsigned long int memory)
 {
     unsigned int i, input = 0, output = 0, chans = 0;
 
@@ -175,26 +189,47 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigne
 
     if (survey -> nsamp == 0)
         survey -> nsamp = ((memory * 256 * 0.95) / (max(input, chans) + max(output, input))) - maxshift;
-//    survey -> nsamp = 2048 * 1024;
 
     // Round down nsamp to multiple of the largest binsize
     if (survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
         survey -> nsamp -= survey -> nsamp % survey -> pass_parameters[survey -> num_passes - 1].binsize;
 
-    *inputsize = max(input, chans) * (survey -> nsamp + maxshift) * sizeof(float);  
+    *inputsize = max(input, chans) * (survey -> nsamp + maxshift) * sizeof(float);
     *outputsize = max(output, input) * (survey -> nsamp + maxshift) * sizeof(float);
-    printf("Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
+    printf("[Subband] Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
 
     return survey -> nsamp;
+}
+
+// Calculate number of samples which can be loaded at once for brute-force dedispersion
+int calculate_nsamp_brute(int maxshift, size_t *inputsize, size_t* outputsize, unsigned long int memory)
+{
+    if (survey -> nsamp == 0)
+    	survey -> nsamp = ((memory * 1000 * 0.99 / sizeof(float)) - maxshift * survey -> nchans) / (survey -> nchans + survey -> tdms);
+
+    *inputsize = (survey -> nsamp + maxshift) * survey -> nchans * sizeof(float);
+    *outputsize = survey -> nsamp * survey -> tdms * sizeof(float);
+    printf("[Brute Force] Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
+
+	return survey -> nsamp;
+}
+
+// Calculate number of samples which can be loaded at once (calls appropriate method)
+int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigned long int memory)
+{
+	if (survey -> useBruteForce)
+		return calculate_nsamp_brute(maxshift, inputsize, outputsize, memory);
+	else
+		return calculate_nsamp_subband(maxshift, inputsize, outputsize, memory);
 }
 
 // DM delay calculation
 float dmdelay(float f1, float f2)
 {
-  return(4148741.601 * ((1.0 / f1 / f1) - (1.0 / f2 / f2)));
+  return(4148.741601 * ((1.0 / f1 / f1) - (1.0 / f2 / f2)));
 }
 
-// Initliase MDSM parameters, return poi/home/lessju/Code/MDSM/src/mdsm/dedispersion_manager.cpp: In function ‘float* inter to input buffer where
+// Initliase MDSM parameters, return poiinter to input buffer where
 // input data will be stored
 float* initialiseMDSM(SURVEY* input_survey)
 {
@@ -220,7 +255,10 @@ float* initialiseMDSM(SURVEY* input_survey)
 
     // Calculate maxshift (maximum for all threads)
     // TODO: calculate proper maxshift
-    maxshift = dmshifts[survey -> nchans - 1] * survey -> pass_parameters[survey -> num_passes - 1].highdm / survey -> tsamp;
+    float hiDM = (survey -> useBruteForce) ?
+    			 survey -> lowdm + survey -> dmstep * survey -> tdms :
+    			 survey -> pass_parameters[survey -> num_passes - 1].highdm;
+    maxshift = dmshifts[survey -> nchans - 1] * hiDM / survey -> tsamp;
     survey -> maxshift = maxshift;
 
     // Calculate nsamp
@@ -228,16 +266,25 @@ float* initialiseMDSM(SURVEY* input_survey)
     outputsize = (size_t *) malloc(sizeof(size_t));
     survey -> nsamp = calculate_nsamp(maxshift, inputsize, outputsize, devices -> minTotalGlobalMem);
 
+    // Calculate output dedispersion size
+    size_t outsize = 0;
+    if (survey -> useBruteForce)
+    	outsize = *outputsize / sizeof(float);
+    else {
+		for(i = 0; i < survey -> num_passes; i++)
+			outsize += (survey -> pass_parameters[i].ncalls / num_devices) * survey -> pass_parameters[i].calldms
+					   / survey -> pass_parameters[i].binsize;
+		outsize *= survey -> nsamp;
+    }
+
     // Initialise buffers and create output buffer (a separate buffer for each GPU output)
     input_buffer = (float *) malloc(*inputsize);
-    output_buffer = (float **) malloc(num_devices * sizeof(float *));
-    for(k = 0; k < num_devices; k++)
-        output_buffer[k] = (float *) malloc(*outputsize);
+    output_buffer = (float *) malloc(num_devices * outsize * sizeof(float));
 
     // Log parameters
     printf("nchans: %d, nsamp: %d, tsamp: %f, foff: %f, fch1: %f\n", survey -> nchans, 
            survey -> nsamp, survey -> tsamp, survey -> foff, survey -> fch1);
-    printf("ndms: %d, max dm: %f, maxshift: %d\n", survey -> tdms, survey -> pass_parameters[survey -> num_passes - 1].highdm, maxshift);
+    printf("ndms: %d, max dm: %f, maxshift: %d\n", survey -> tdms, hiDM, maxshift);
 
     if (pthread_barrier_init(&input_barrier, NULL, num_devices + 2))
         { fprintf(stderr, "Unable to i nitialise input barrier\n"); exit(0); }
@@ -250,6 +297,7 @@ float* initialiseMDSM(SURVEY* input_survey)
     output_params.iterations = 2;
     output_params.maxiters = 2;
     output_params.output_buffer = output_buffer;
+    output_params.dedispersed_size = outsize;
     output_params.stop = 0;
     output_params.rw_lock = &rw_lock;
     output_params.input_barrier = &input_barrier;
@@ -270,8 +318,9 @@ float* initialiseMDSM(SURVEY* input_survey)
         threads_params[k].maxiters = 2;
         threads_params[k].stop = 0;
         threads_params[k].maxshift = maxshift;
+        threads_params[k].dedispersed_size = outsize;
         threads_params[k].binsize = 1;
-        threads_params[k].output = output_buffer[k];
+        threads_params[k].output = &output_buffer[*outputsize * k * sizeof(float)];
         threads_params[k].input = input_buffer;
         threads_params[k].dmshifts = dmshifts;
         threads_params[k].thread_num = k;
@@ -317,9 +366,6 @@ void tearDownMDSM()
     pthread_barrier_destroy(&output_barrier);
     
     // Free memory
-    for(k = 0; k < num_devices; k++)
-       free(output_buffer[k]);
-
     free(devices -> devices);
     free(devices);
 
@@ -333,7 +379,7 @@ void tearDownMDSM()
 }
 
 // Process one data chunk
-int process_chunk(unsigned int data_read, long long timestamp = 0, long blockRate = 0)
+float *next_chunk(unsigned int data_read, unsigned &samples, long long timestamp = 0, long blockRate = 0)
 {   
     int k;
 
@@ -348,6 +394,9 @@ int process_chunk(unsigned int data_read, long long timestamp = 0, long blockRat
     if (!(ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD))
         { fprintf(stderr, "Error during barrier synchronisation\n"); exit(0); }
 
+    ppnsamp = pnsamp;
+    pnsamp = data_read;
+
     // Stopping clause (handled internally)
     if (data_read == 0) { 
         output_params.stop = 1;
@@ -358,17 +407,14 @@ int process_chunk(unsigned int data_read, long long timestamp = 0, long blockRat
         if (pthread_rwlock_unlock(&rw_lock))
             { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
-        // Reach barriers maxiters times to wait for rest to process
-        for(i = 0; i < 2 - 1; i++) {
-            pthread_barrier_wait(&input_barrier);
-            pthread_barrier_wait(&output_barrier);
-        }  
-        return 0;
+        // Return first buffered data
+        samples = ppnsamp;
+        return output_buffer;
 
     // Update thread params
     } else {
 
-      if (data_read < survey -> nsamp) {
+      if (data_read < survey -> nsamp && !survey->useBruteForce ) {
           // Round down nsamp to multiple of the largest binsize
           if (data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize != 0)
               data_read -= data_read % survey -> pass_parameters[survey -> num_passes - 1].binsize;
@@ -387,11 +433,29 @@ int process_chunk(unsigned int data_read, long long timestamp = 0, long blockRat
     if (pthread_rwlock_unlock(&rw_lock))
         { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
-    // Wait input barrier (since input is being handled by the calling host code
+    if (loop_counter >= 2) {
+    	samples = ppnsamp;
+    	return output_buffer;
+    }
+    else {
+    	samples = -1;
+    	return NULL;
+    }
+}
+
+// Start processing next chunk
+int start_processing(unsigned int data_read) {
+
+	// Stopping clause must be handled here... we need to return buffered processed data
+	if (data_read == 0 && outSwitch)
+        outSwitch = false;
+	else if (data_read == 0 && !outSwitch)
+		return 0;
+
+	// Wait input barrier (since input is being handled by the calling host code
     ret = pthread_barrier_wait(&input_barrier);
     if (!(ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD))
         { fprintf(stderr, "Error during barrier synchronisation\n"); exit(0); }
 
     return ++loop_counter;
 }
-

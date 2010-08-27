@@ -1,9 +1,7 @@
 #include "pelican/core/PipelineApplication.h"
 #include "LofarTypes.h"
-#include "MdsmPipeline.h"
-#include "AdapterSubbandTimeSeries.h"
-#include "SubbandTimeSeries.h"
-#include "LofarChunker.h"
+#include "SigprocMdsmPipeline.h"
+#include "SigprocAdapter.h"
 #include <QtCore/QCoreApplication>
 #include <iostream>
 #include <map>
@@ -21,10 +19,10 @@ int main(int argc, char* argv[])
         PipelineApplication pApp(argc, argv);
 
         // Register the pipelines that can run.
-        pApp.registerPipeline(new MdsmPipeline);
+        pApp.registerPipeline(new SigprocMdsmPipeline);
 
         // Set the data client.
-        pApp.setDataClient("LofarStreamDataClient");
+        pApp.setDataClient("FileDataClient");
 
         // Start the pipeline driver.
         pApp.start();

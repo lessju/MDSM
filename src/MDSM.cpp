@@ -9,6 +9,9 @@
 // C++ stuff
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
+#include <DedispersedSeries.h>
+#include "DedispersedTimeSeries.h"
 
 #define USING_PELICAN_LOFAR 0
 
@@ -104,46 +107,62 @@ int main(int argc, char *argv[])
 {
     // Create mait QCoreApplication instance
     QCoreApplication app(argc, argv);
-    SURVEY* survey = NULL;
-    #if USING_PELICAN_LOFAR == 1
-        // Initialiase Pelican Lofar client if using it
-//        survey = lofar_process_arguments();
-//        PelicanLofarClient lofarClient("ChannelisedStreamData", "127.0.0.1", 6969);
-    #else
-        survey = file_process_arguments(argc, argv);
-    #endif
+    SURVEY* survey = file_process_arguments(argc, argv);
+
     // Initialise Dedispersion code
     // NOTE: survey will be updated with MDSM parameters
     float *input_buffer = NULL;
+    float *outputBuffer = NULL;
+    int retVal;
     input_buffer = initialiseMDSM(survey);
 
     // Process current chunk
     unsigned int counter = 0, data_read = 0, total = 0;
     while (TRUE) {
 
-        #if USING_PELICAN_LOFAR == 1
-            //  RECEIVING DATA FROM LOFAR (OR LOFAR EMULATOR)
-//            if (counter == 0)
-//                data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp + survey -> maxshift) - survey -> maxshift;
-//            else
-//                data_read = lofarClient.getNextBuffer(input_buffer, survey -> nsamp);
-        #else
-            // READING DATA FROM FILE
-            if (counter == 0) {   // First read, read in maxshift (TODO: need to be changed to handle maxshift internally
+		// READING DATA FROM FILE
+		if (counter == 0) {   // First read, read in maxshift (TODO: need to be changed to handle maxshift internally
 
-                data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp + survey -> maxshift, 
-                                           survey -> nchans);
-                if (data_read < survey -> maxshift) {
-                    fprintf(stderr, "Not enough samples in file to perform dediseprsion\n");
-                    data_read = 0;
-                }
-                else
-                    data_read -= survey -> maxshift;
-            }
-            else                 // Read in normally 
-                data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
-        #endif
-        if (!process_chunk(data_read, total, 1)) break;
+			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp + survey -> maxshift,
+									   survey -> nchans);
+			if (data_read < survey -> maxshift) {
+				fprintf(stderr, "Not enough samples in file to perform dediseprsion\n");
+				data_read = 0;
+			}
+			else
+				data_read -= survey -> maxshift;
+		}
+		else                 // Read in normally
+			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
+
+		unsigned samples;
+		outputBuffer = next_chunk(data_read, samples, total, 1);
+        retVal = start_processing(data_read);
+
+        // OutputBuffer available
+        if (outputBuffer != NULL) {
+
+        	// Create dedispersed time series data blob
+        	DedispersedTimeSeriesF32 blob;
+        	blob.resize(survey -> tdms);
+
+        	if (survey -> useBruteForce) {
+        		// All DMs have same number of samples
+        		DedispersedSeries<float>* data;
+        		for (unsigned d = 0; d < survey -> tdms; d++) {
+        			data  = blob.samples(d);
+        			data -> resize(samples);
+        			data -> setDmValue(survey -> lowdm + survey -> dmstep * d);
+        			memcpy(data -> ptr(), &outputBuffer[d * samples], samples * sizeof(float));
+      			}
+        	}
+        	else {
+        	 ;	// Number of samples differs among passes
+        	}
+        }
+
+        // Check if there is more processing to be done
+        if (!retVal) break;
        
         total += data_read;
         counter++;

@@ -64,7 +64,6 @@ include_directories(${PELICAN_INCLUDE_DIR})
 
 # === Recurse into sub-directories defined in modules.cmake.
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/standalone")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/pelican-mdsm/modules")
 include_directories(${QT_QTXML_INCLUDE_DIR})
 include(modules.cmake)
@@ -75,7 +74,6 @@ target_link_libraries(standalone-mdsm
     ${QT_QTCORE_LIBRARY}
     ${PELICAN_LOFAR_LIBRARIES}
     ${PELICAN_LIBRARIES}
-    standalone
     mdsm-cuda
     mdsm
 )

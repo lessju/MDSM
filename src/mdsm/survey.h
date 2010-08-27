@@ -16,6 +16,12 @@ typedef struct {
     unsigned int nsamp, nchans, tdms, maxshift, nbits;
     float tsamp, foff, fch1;
     
+    // Switch between brute-froce & subband dedisp
+    bool useBruteForce;
+
+    // Brute Force parameters
+	float lowdm, dmstep;
+
     // subband dedispersion paramters
     SUBBAND_PASSES *pass_parameters;
     unsigned num_passes, nsubs;
@@ -27,7 +33,7 @@ typedef struct {
     // File pointer (to be substitued with QIODevice)
     FILE *fp;
 
-    // Number of GPUs which
+    // Number of GPUs which are used
     unsigned num_threads;
 
 } SURVEY;

@@ -34,7 +34,6 @@
                 <subbands number="1" />
                 <polarisations number="1" />
                 <samplesPerRead number="64" />
-                <hasTotalPower value="0" />
             </RawVoltageAdapter>
         </adapters>
 
