@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "unistd.h"
+#include "time.h"
+#include "string.h"
 
-float fch1 = 120, foff = -0.195, tsamp = 0.000661, dmstep = 0.065, startdm = 0;
-int nchans = 512, nsamp = 32 * 1024, tdms = 1200;
+float fch1 = 126, foff = -6, tsamp = 5e-6, dmstep = 0.065, startdm = 0;
+int nchans = 128, nsamp = 1024, tdms = 128, threads = 1;
 
 // Process command-line parameters
 void process_arguments(int argc, char *argv[])
@@ -19,8 +21,19 @@ void process_arguments(int argc, char *argv[])
            nchans = atoi(argv[++i]);
        else if (!strcmp(argv[i], "-nsamp"))
            nsamp = atoi(argv[++i]);
+       else if (!strcmp(argv[i], "-dmstep"))
+           dmstep = atof(argv[++i]);
+       else if (!strcmp(argv[i], "-startdm"))
+           startdm = atof(argv[++i]);
+       else if (!strcmp(argv[i], "-tdms"))
+           tdms = atoi(argv[++i]);
+       else if (!strcmp(argv[i], "-threads"))
+           threads = atoi(argv[++i]);
        i++;
     }
+
+    foff = foff / (float) nchans;
+    tsamp = tsamp * nchans;
 }
 
 // Fill buffer with data (blocking call)
@@ -47,6 +60,9 @@ int main(int argc, char *argv[])
 
    process_arguments(argc, argv);
 
+   printf("nsamp: %d, nchans: %d, tsamp: %f, startdm: %f, dmstep: %f, tdms: %d, fch1: %f, foff: %f\n",
+           nsamp, nchans, tsamp, startdm, dmstep, tdms, fch1, foff);
+
     // Calculate DM-shifts
     int **dmshifts = (int **) malloc(tdms * sizeof(int *));
     for (n = 0; n < tdms; n++) {
@@ -63,20 +79,18 @@ int main(int argc, char *argv[])
     output = (float *) malloc( nsamp * tdms * sizeof(float));
 
    // Dedisperse
+   generate_data(input, nsamp + maxshift, nchans);
+
    time_t start = time(NULL);
-   for(counter = 0; counter < 2076923; counter+= nsamp) {
-
-       generate_data(input, nsamp + maxshift, nchans);
-       printf("%d: %f done\n", (int) (time(NULL) - start), 100 * nsamp * counter / (double) (2076923 ));
-       for(n = 0; n < tdms; n++)
-           for(s = 0; s < nsamp; s++) {
-
-               value = 0;
-               for(c = 0; c < nchans; c++)
-                   value += input[(s + dmshifts[n][c]) * nchans + c];
-               output[s * tdms + n] = value;
-           }
+   for(n = 0; n < tdms; n++) {
+       for(s = 0; s < nsamp; s++) {
+           value = 0;
+           for(c = 0; c < nchans; c++)
+               value += input[(s + dmshifts[n][c]) * nchans + c];
+           output[s * tdms + n] = value;
+       }
     }
+
     printf("Time: %d\n", (int) (time(NULL) - start));
 }
 

@@ -20,7 +20,7 @@ DedispersedDataWriter::DedispersedDataWriter(const ConfigNode& configNode )
     _filePrefix = configNode.getOption("file", "prefix", "MDSM_");
     _fch1     = configNode.getOption("topChannelFrequency", "value", "0").toFloat();
     _foff     = configNode.getOption("frequencyOffset", "value", "0").toFloat();
-    _tsamp    = configNode.getOption("samplingTime", "value", "0").toFloat();
+    _tsamp    = configNode.getOption("samplingTime", "value", "0").toFloat() / 1e6;
     QString dms = configNode.getOption("DMs", "values", "0");
 
     // TODO: Process DMs string to extract proper values;

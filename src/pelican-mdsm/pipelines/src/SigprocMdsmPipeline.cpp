@@ -43,7 +43,7 @@ void SigprocMdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
     mdsm->run(stokes, dedispersedData);
 
     // Output channelised data
-    dataOutput(dedispersedData, "DedispersedTimeSeries");
+    dataOutput(dedispersedData, "DedispersedTimeSeriesF32");
 
     _iteration++;
 }

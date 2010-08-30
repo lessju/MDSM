@@ -29,12 +29,8 @@ void SigprocAdapter::deserialise(QIODevice* in)
         _header = read_header(_fp);
     }
 
-    unsigned dataSize= _nSamples * _nSubbands * _nBits / 8;
-    float *dataTemp = (float *) malloc(dataSize * sizeof(float));
-
-//	in -> seek(_iteration * dataSize);
-
-    unsigned amountRead = read_block(_fp, _nBits, dataTemp, dataSize);
+    float *dataTemp = (float *) malloc(_nSamples * _nSubbands * _nBits / 8 * sizeof(float));
+    unsigned amountRead = read_block(_fp, _nBits, dataTemp, _nSamples * _nSubbands);
 
     // If chunk size is 0, return empty blob (end of file)
     if (amountRead == 0) {
@@ -42,7 +38,7 @@ void SigprocAdapter::deserialise(QIODevice* in)
         _stokesData -> resize(0, 0, 0, 0);
         return;
     }
-    else if (amountRead < dataSize) {
+    else if (amountRead < _nSamples * _nSubbands) {
         // Last chunk in file (ignore?)
         _stokesData -> resize(0, 0, 0, 0);
         return;

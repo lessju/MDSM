@@ -93,7 +93,7 @@ SURVEY* processSurveyParameters(QString filepath)
         if( !e.isNull() )
         {
             if (QString::compare(e.tagName(), QString("frequencies"), Qt::CaseInsensitive) == 0) {
-                survey -> fch1 = e.attribute("center").toFloat();
+                survey -> fch1 = e.attribute("top").toFloat();
                 survey -> foff = e.attribute("offset").toFloat();
             }
             else if (QString::compare(e.tagName(), QString("dm"), Qt::CaseInsensitive) == 0) {

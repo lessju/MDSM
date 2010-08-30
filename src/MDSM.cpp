@@ -112,8 +112,7 @@ int main(int argc, char *argv[])
     // Initialise Dedispersion code
     // NOTE: survey will be updated with MDSM parameters
     float *input_buffer = NULL;
-    float *outputBuffer = NULL;
-    int retVal;
+    int retVal = 0;
     input_buffer = initialiseMDSM(survey);
 
     // Process current chunk
@@ -134,32 +133,6 @@ int main(int argc, char *argv[])
 		}
 		else                 // Read in normally
 			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
-
-		unsigned samples;
-		outputBuffer = next_chunk(data_read, samples, total, 1);
-        retVal = start_processing(data_read);
-
-        // OutputBuffer available
-        if (outputBuffer != NULL) {
-
-        	// Create dedispersed time series data blob
-        	DedispersedTimeSeriesF32 blob;
-        	blob.resize(survey -> tdms);
-
-        	if (survey -> useBruteForce) {
-        		// All DMs have same number of samples
-        		DedispersedSeries<float>* data;
-        		for (unsigned d = 0; d < survey -> tdms; d++) {
-        			data  = blob.samples(d);
-        			data -> resize(samples);
-        			data -> setDmValue(survey -> lowdm + survey -> dmstep * d);
-        			memcpy(data -> ptr(), &outputBuffer[d * samples], samples * sizeof(float));
-      			}
-        	}
-        	else {
-        	 ;	// Number of samples differs among passes
-        	}
-        }
 
         // Check if there is more processing to be done
         if (!retVal) break;
