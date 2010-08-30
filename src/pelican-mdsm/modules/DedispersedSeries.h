@@ -52,7 +52,7 @@ template <class T> class DedispersedSeries
         unsigned nSamples() const { return _samples.size(); }
 
         /// Return the dm value associated with this time series
-        unsigned dmValue() const { return _dmValue; }
+        float dmValue() const { return _dmValue; }
 
         /// Sets the dm value associated with this time series
         void setDmValue(float value) { _dmValue = value; }

@@ -39,7 +39,7 @@ void MdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
         for (unsigned i = 0; i < 2; i++) { // NOTE: Too dependent on MDSM's internal state
             std::cout << "Processing extra step " << i << std::endl;
             mdsm->run(stokes, dedispersedData);
-            dataOutput(dedispersedData, "DedispersedTimeSeries");
+            dataOutput(dedispersedData, "DedispersedTimeSeriesF32");
             stop();
         }
     }
@@ -50,7 +50,9 @@ void MdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
     mdsm->run(stokes, dedispersedData);
 
     // Output channelised data
-    dataOutput(stokes, "DedispersedDataWriter");
+    //    dataOutput(stokes, "DedispersedDataWriter");
+
+    dataOutput(dedispersedData, "DedispersedTimeSeriesF32");
 
     _iteration++;
 }
