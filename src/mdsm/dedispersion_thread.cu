@@ -208,11 +208,11 @@ void brute_force_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* pa
     // ------------------------------------- Perform dedispersion on GPU --------------------------------------
     cudaEventRecord(event_start, 0);
 
-    float startdm = survey -> lowdm * survey -> tdms / survey -> num_threads * params -> thread_num;
+//    float startdm = survey -> lowdm * survey -> tdms / survey -> num_threads * params -> thread_num;
 
-    dedisperse_loop<<< dim3(128, survey -> tdms / survey -> num_threads), 128 >>>
+    dedisperse_loop<<< dim3(128, survey -> tdms), 128 >>>
 			(d_output, d_input, survey -> nsamp, survey -> nchans,
-			 survey -> tsamp, 1, startdm, survey -> dmstep, 0, 0);
+			 survey -> tsamp, 1, survey -> lowdm, survey -> dmstep, 0, 0);
 
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
@@ -258,19 +258,22 @@ void* dedisperse(void* thread_params)
 
             // Read input data into GPU memory
             cudaEventRecord(event_start, 0);
-            if (loop_counter == 1)
+            if (loop_counter == 1) {
                 // First iteration, no available extra samples, so load everything to GPU memory
                 cutilSafeCall( cudaMemcpy(d_input, params -> input, (nsamp + maxshift) * nchans * sizeof(float), cudaMemcpyHostToDevice) );
+                memcpy(tempshift, params -> input + nsamp * nchans, maxshift * nchans * sizeof(float));
+            }
             else {
                 // Shift buffers and load input buffer
                 cutilSafeCall( cudaMemcpy(d_input, tempshift, maxshift * nchans * sizeof(float), cudaMemcpyHostToDevice) );
                 cutilSafeCall( cudaMemcpy(d_input + (maxshift * nchans), params -> input,
                                           nsamp * nchans * sizeof(float), cudaMemcpyHostToDevice) );
+                memcpy(tempshift, params -> input + (nsamp - maxshift) * nchans, maxshift * nchans * sizeof(float));
             }
 
             // Copy maxshift value to temporary host store
             // TODO: Inefficient, find better way
-            memcpy(tempshift, params -> input + nsamp * nchans, maxshift * nchans * sizeof(float));
+//            memcpy(tempshift, params -> input + (nsamp - maxshift) * nchans, maxshift * nchans * sizeof(float));
 
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);

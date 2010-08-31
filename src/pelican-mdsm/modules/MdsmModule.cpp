@@ -10,6 +10,7 @@
 #include <iostream>
 #include <complex>
 #include "math.h"
+#include <cstdlib>
 
 #include <QString>
 
@@ -67,7 +68,7 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
     // NOTE: we always care about the first Stokes parameter (XX)
     for(unsigned t = 0; t < copySamp; t++) {
         for (unsigned s = 0; s < nSubbands; s++) {
-            data = streamData -> spectrumData(t, s, 0);;
+            data = streamData -> spectrumData(t, s, 0);
             for (unsigned c = 0; c < nChannels; c++) {
                 _input_buffer[(_samples + t)* nSubbands * nChannels
                               + s * nChannels + c] = data[c];
@@ -90,6 +91,7 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         float *outputBuffer = next_chunk(numSamp, samples, _timestamp, _blockRate);
 
         if (outputBuffer != NULL && _createOutputBlob) {
+
             // Output available, create data blob
             dedispersedData -> resize(_survey -> tdms);
             if (_survey -> useBruteForce) {
@@ -99,8 +101,11 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
                     data  = dedispersedData -> samples(d);
                     data -> resize(samples);
                     data -> setDmValue(_survey -> lowdm + _survey -> dmstep * d);
-                    memcpy(data -> ptr(), &outputBuffer[d * samples], samples * sizeof(float));
+                    for (unsigned xx = 0; xx < samples; xx++)
+                    	(data -> ptr())[xx] = outputBuffer[d * samples + xx];
+//                    memcpy(data -> ptr(), &outputBuffer[d * samples], samples * sizeof(float));
                 }
+
             }
             else {
              ;	// Number of samples differs among passes
@@ -114,15 +119,15 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         _counter++;
         _samples = 0;
 
-        for(unsigned t = 0; t < nSamples - copySamp; t++) {
+        for(unsigned t = copySamp; t < nSamples; t++) {
             for (unsigned s = 0; s < nSubbands; s++) {
                 data = streamData -> spectrumData(t, s, 0);
                 for (unsigned c = 0; c < nChannels; c++)
-                    _input_buffer[(_samples + t) * nSubbands * nChannels
+                    _input_buffer[(t - copySamp) * nSubbands * nChannels
                                   + s * nChannels + c] = data[c];
             }
         }
-        _samples += copySamp;
+        _samples += nSamples - copySamp;
     }
     else
         dedispersedData -> resize(0);

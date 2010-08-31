@@ -112,7 +112,6 @@ int main(int argc, char *argv[])
     // Initialise Dedispersion code
     // NOTE: survey will be updated with MDSM parameters
     float *input_buffer = NULL;
-    int retVal = 0;
     input_buffer = initialiseMDSM(survey);
 
     // Process current chunk
@@ -135,7 +134,10 @@ int main(int argc, char *argv[])
 			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
 
         // Check if there is more processing to be done
-        if (!retVal) break;
+
+		unsigned int x;
+		next_chunk(data_read, x);
+		if (!start_processing(data_read))  break;
        
         total += data_read;
         counter++;

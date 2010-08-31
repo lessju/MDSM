@@ -256,7 +256,7 @@ float* initialiseMDSM(SURVEY* input_survey)
     // Calculate maxshift (maximum for all threads)
     // TODO: calculate proper maxshift
     float hiDM = (survey -> useBruteForce) ?
-    			 survey -> lowdm + survey -> dmstep * survey -> tdms :
+    			 survey -> lowdm + survey -> dmstep * (survey -> tdms - 1) :
     			 survey -> pass_parameters[survey -> num_passes - 1].highdm;
     maxshift = dmshifts[survey -> nchans - 1] * hiDM / survey -> tsamp;
     survey -> maxshift = maxshift;
@@ -320,7 +320,7 @@ float* initialiseMDSM(SURVEY* input_survey)
         threads_params[k].maxshift = maxshift;
         threads_params[k].dedispersed_size = outsize;
         threads_params[k].binsize = 1;
-        threads_params[k].output = &output_buffer[*outputsize * k * sizeof(float)];
+        threads_params[k].output = &output_buffer[outsize * k * sizeof(float)];
         threads_params[k].input = input_buffer;
         threads_params[k].dmshifts = dmshifts;
         threads_params[k].thread_num = k;
@@ -407,7 +407,7 @@ float *next_chunk(unsigned int data_read, unsigned &samples, long long timestamp
         if (pthread_rwlock_unlock(&rw_lock))
             { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
-        // Return first buffered data
+        // Return n-1 buffer
         samples = ppnsamp;
         return output_buffer;
 
@@ -433,8 +433,9 @@ float *next_chunk(unsigned int data_read, unsigned &samples, long long timestamp
     if (pthread_rwlock_unlock(&rw_lock))
         { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
-    if (loop_counter >= 2) {
+    if (loop_counter >= 1) {
     	samples = ppnsamp;
+    	printf("Returned buffer\n");
     	return output_buffer;
     }
     else {
