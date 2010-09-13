@@ -56,7 +56,7 @@ void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp)
         // Store mean and stddev values in survey
         survey -> pass_parameters[i].mean = mean;
         survey -> pass_parameters[i].stddev = stddev;
-//        printf("mean: %f, stddev: %f\n", mean, stddev);
+        printf("mean: %f, stddev: %f\n", mean, stddev);
         shift += vals;
     }
 }
@@ -137,7 +137,7 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
 	}
 	stddev = sqrt(stddev / iters); // Stddev for entire array
 
-//    printf("mean: %f, stddev: %f\n", mean, stddev);
+        printf("mean: %f, stddev: %f\n", mean, stddev);
 
     // Subtract dm mean from all samples and apply threshold
 	unsigned thread;
@@ -145,12 +145,18 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
 	for(thread = 0; thread < survey -> num_threads; thread++) {
 		for (k = 0; k < survey -> tdms / survey -> num_threads; k++)
 		   for(l = 0; l < survey -> nsamp; l++) {
+                       if (buffer[size * thread + k * survey -> nsamp + l] != 0.0){
 			   temp_val = buffer[size * thread + k * survey -> nsamp + l] - mean;
-				   if (temp_val >= (stddev * 4) )
-					  fprintf(output, "%lld, %f, %f\n", timestamp + l * blockRate,
-							  survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep, temp_val + mean);
-			   }
-	}
+                           if (temp_val >= (stddev * 6) ){
+                               fprintf(output, "%lld, %f, %f\n", timestamp + l * blockRate,
+                                       survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep, temp_val + mean);
+                               buffer[size * thread + k * survey -> nsamp + l] = 0.0;}
+                           else
+                               buffer[size * thread + k * survey -> nsamp + l] = temp_val;
+                       }   
+                   }
+        }
+        
 }
 
 // Process dedispersion output
@@ -179,7 +185,7 @@ void* process_output(void* output_params)
 
             if (params -> survey -> useBruteForce)
             	process_brute(params -> output_buffer, params -> output_file, params -> survey,  ppnsamp,
-            				  params -> dedispersed_size, pptimestamp, ppblockRate);
+                              params -> dedispersed_size, pptimestamp, ppblockRate);
             else {
 				mean_stddev(params -> output_buffer, params -> survey, ppnsamp);
 				printf("%d: Calculated mean and stddev %d [output]: %d\n", (int) (time(NULL) - start), loop_counter,

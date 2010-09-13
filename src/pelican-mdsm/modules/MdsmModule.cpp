@@ -67,9 +67,11 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
 
     // NOTE: we always care about the first Stokes parameter (XX)
     for(unsigned t = 0; t < copySamp; t++) {
-        for (unsigned s = 0; s < nSubbands; s++) {
+        //        for (unsigned s = 0; s < nSubbands; s++) {
+        for (int s = nSubbands-1; s >= 0; --s) {
             data = streamData -> spectrumData(t, s, 0);
-            for (unsigned c = 0; c < nChannels; c++) {
+            //            for (unsigned c = 0; c < nChannels; c++) {
+            for(int c = nChannels - 1; c >= 0 ; --c){
                 _input_buffer[(_samples + t)* nSubbands * nChannels
                               + s * nChannels + c] = data[c];
             }
@@ -91,7 +93,7 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         float *outputBuffer = next_chunk(numSamp, samples, _timestamp, _blockRate);
 
         if (outputBuffer != NULL && _createOutputBlob) {
-
+        
             // Output available, create data blob
             dedispersedData -> resize(_survey -> tdms);
             if (_survey -> useBruteForce) {
@@ -101,9 +103,9 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
                     data  = dedispersedData -> samples(d);
                     data -> resize(samples);
                     data -> setDmValue(_survey -> lowdm + _survey -> dmstep * d);
-                    for (unsigned xx = 0; xx < samples; xx++)
-                    	(data -> ptr())[xx] = outputBuffer[d * samples + xx];
-//                    memcpy(data -> ptr(), &outputBuffer[d * samples], samples * sizeof(float));
+                    //                    for (unsigned xx = 0; xx < samples; xx++)
+                    //    (data -> ptr())[xx] = outputBuffer[d * samples + xx];
+                    memcpy(data -> ptr(), &outputBuffer[d * samples], samples * sizeof(float));
                 }
 
             }
@@ -120,9 +122,11 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         _samples = 0;
 
         for(unsigned t = copySamp; t < nSamples; t++) {
-            for (unsigned s = 0; s < nSubbands; s++) {
+            //            for (unsigned s = 0; s < nSubbands; s++) {
+            for (int s = nSubbands-1; s >= 0; --s) {
                 data = streamData -> spectrumData(t, s, 0);
-                for (unsigned c = 0; c < nChannels; c++)
+                for(int c = nChannels - 1; c >= 0 ; --c)
+                    //                for (unsigned c = 0; c < nChannels; c++)
                     _input_buffer[(t - copySamp) * nSubbands * nChannels
                                   + s * nChannels + c] = data[c];
             }

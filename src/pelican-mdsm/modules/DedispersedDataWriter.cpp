@@ -114,6 +114,7 @@ void DedispersedDataWriter::send(const QString&, const DataBlob* incoming)
             // Find DM time series
             for(unsigned j = 0; j < timeData -> nDMs(); j++) {
                 if (fabs(timeData -> samples(j) -> dmValue() - _dmValues[i])  < 0.00001) {
+                    std::cout << "Writing to file..." << std::endl;
                     DedispersedSeries<float>* series = timeData -> samples(j);
                     _files[i] -> write(reinterpret_cast<char *>(series -> ptr()), series -> nSamples() * sizeof(float));
                     _files[i] -> flush();

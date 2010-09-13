@@ -433,7 +433,8 @@ float *next_chunk(unsigned int data_read, unsigned &samples, long long timestamp
     if (pthread_rwlock_unlock(&rw_lock))
         { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
-    if (loop_counter >= 1) {
+    //    if (loop_counter >= 1) {
+    if (loop_counter >= 2) {
     	samples = ppnsamp;
     	printf("Returned buffer\n");
     	return output_buffer;
