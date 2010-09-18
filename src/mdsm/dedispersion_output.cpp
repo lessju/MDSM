@@ -85,7 +85,7 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
             for (k = 0; k < ndms; k++)
                 for(l = 0; l < nsamp; l++) {
                     temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
-                    if (temp_val >= (stddev * 4) )
+                    if (temp_val >= (stddev * 5) )
                           fprintf(output, "%lld, %f, %f\n", timestamp + (l * survey -> pass_parameters[i].binsize)  
                                                             * blockRate, startdm + k * dmstep, temp_val + mean); 
                 }
@@ -143,20 +143,16 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
 	unsigned thread;
 	int thread_shift = survey -> lowdm + survey -> tdms * survey -> dmstep / survey -> num_threads;
 	for(thread = 0; thread < survey -> num_threads; thread++) {
-		for (k = 0; k < survey -> tdms / survey -> num_threads; k++)
-		   for(l = 0; l < survey -> nsamp; l++) {
-                       if (buffer[size * thread + k * survey -> nsamp + l] != 0.0){
-			   temp_val = buffer[size * thread + k * survey -> nsamp + l] - mean;
-                           if (temp_val >= (stddev * 6) ){
-                               fprintf(output, "%lld, %f, %f\n", timestamp + l * blockRate,
-                                       survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep, temp_val + mean);
-                               buffer[size * thread + k * survey -> nsamp + l] = 0.0;}
-                           else
-                               buffer[size * thread + k * survey -> nsamp + l] = temp_val;
-                       }   
-                   }
+            for (k = 0; k < survey -> tdms / survey -> num_threads; k++) {
+                for(l = 0; l < survey -> nsamp; l++) {
+                    temp_val = buffer[size * thread + k * survey -> nsamp + l] - mean;
+                    if (abs(temp_val) >= (stddev * 5) ){
+                        fprintf(output, "%lld, %f, %f\n", timestamp + l * blockRate,
+                                survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep, temp_val + mean);
+                    }   
+                }
+            }
         }
-        
 }
 
 // Process dedispersion output

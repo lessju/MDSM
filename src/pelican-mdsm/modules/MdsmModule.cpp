@@ -44,6 +44,7 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
     nSamples = streamData -> nTimeBlocks();
     nSubbands = streamData -> nSubbands();
     nChannels = (nSamples == 0) ? 0 : streamData->nChannels();
+    //    std::cout << nSamples << " " << nSubbands << " " << nChannels << std::endl;
     float *data;
 
     // We need the timestamp of the first packet in the first blob (assuming that we don't
@@ -58,7 +59,6 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
 
     // Check to see whether all samples will fit in memory
     copySamp = nSamples <= reqSamp - _samples ? nSamples : reqSamp - _samples;
-
     // Check if we reached the end of the stream, in which case we clear the MDSM buffers
     if (nSamples == 0) {
         reqSamp = 0;
@@ -67,13 +67,15 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
 
     // NOTE: we always care about the first Stokes parameter (XX)
     for(unsigned t = 0; t < copySamp; t++) {
-        //        for (unsigned s = 0; s < nSubbands; s++) {
-        for (int s = nSubbands-1; s >= 0; --s) {
-            data = streamData -> spectrumData(t, s, 0);
-            //            for (unsigned c = 0; c < nChannels; c++) {
-            for(int c = nChannels - 1; c >= 0 ; --c){
+        unsigned rs, rc ; // reverse subband and channel order (lowest first)
+        for (unsigned s = 0; s < nSubbands; s++) {
+            //            data = streamData -> spectrumData(t, s, 0);
+            rs = nSubbands - 1 - s;
+            data = streamData -> spectrumData(t, rs, 0);
+            for (unsigned c = 0; c < nChannels; c++) {
+                rc = nChannels - 1 - c;
                 _input_buffer[(_samples + t)* nSubbands * nChannels
-                              + s * nChannels + c] = data[c];
+                              + s * nChannels + c] = data[rc];
             }
         }
     }
@@ -122,13 +124,16 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         _samples = 0;
 
         for(unsigned t = copySamp; t < nSamples; t++) {
-            //            for (unsigned s = 0; s < nSubbands; s++) {
-            for (int s = nSubbands-1; s >= 0; --s) {
-                data = streamData -> spectrumData(t, s, 0);
-                for(int c = nChannels - 1; c >= 0 ; --c)
-                    //                for (unsigned c = 0; c < nChannels; c++)
+            unsigned rs, rc;
+            for (unsigned s = 0; s < nSubbands; s++) {
+                rs = nSubbands - 1 - s;
+                //data = streamData -> spectrumData(t, s, 0);
+                data = streamData -> spectrumData(t, rs, 0);
+                for(int c = 0 ; c < nChannels ; ++c){
+                    rc = nChannels - 1 - c;
                     _input_buffer[(t - copySamp) * nSubbands * nChannels
-                                  + s * nChannels + c] = data[c];
+                                  + s * nChannels + c] = data[rc];
+                }
             }
         }
         _samples += nSamples - copySamp;

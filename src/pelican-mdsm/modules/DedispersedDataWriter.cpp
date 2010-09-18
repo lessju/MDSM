@@ -20,7 +20,7 @@ DedispersedDataWriter::DedispersedDataWriter(const ConfigNode& configNode )
     _filePrefix = configNode.getOption("file", "prefix", "MDSM_");
     _fch1     = configNode.getOption("topChannelFrequency", "value", "0").toFloat();
     _foff     = configNode.getOption("frequencyOffset", "value", "0").toFloat();
-    _tsamp    = configNode.getOption("samplingTime", "value", "0").toFloat() / 1e6;
+    _tsamp    = configNode.getOption("samplingTime", "value", "0").toFloat();
     QString dms = configNode.getOption("DMs", "values", "0");
 
     // TODO: Process DMs string to extract proper values;
@@ -114,8 +114,8 @@ void DedispersedDataWriter::send(const QString&, const DataBlob* incoming)
             // Find DM time series
             for(unsigned j = 0; j < timeData -> nDMs(); j++) {
                 if (fabs(timeData -> samples(j) -> dmValue() - _dmValues[i])  < 0.00001) {
-                    std::cout << "Writing to file..." << std::endl;
                     DedispersedSeries<float>* series = timeData -> samples(j);
+		     std::cout << "Writing to file..." << series -> nSamples()<< std::endl;
                     _files[i] -> write(reinterpret_cast<char *>(series -> ptr()), series -> nSamples() * sizeof(float));
                     _files[i] -> flush();
                     break;

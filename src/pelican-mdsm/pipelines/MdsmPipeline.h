@@ -5,6 +5,7 @@
 #include "pelican/data/DataBlob.h"
 #include "PPFChanneliser.h"
 #include "StokesGenerator.h"
+#include "RFI_Clipper.h"
 #include "TimeSeriesDataSet.h"
 #include "SpectrumDataSet.h"
 #include "DedispersedTimeSeries.h"
@@ -30,6 +31,7 @@ class MdsmPipeline : public AbstractPipeline
         MdsmModule* mdsm;
         PPFChanneliser* ppfChanneliser;
         StokesGenerator* stokesGenerator;
+        RFI_Clipper* rfiClipper;
 
         /// Local data blobs
         SpectrumDataSetC32* spectra;

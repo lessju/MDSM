@@ -17,6 +17,7 @@ void MdsmPipeline::init()
     // Create modules
     mdsm = (MdsmModule *) createModule("MdsmModule");
     ppfChanneliser = (PPFChanneliser *) createModule("PPFChanneliser");
+    rfiClipper = (RFI_Clipper *) createModule("RFI_Clipper");
     stokesGenerator = (StokesGenerator *) createModule("StokesGenerator");
 
     // Create local datablobs
@@ -47,6 +48,9 @@ void MdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
     // Run modules
     ppfChanneliser->run(timeSeries, spectra);
     stokesGenerator->run(spectra, stokes);
+    // Clips RFI and modifies blob in place                                                                      
+    rfiClipper->run(stokes);
+
     mdsm->run(stokes, dedispersedData);
 
     // Output channelised data
