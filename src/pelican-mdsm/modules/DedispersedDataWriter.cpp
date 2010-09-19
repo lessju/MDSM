@@ -17,10 +17,18 @@
 DedispersedDataWriter::DedispersedDataWriter(const ConfigNode& configNode )
 : AbstractOutputStream(configNode)
 {
+    _nSubbands = configNode.getOption("subbandsPerPacket", "value", "0").toUInt();
+    _nTotalSubbands = configNode.getOption("totalComplexSubbands", "value", "0").toUInt();
+    _clock = configNode.getOption("clock", "value", "200").toUInt();
+    _integration    = configNode.getOption("integrateTimeBins", "value", "1").toUInt();
+    _nChannels = configNode.getOption("outputChannelsPerSubband", "value", "512").toUInt();
+
     _filePrefix = configNode.getOption("file", "prefix", "MDSM_");
     _fch1     = configNode.getOption("topChannelFrequency", "value", "0").toFloat();
-    _foff     = configNode.getOption("frequencyOffset", "value", "0").toFloat();
-    _tsamp    = configNode.getOption("samplingTime", "value", "0").toFloat();
+    //    _foff     = configNode.getOption("frequencyOffset", "value", "0").toFloat();
+    _foff = - float(_clock) / (2.0 * _nTotalSubbands) * float(_nSubbands);
+    //    _tsamp    = configNode.getOption("samplingTime", "value", "0").toFloat();
+    _tsamp =  (2.0 * _nTotalSubbands) * _nChannels * _integration / float(_clock) / 1e6;
     QString dms = configNode.getOption("DMs", "values", "0");
 
     // TODO: Process DMs string to extract proper values;

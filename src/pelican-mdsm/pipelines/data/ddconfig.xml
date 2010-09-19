@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pelican>
+
+<configuration version="1.0">
+
+  <nodesets>
+    <nodeset name="FixedParameters">
+      <samplesPerPacket value="16"/>
+      <nRawPolarisations value="2"/>
+      <dataBitSize value="16"/>
+      <totalComplexSubbands value="512"/>
+    </nodeset>
+
+    <nodeset name="ChangeParameters">
+      <clock value="200"/> <!-- Could also be 160 -->
+      <subbandsPerPacket value="61"/> <!-- 31 or 61 or 62-->
+      <outputChannelsPerSubband value="128"/>
+      <udpPacketsPerIteration value="64"/>
+      <integrateTimeBins value="1"/>
+      <topChannelFrequency value="154.6875"/>
+    </nodeset>
+  </nodesets>
+
+  <pipeline>
+
+    <buffers>
+      <TimeSeriesDataSetC32>
+        <buffer maxSize="24000000000" maxChunkSize="7000000000"/>
+      </TimeSeriesDataSetC32>
+    </buffers>
+
+    <chunkers>
+      <LofarChunker>
+        <import nodeset="FixedParameters"/>
+        <import nodeset="ChangeParameters"/>
+        <!--   -->
+        <data type="TimeSeriesDataSetC32"/>
+        <connection host="127.0.0.1" port="4346"/> <!--Change-->
+      </LofarChunker>
+    </chunkers>
+
+    <clients>
+      <LofarStreamDataClient>
+        <data type="TimeSeriesDataSetC32" adapter="AdapterTimeSeriesDataSet"/>
+      </LofarStreamDataClient>
+    </clients>
+
+    <adapters>
+      <AdapterTimeSeriesDataSet>
+        <import nodeset="FixedParameters"/>
+        <import nodeset="ChangeParameters"/>
+        <!--   -->
+        <fixedSizePackets value="false" />
+      </AdapterTimeSeriesDataSet>
+    </adapters>
+
+    <modules>
+      <PPFChanneliser>
+        <import nodeset="FixedParameters"/>
+        <import nodeset="ChangeParameters"/>
+        <!--   -->
+        <processingThreads value="6" />
+        <filter nTaps="8" filterWindow="kaiser"/>
+      </PPFChanneliser>
+
+      <StokesGenerator>
+      </StokesGenerator>
+      
+      <MdsmModule>
+        <observationfile filepath="data/mydm.xml" />
+        <createOutputBlob value="1" />
+      </MdsmModule>
+
+      <StokesIntegrator>
+        <import nodeset="FixedParameters"/>
+        <import nodeset="ChangeParameters"/>
+      </StokesIntegrator>
+
+    </modules>
+
+    <output>
+
+      <dataStreams>
+        <!-- <stream name="TimeSeriesDataSetStokes" listeners="PelicanTCPBlobServer" />  -->
+        <stream name="SpectrumDataSetStokes" listeners="SigprocStokesWriter"/>
+        <stream name="DedispersedTimeSeriesF32" listeners="DedispersedDataWriter"/>
+      </dataStreams>
+
+      <streamers>
+        <!-- <PelicanTCPBlobServer active="true" >
+             <connection port="6969" />
+        </PelicanTCPBlobServer>
+        -->
+        <SigprocStokesWriter active="false">
+          <import nodeset="FixedParameters"/>
+            <import nodeset="ChangeParameters"/>
+            <!-- -->
+            <file filepath="test.fil" /><!--Change-->
+          <params telescope="LOFAR" nPolsToWrite="1"/><!--Change-->
+        </SigprocStokesWriter>
+        <DedispersedDataWriter>
+          <import nodeset="FixedParameters"/>
+          <import nodeset="ChangeParameters"/>
+          <!--   -->
+          <file prefix="/data/DD" />
+          <numberOfChannels value="1"/>
+          <DMs values="0.0, 26.833" />
+        </DedispersedDataWriter>
+      </streamers>
+
+    </output>
+
+  </pipeline>
+</configuration>
+
+

@@ -34,6 +34,9 @@ class DedispersedDataWriter: public AbstractOutputStream
         std::vector<std::ofstream*> _files;
         std::vector<float> 		  	_dmValues;
         float         		  		_fch1, _foff, _tsamp, _refdm;
+        int _nTotalSubbands;
+        unsigned _nChannels, _nSubbands, _clock, _integration ;
+
 };
 
 PELICAN_DECLARE(AbstractOutputStream, DedispersedDataWriter)
