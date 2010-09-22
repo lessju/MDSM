@@ -137,11 +137,11 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
 	}
 	stddev = sqrt(stddev / iters); // Stddev for entire array
 
-        printf("mean: %f, stddev: %f\n", mean, stddev);
+    printf("mean: %f, stddev: %f\n", mean, stddev);
 
     // Subtract dm mean from all samples and apply threshold
 	unsigned thread;
-	int thread_shift = survey -> lowdm + survey -> tdms * survey -> dmstep / survey -> num_threads;
+	int thread_shift = survey -> tdms * survey -> dmstep / survey -> num_threads;
 	for(thread = 0; thread < survey -> num_threads; thread++) {
             for (k = 0; k < survey -> tdms / survey -> num_threads; k++) {
                 for(l = 0; l < survey -> nsamp; l++) {

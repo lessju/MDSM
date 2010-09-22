@@ -205,10 +205,10 @@ int calculate_nsamp_subband(int maxshift, size_t *inputsize, size_t* outputsize,
 int calculate_nsamp_brute(int maxshift, size_t *inputsize, size_t* outputsize, unsigned long int memory)
 {
     if (survey -> nsamp == 0)
-    	survey -> nsamp = ((memory * 1000 * 0.99 / sizeof(float)) - maxshift * survey -> nchans) / (survey -> nchans + survey -> tdms);
+    	survey -> nsamp = ((memory * 1000 * 0.99 / sizeof(float)) - maxshift * survey -> nchans) / (survey -> nchans + survey -> tdms / num_devices);
 
     *inputsize = (survey -> nsamp + maxshift) * survey -> nchans * sizeof(float);
-    *outputsize = survey -> nsamp * survey -> tdms * sizeof(float);
+    *outputsize = survey -> nsamp * survey -> tdms * sizeof(float) / num_devices;
     printf("[Brute Force] Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
 
 	return survey -> nsamp;
@@ -432,10 +432,8 @@ float *next_chunk(unsigned int data_read, unsigned &samples, long long timestamp
     if (pthread_rwlock_unlock(&rw_lock))
         { fprintf(stderr, "Error releasing rw_lock\n"); exit(0); }
 
-    //    if (loop_counter >= 1) {
-    if (loop_counter >= 2) {
+    if (loop_counter >= 1) {
     	samples = ppnsamp;
-    	printf("Returned buffer\n");
     	return output_buffer;
     }
     else {

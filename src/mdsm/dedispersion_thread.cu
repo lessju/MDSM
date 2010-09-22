@@ -24,7 +24,7 @@ DEVICES* initialise_devices()
         
         if (deviceProp.major == 9999 && deviceProp.minor == 9999)
             { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
-        else {
+        else if (deviceProp.totalGlobalMem / 1024 > 1024 * 3.5 * 1024) {
 			(devices -> devices)[counter].multiprocessor_count = deviceProp.multiProcessorCount;
 			(devices -> devices)[counter].constant_memory = deviceProp.totalConstMem;
 			(devices -> devices)[counter].shared_memory = deviceProp.sharedMemPerBlock;
@@ -41,7 +41,7 @@ DEVICES* initialise_devices()
     }
 
     // TEMPORARY TESTING HACKS
-    devices -> num_devices = 1;
+    devices -> num_devices = 4;
     devices -> minTotalGlobalMem = 1024 * 1024 * 4;
 
     return devices;
@@ -208,11 +208,10 @@ void brute_force_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* pa
     // ------------------------------------- Perform dedispersion on GPU --------------------------------------
     cudaEventRecord(event_start, 0);
 
-//    float startdm = survey -> lowdm * survey -> tdms / survey -> num_threads * params -> thread_num;
-
-    dedisperse_loop<<< dim3(128, survey -> tdms), 128 >>>
+    float startdm = survey -> lowdm + survey -> dmstep * survey -> tdms / survey -> num_threads * params -> thread_num;
+    dedisperse_loop<<< dim3(128, survey -> tdms / survey -> num_threads), 128 >>>
 			(d_output, d_input, survey -> nsamp, survey -> nchans,
-			 survey -> tsamp, 1, survey -> lowdm, survey -> dmstep, 0, 0);
+			 survey -> tsamp, 1, startdm, survey -> dmstep, 0, 0);
 
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
