@@ -280,7 +280,6 @@ float* initialiseMDSM(SURVEY* input_survey)
     // Initialise buffers and create output buffer (a separate buffer for each GPU output)
     input_buffer = (float *) malloc(*inputsize);
     output_buffer = (float *) malloc(num_devices * outsize * sizeof(float));
-
     // Log parameters
     printf("nchans: %d, nsamp: %d, tsamp: %f, foff: %f, fch1: %f\n", survey -> nchans, 
            survey -> nsamp, survey -> tsamp, survey -> foff, survey -> fch1);
@@ -320,7 +319,7 @@ float* initialiseMDSM(SURVEY* input_survey)
         threads_params[k].maxshift = maxshift;
         threads_params[k].dedispersed_size = outsize;
         threads_params[k].binsize = 1;
-        threads_params[k].output = &output_buffer[outsize * k * sizeof(float)];
+        threads_params[k].output = &output_buffer[outsize * k];
         threads_params[k].input = input_buffer;
         threads_params[k].dmshifts = dmshifts;
         threads_params[k].thread_num = k;

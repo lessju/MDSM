@@ -234,7 +234,7 @@ void* dedisperse(void* thread_params)
     printf("%d: Started thread %d\n", (int) (time(NULL) - start), tid);
 
     // Initialise device, allocate device memory and copy dmshifts and dmvalues to constant memory
-    cutilSafeCall( cudaSetDevice(0));//params -> device_id));
+    cutilSafeCall( cudaSetDevice(params -> device_id));
     cudaSetDeviceFlags( cudaDeviceBlockingSync );
 
     cutilSafeCall( cudaMalloc((void **) &d_input, params -> inputsize));
@@ -311,7 +311,6 @@ void* dedisperse(void* thread_params)
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);
             cudaEventElapsedTime(&timestamp, event_start, event_stop);
-            printf("%d: Written output %d: %f\n", (int) (time(NULL) - start), tid, timestamp);
         }
 
         // Acquire rw lock
