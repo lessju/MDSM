@@ -41,8 +41,8 @@ DEVICES* initialise_devices()
     }
 
     // TEMPORARY TESTING HACKS
-    devices -> num_devices = 4;
-    devices -> minTotalGlobalMem = 1024 * 1024 * 4;
+//    devices -> num_devices = 2;
+//    devices -> minTotalGlobalMem = 1024 * 1024 * 4;
 
     return devices;
 }

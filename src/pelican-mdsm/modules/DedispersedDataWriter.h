@@ -11,6 +11,7 @@
 #include <vector>
 
 using namespace pelican;
+using namespace pelican::lofar;
 
 class DedispersedDataWriter: public AbstractOutputStream
 {
