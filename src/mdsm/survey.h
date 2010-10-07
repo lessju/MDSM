@@ -35,6 +35,8 @@ typedef struct {
 
     // Number of GPUs which are used
     unsigned num_threads;
+    unsigned *gpu_ids;
+    unsigned num_gpus;
 
 } SURVEY;
 

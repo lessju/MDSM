@@ -1,7 +1,7 @@
 #include "dedispersion_kernel.cu"
 #include "dedispersion_thread.h"
 
-DEVICES* initialise_devices()
+DEVICES* initialise_devices(SURVEY* survey)
 {
 	int num_devices;
 
@@ -14,34 +14,46 @@ DEVICES* initialise_devices()
     // Create and populate devices object
     DEVICES* devices = (DEVICES *) malloc(sizeof(DEVICES));
     devices -> devices = (DEVICE_INFO *) malloc(num_devices * sizeof(DEVICE_INFO));
-    devices -> num_devices = num_devices;
+    devices -> num_devices = 0;
     devices -> minTotalGlobalMem = (1024 * 1024 * 16);
 
     int orig_num = num_devices, counter = 0;
+    char useDevice = 0;
     for(int i = 0; i < orig_num; i++) {
         cudaDeviceProp deviceProp;
         cutilSafeCall(cudaGetDeviceProperties(&deviceProp, i));
+        useDevice = 0;
         
         if (deviceProp.major == 9999 && deviceProp.minor == 9999)
             { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
         else if (deviceProp.totalGlobalMem / 1024 > 1024 * 3.5 * 1024) {
-			(devices -> devices)[counter].multiprocessor_count = deviceProp.multiProcessorCount;
-			(devices -> devices)[counter].constant_memory = deviceProp.totalConstMem;
-			(devices -> devices)[counter].shared_memory = deviceProp.sharedMemPerBlock;
-			(devices -> devices)[counter].register_count = deviceProp.regsPerBlock;
-			(devices -> devices)[counter].thread_count = deviceProp.maxThreadsPerBlock;
-			(devices -> devices)[counter].clock_rate = deviceProp.clockRate;
-			(devices -> devices)[counter].device_id = i;
 
-			if (deviceProp.totalGlobalMem / 1024 < devices -> minTotalGlobalMem)
-				devices -> minTotalGlobalMem = deviceProp.totalGlobalMem / 1024;
+            // Check if device is in user specfied list, if any
+            if (survey -> gpu_ids != NULL)
+                for(unsigned j = 0; j < survey -> num_gpus; j++)
+                    if ((survey -> gpu_ids)[j] == i)
+                        useDevice = 1;
 
-			counter++;
+            if (useDevice) {
+	            (devices -> devices)[counter].multiprocessor_count = deviceProp.multiProcessorCount;
+	            (devices -> devices)[counter].constant_memory = deviceProp.totalConstMem;
+	            (devices -> devices)[counter].shared_memory = deviceProp.sharedMemPerBlock;
+	            (devices -> devices)[counter].register_count = deviceProp.regsPerBlock;
+	            (devices -> devices)[counter].thread_count = deviceProp.maxThreadsPerBlock;
+	            (devices -> devices)[counter].clock_rate = deviceProp.clockRate;
+	            (devices -> devices)[counter].device_id = i;
+
+	            if (deviceProp.totalGlobalMem / 1024 < devices -> minTotalGlobalMem)
+		            devices -> minTotalGlobalMem = deviceProp.totalGlobalMem / 1024;
+
+	            counter++;
+                (devices -> num_devices)++;
+            }
         }
     }
 
     // TEMPORARY TESTING HACKS
-//    devices -> num_devices = 2;
+//    devices -> num_devices = 1;
 //    devices -> minTotalGlobalMem = 1024 * 1024 * 4;
 
     return devices;

@@ -3,12 +3,13 @@
 #include "unistd.h"
 
 // QT stuff
+#include <QStringList>
 #include <QDomElement>
 #include <QFile>
 
 // Forward declarations
 extern "C" void* call_dedisperse(void* thread_params);
-extern "C" DEVICES* call_initialise_devices();
+extern "C" DEVICES* call_initialise_devices(SURVEY *survey);
 
 // Global parameters
 SURVEY *survey;
@@ -84,6 +85,8 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> nsamp = 0;
     survey -> fp = NULL;
     survey -> nbits = 0;
+    survey -> gpu_ids = NULL;
+    survey -> num_gpus = 0;
 
     // Start parsing observation file and generate survey parameters
     n = root.firstChild();
@@ -110,6 +113,20 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> tsamp = e.attribute("tsamp").toFloat();
             else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0)
 			   survey -> nsamp = e.attribute("number").toUInt();
+        
+            // Check if user has specified GPUs to use
+            else if (QString::compare(e.tagName(), QString("gpus"), Qt::CaseInsensitive) == 0) {
+			    QString gpus = e.attribute("ids");
+                QStringList gpuList = gpus.split(",", QString::SkipEmptyParts);
+                survey -> gpu_ids = (unsigned *) malloc(sizeof(unsigned) * gpuList.count());
+                std::cout << "GPUs to use: ";
+                for(int i = 0; i < gpuList.count(); i++) {
+                    (survey -> gpu_ids)[i] = gpuList[i].toUInt();
+                    std::cout << gpuList[i].toUInt() << " ";
+                }
+                survey -> num_gpus = gpuList.count();
+                std::cout << std::endl;
+            }
 
             // Refers to a new pass subsection
             else if (QString::compare(e.tagName(), QString("passes"), Qt::CaseInsensitive) == 0) {
@@ -242,7 +259,7 @@ float* initialiseMDSM(SURVEY* input_survey)
     pthread_attr_init(&thread_attr);
     pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
 
-    devices = call_initialise_devices();
+    devices = call_initialise_devices(input_survey);
     num_devices = devices -> num_devices;
     survey -> num_threads = num_devices;
     threads = (pthread_t *) calloc(sizeof(pthread_t), num_devices);
