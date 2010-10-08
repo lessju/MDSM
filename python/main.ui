@@ -118,7 +118,7 @@
         <item row="1" column="0">
          <widget class="QLabel" name="bwLabel">
           <property name="text">
-           <string>Bandwidth (MHz)</string>
+           <string>Channel width (MHz)</string>
           </property>
           <property name="margin">
            <number>4</number>
@@ -134,7 +134,7 @@
         <item row="0" column="0">
          <widget class="QLabel" name="highFreqLabel">
           <property name="text">
-           <string>High Frequency (MHz)</string>
+           <string>Tob Channel number</string>
           </property>
           <property name="margin">
            <number>4</number>

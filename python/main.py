@@ -11,6 +11,7 @@ from scattering import *
 from dm_step import *
 import ddplan as presto
 
+
 """ Main MDSM Parameters script """
 
 class MainWindow(gui.QMainWindow):
@@ -39,9 +40,9 @@ class MainWindow(gui.QMainWindow):
         """ Reset the window ui """
         
         # Reset UI
-        self.mainWidget.highFreqEdit.setText("240")
-        self.mainWidget.bandwidthEdit.setText("6")
-        self.mainWidget.tsampEdit.setText("0.005")
+        self.mainWidget.highFreqEdit.setText("250")
+        self.mainWidget.bandwidthEdit.setText(".1953125")
+        self.mainWidget.tsampEdit.setText("0.00512")
         self.mainWidget.widthEdit.setText("1")
         self.mainWidget.nchansEdit.setText("31")
         self.mainWidget.smearEdit.setText("100")
@@ -73,11 +74,12 @@ class MainWindow(gui.QMainWindow):
 
         # Interpret parameters
         try:
-            highFreq = float(self.mainWidget.highFreqEdit.text())
-            bandwidth = float(self.mainWidget.bandwidthEdit.text())
-            tsamp = float(self.mainWidget.tsampEdit.text())
+            tsamp = float(self.mainWidget.tsampEdit.text()) / 1000.0
             pulseWidth = float(self.mainWidget.widthEdit.text())
             nchans = int(self.mainWidget.nchansEdit.text())
+            bandwidth = float(self.mainWidget.bandwidthEdit.text()) * nchans
+            highFreq = 100.0 + float(self.mainWidget.highFreqEdit.text()) * float(self.mainWidget.bandwidthEdit.text()) 
+            nchanslog2 = float(log(nchans,2))
             smearing = float(self.mainWidget.smearEdit.text())
             snr = float(self.mainWidget.snrEdit.text())
             scat = float(self.mainWidget.scatteringEdit.text())
@@ -106,7 +108,8 @@ class MainWindow(gui.QMainWindow):
         maxDm = max(self.scattering.calculate_dm())
         dmStep = self.dmstep.calculate_optimal_dmstep(acceptedSNR = snr)
         numDms = maxDm / dmStep
-        numChans = pow(2, ceil(log(nchans * channelDisp * maxDm / ((smearing / 100) * pulseWidth), 2)))
+        numChanslog2 = log(nchans * channelDisp * maxDm / ((smearing / 100) * pulseWidth), 2)
+        numChans = int(nchans * pow(2, round(numChanslog2 - nchanslog2)))
         sRate = (tsamp / nchans) * numChans
 
         self.mainWidget.tableWidget.setCellWidget(0, 1, gui.QLabel("%.4f ms" % totalDisp))
@@ -119,7 +122,7 @@ class MainWindow(gui.QMainWindow):
 
         # Call Presto's DDPlan.py script 
         methods = presto.calculateParams(0, maxDm, highFreq - bandwidth / 2.0, bandwidth, 
-                                         numChans, 32, sRate / 1000, pulseWidth * (smearing / 100))
+                                         numChans, 32, sRate , pulseWidth * (smearing / 100))
         
         # Add the presto result to a separate tab
         table = self.mainWidget.prestoTableWidget
@@ -153,7 +156,7 @@ class MainWindow(gui.QMainWindow):
         root = ET.Element("observation")
 
         freq = ET.SubElement(root, "frequencies")
-        freq.set("center", str(self.highFreq))
+        freq.set("top", str(self.highFreq))
         freq.set("offset", str(-self.bandwidth / self.numChans))
     
         dm = ET.SubElement(root, "dm")

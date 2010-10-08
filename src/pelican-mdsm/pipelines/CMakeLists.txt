@@ -3,6 +3,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set(pipeline_lib_src
     src/MdsmPipeline.cpp
     src/SigprocMdsmPipeline.cpp
+    src/DDStream1.cpp
+    src/DDStream2.cpp
 )
 add_library(pelicanMdsm ${pipeline_lib_src} )
 target_link_libraries(pelicanMdsm
@@ -21,6 +23,29 @@ set_target_properties(mdsmPipeline PROPERTIES
 )
 
 target_link_libraries(mdsmPipeline
+    pelicanMdsm
+)
+
+add_executable(DDStream1 src/mainDDStream1.cpp)
+
+# Link with openmp.
+set_target_properties(mdsmPipeline PROPERTIES
+    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "${OpenMP_CXX_FLAGS}"
+)
+
+target_link_libraries(DDStream1
+    pelicanMdsm
+)
+add_executable(DDStream2 src/mainDDStream2.cpp)
+
+# Link with openmp.
+set_target_properties(mdsmPipeline PROPERTIES
+    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "${OpenMP_CXX_FLAGS}"
+)
+
+target_link_libraries(DDStream2
     pelicanMdsm
 )
 
