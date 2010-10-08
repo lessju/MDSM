@@ -32,6 +32,7 @@ OUTPUT_PARAMS output_params;
 int loop_counter = 0, num_devices, ret;
 bool outSwitch = true;
 unsigned pnsamp, ppnsamp;
+char *outfilename = "output.dat";
 
 #include <iostream>
 
@@ -113,6 +114,8 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> tsamp = e.attribute("tsamp").toFloat();
             else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0)
 			   survey -> nsamp = e.attribute("number").toUInt();
+            else if (QString::compare(e.tagName(), QString("output"), Qt::CaseInsensitive) == 0)
+			   outfilename =  e.attribute("filename").toUtf8().data();
         
             // Check if user has specified GPUs to use
             else if (QString::compare(e.tagName(), QString("gpus"), Qt::CaseInsensitive) == 0) {
@@ -319,7 +322,7 @@ float* initialiseMDSM(SURVEY* input_survey)
     output_params.input_barrier = &input_barrier;
     output_params.output_barrier = &output_barrier;
     output_params.start = start;
-    output_params.output_file = fopen("output.dat", "w");
+    output_params.output_file = fopen(outfilename, "w");
     output_params.survey = survey;
 
     // Create output thread 
