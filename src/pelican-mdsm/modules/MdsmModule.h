@@ -26,6 +26,7 @@ class MdsmModule : public AbstractModule
         bool		 _createOutputBlob;
         float        *_input_buffer;
         unsigned int _samples;
+        unsigned int _gettime;
         unsigned int _counter;
         long long    _timestamp;
         long         _blockRate;

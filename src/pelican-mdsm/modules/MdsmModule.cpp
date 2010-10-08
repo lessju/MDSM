@@ -49,9 +49,11 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
 
     // We need the timestamp of the first packet in the first blob (assuming that we don't
     // lose any packets), and the sampling time. This will give each sample a unique timestamp
-    if (_samples == 0) {
+    // _blockRate currently contains the number of time samples per chunk... not very useful
+    if (_gettime == 0) {
         _timestamp = streamData -> getLofarTimestamp();
         _blockRate = streamData -> getBlockRate();
+        std::cout << "---------------Block:" << _timestamp << " " << _gettime << std::endl;
     }
 
     // Calculate number of required samples
@@ -80,7 +82,7 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         }
     }
     _samples += copySamp;
-
+    _gettime = _samples;
     // We have enough samples to pass to MDSM
     if (_samples == reqSamp || nSamples == 0) {
         // Copy this chunk and get previous output
@@ -119,9 +121,11 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
             dedispersedData -> resize(0);
 
         // Tell MDSM to start processing this chunk
+        _gettime = _samples;
         if (!start_processing(_samples))  return;
         _counter++;
         _samples = 0;
+        _gettime = _samples;
 
         for(unsigned t = copySamp; t < nSamples; t++) {
             unsigned rs, rc;
