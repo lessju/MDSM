@@ -32,7 +32,7 @@ OUTPUT_PARAMS output_params;
 int loop_counter = 0, num_devices, ret;
 bool outSwitch = true;
 unsigned pnsamp, ppnsamp;
-char *outfilename = "output.dat";
+char outfilename[50];
 
 #include <iostream>
 
@@ -88,6 +88,7 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> nbits = 0;
     survey -> gpu_ids = NULL;
     survey -> num_gpus = 0;
+    strcpy(outfilename, "output.dat");
 
     // Start parsing observation file and generate survey parameters
     n = root.firstChild();
@@ -114,8 +115,10 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> tsamp = e.attribute("tsamp").toFloat();
             else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0)
 			   survey -> nsamp = e.attribute("number").toUInt();
-            else if (QString::compare(e.tagName(), QString("output"), Qt::CaseInsensitive) == 0)
-			   outfilename =  e.attribute("filename").toUtf8().data();
+            else if (QString::compare(e.tagName(), QString("output"), Qt::CaseInsensitive) == 0) {
+                char *temp = e.attribute("filename").toUtf8().data();
+			    strcpy(outfilename, temp);
+            }
         
             // Check if user has specified GPUs to use
             else if (QString::compare(e.tagName(), QString("gpus"), Qt::CaseInsensitive) == 0) {
