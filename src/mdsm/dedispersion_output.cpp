@@ -12,8 +12,8 @@
 void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp)
 {
     unsigned int i, j, iters, vals, mod_factor, shift = 0;
-    double total, total2;
-    float mean = 0, stddev = 0, mean2 = 0;
+    double total;
+    float mean = 0, stddev = 0;
 
     for(i = 0; i < survey -> num_passes; i++) {
 
@@ -26,24 +26,21 @@ void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp)
         // Split value calculation in "kernels" to avoid overflows      
         // TODO: Join mean and stddev kernel in one loop  
 
-        // Calculate the mean and stddev
+        // Calculate the mean
         iters = 0;
         while(1) {
             total  = 0;
-            total2  = 0;
-            for(j = 0; j < mod_factor; j++){
+            for(j = 0; j < mod_factor; j++)
                 total += buffer[shift + iters * mod_factor + j];
-                total2 += pow(buffer[shift + iters * mod_factor + j], 2);
-                    };
             mean += (total / j);
-            mean2 += (total2 / j);
+
             iters++;
             if (iters * mod_factor + j >= vals) break;
         }
         mean /= iters;  // Mean for entire array
-        stddev = sqrt(mean2/iters - pow(mean,2));
+
         // Calculate standard deviation
-        /*        iters = 0;
+        iters = 0;
         while(1) {
 
             total = 0;
@@ -55,7 +52,6 @@ void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp)
              if (iters * mod_factor + j >= vals) break;
         }
         stddev = sqrt(stddev / iters); // Stddev for entire array
-        */
 
         // Store mean and stddev values in survey
         survey -> pass_parameters[i].mean = mean;
@@ -66,7 +62,7 @@ void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp)
 }
 
 // Apply mean and stddev to apply thresholding
-void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, long long timestamp, long blockRate)
+void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, double timestamp, double blockRate)
 {
     unsigned int i = 0, thread, k, l, ndms, nsamp, shift = 0;
     float temp_val, startdm, dmstep, mean, stddev;
@@ -89,20 +85,10 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
             for (k = 0; k < ndms; k++)
                 for(l = 0; l < nsamp; l++) {
                     temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
-                    if (temp_val >= stddev * 5 ) {
-                        std::cout << "******************  Hit :" << timestamp 
-                                  << " " <<  survey -> pass_parameters[i].binsize
-                                  << " " 
-                                  << blockRate 
-                                  << " " 
-                                  << temp_val << " " << stddev
-                                  << " " 
-                                  << startdm + k * dmstep
-                                  << std::endl;
-                        fprintf(output, "%lld, %f, %f\n", 
-                                timestamp + (l * survey -> pass_parameters[i].binsize)
-                                , startdm + k * dmstep, temp_val + mean);
-                    }
+                    if (temp_val >= stddev * 5 )
+                        fprintf(output, "%lf, %f, %f\n", 
+                                timestamp + l * blockRate,
+                                startdm + k * dmstep, temp_val + mean);
                 }
             
             shift += nsamp * ndms;
@@ -112,7 +98,7 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
 }
 
 // Apply mean and stddev to apply thresholding
-void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, long long timestamp, long blockRate)
+void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, double timestamp, double blockRate)
 {
 	unsigned int j, k, l, iters, vals, mod_factor;
 	float mean = 0, stddev = 0, temp_val;
@@ -162,7 +148,7 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
                 for(l = 0; l < survey -> nsamp; l++) {
                     temp_val = buffer[size * thread + k * survey -> nsamp + l] - mean;
                     if (abs(temp_val) >= (stddev * 5) ){
-                        fprintf(output, "%lld, %f, %f\n", timestamp + l * blockRate,
+                        fprintf(output, "%lf, %f, %f\n", timestamp + l * blockRate,
                                 survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep, temp_val + mean);
                     }   
                 }

@@ -18,11 +18,12 @@ using namespace pelican;
 
 // Constructor
 MdsmModule::MdsmModule(const ConfigNode& config)
-    : AbstractModule(config), _samples(0), _counter(0), _iteration(0)
+    : AbstractModule(config), _samples(0), _gettime(0), _counter(0), _iteration(0)
 {
     // Configure MDSM Module
     QString _filepath = config.getOption("observationfile", "filepath");
     _createOutputBlob = (bool) config.getOption("createOutputBlob", "value", "0").toUInt();
+    _invertChannels = (bool) config.getOption("invertChannels", "value", "1").toUInt();
 
     // Process Survey parameters (through observation file)
     _survey = processSurveyParameters(_filepath);
@@ -44,7 +45,6 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
     nSamples = streamData -> nTimeBlocks();
     nSubbands = streamData -> nSubbands();
     nChannels = (nSamples == 0) ? 0 : streamData->nChannels();
-    //    std::cout << nSamples << " " << nSubbands << " " << nChannels << std::endl;
     float *data;
 
     // We need the timestamp of the first packet in the first blob (assuming that we don't
@@ -53,7 +53,6 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
     if (_gettime == 0) {
         _timestamp = streamData -> getLofarTimestamp();
         _blockRate = streamData -> getBlockRate();
-        std::cout << "---------------Block:" << _timestamp << " " << _gettime << std::endl;
     }
 
     // Calculate number of required samples
@@ -69,30 +68,23 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
 
     // NOTE: we always care about the first Stokes parameter (XX)
     for(unsigned t = 0; t < copySamp; t++) {
-        unsigned rs, rc ; // reverse subband and channel order (lowest first)
         for (unsigned s = 0; s < nSubbands; s++) {
-            //            data = streamData -> spectrumData(t, s, 0);
-            rs = nSubbands - 1 - s;
-            data = streamData -> spectrumData(t, rs, 0);
-            for (unsigned c = 0; c < nChannels; c++) {
-                rc = nChannels - 1 - c;
+            data = streamData -> spectrumData(t, (_invertChannels) ? nSubbands - 1 - s : s, 0);
+            for (unsigned c = 0; c < nChannels; c++)
                 _input_buffer[(_samples + t)* nSubbands * nChannels
-                              + s * nChannels + c] = data[rc];
-            }
+                              + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
         }
     }
     _samples += copySamp;
     _gettime = _samples;
+
     // We have enough samples to pass to MDSM
     if (_samples == reqSamp || nSamples == 0) {
         // Copy this chunk and get previous output
         unsigned int numSamp;
         unsigned samples;
 
-        if (_counter == 0)
-            numSamp = _samples - _survey -> maxshift;
-        else
-            numSamp = _samples;
+        numSamp = (_counter == 0) ? _samples - _survey -> maxshift : _samples;
 
         float *outputBuffer = next_chunk(numSamp, samples, _timestamp, _blockRate);
 
@@ -107,20 +99,39 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
                     data  = dedispersedData -> samples(d);
                     data -> resize(samples);
                     data -> setDmValue(_survey -> lowdm + _survey -> dmstep * d);
-                    //                    for (unsigned xx = 0; xx < samples; xx++)
-                    //    (data -> ptr())[xx] = outputBuffer[d * samples + xx];
                     memcpy(data -> ptr(), &outputBuffer[d * samples], samples * sizeof(float));
                 }
-
             }
             else {
-             ;	// Number of samples differs among passes
+                // Number of samples differs among passes
+                DedispersedSeries<float>* data;
+                unsigned totdms = 0, shift = 0; 
+                for (unsigned thread = 0; thread < _survey -> num_threads; thread++) {
+                    for(unsigned pass = 0; pass < _survey -> num_passes; pass++) {
+                        unsigned ndms = (_survey -> pass_parameters[pass].ncalls / _survey -> num_threads) 
+                                       * _survey -> pass_parameters[pass].calldms;
+
+                        float startdm = _survey -> pass_parameters[pass].lowdm + _survey -> pass_parameters[pass].sub_dmstep 
+                                        * (_survey -> pass_parameters[pass].ncalls / _survey -> num_threads) * thread;
+                        float dmstep  = _survey -> pass_parameters[pass].dmstep;
+
+                        unsigned nsamp = samples / _survey -> pass_parameters[pass].binsize;
+                        for(unsigned dm = 0; dm < ndms; dm++) {
+                            data = dedispersedData -> samples(totdms + dm);
+                            data -> resize(nsamp);
+                            data -> setDmValue(startdm + dm * dmstep);
+                            memcpy(data -> ptr(), &outputBuffer[shift], nsamp * sizeof(float));
+                            shift += nsamp;
+                        }
+                        totdms += ndms;
+                    }   
+                }
             }
         }
         else
             dedispersedData -> resize(0);
 
-        // Tell MDSM to start processing this chunk
+        // Copy remaining samples (if any) to MDSM input buffer
         _gettime = _samples;
         if (!start_processing(_samples))  return;
         _counter++;
@@ -128,16 +139,11 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         _gettime = _samples;
 
         for(unsigned t = copySamp; t < nSamples; t++) {
-            unsigned rs, rc;
             for (unsigned s = 0; s < nSubbands; s++) {
-                rs = nSubbands - 1 - s;
-                //data = streamData -> spectrumData(t, s, 0);
-                data = streamData -> spectrumData(t, rs, 0);
-                for(int c = 0 ; c < nChannels ; ++c){
-                    rc = nChannels - 1 - c;
+                data = streamData -> spectrumData(t, (_invertChannels) ? nSubbands - 1 - s : s, 0);
+                for(unsigned c = 0 ; c < nChannels ; ++c)
                     _input_buffer[(t - copySamp) * nSubbands * nChannels
-                                  + s * nChannels + c] = data[rc];
-                }
+                                  + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
             }
         }
         _samples += nSamples - copySamp;

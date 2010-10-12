@@ -31,6 +31,7 @@ class MdsmModule : public AbstractModule
         long long    _timestamp;
         long         _blockRate;
         long         _iteration;
+        bool         _invertChannels;
 };
 
 // Declare this class as a pelican module.

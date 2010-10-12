@@ -29,10 +29,13 @@ DEVICES* initialise_devices(SURVEY* survey)
         else if (deviceProp.totalGlobalMem / 1024 > 1024 * 3.5 * 1024) {
 
             // Check if device is in user specfied list, if any
-            if (survey -> gpu_ids != NULL)
+            if (survey -> gpu_ids != NULL) {
                 for(unsigned j = 0; j < survey -> num_gpus; j++)
                     if ((survey -> gpu_ids)[j] == i)
                         useDevice = 1;
+            }
+            else
+                useDevice = 1;
 
             if (useDevice) {
 	            (devices -> devices)[counter].multiprocessor_count = deviceProp.multiProcessorCount;

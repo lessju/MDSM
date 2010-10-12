@@ -1,5 +1,5 @@
-#ifndef SIGPROCSTOKESWRITER_H
-#define SIGPROCSTOKESWRITER_H
+#ifndef DEDISPERSEDDATAWRITER_H
+#define DEDISPERSEDDATAWRITER_H
 
 #include "pelican/output/AbstractOutputStream.h"
 #include "pelican/utility/ConfigNode.h"
@@ -19,8 +19,8 @@ class DedispersedDataWriter: public AbstractOutputStream
 		DedispersedDataWriter( const ConfigNode& config );
         ~DedispersedDataWriter();
 
-    public:
-        virtual void send(const QString& streamName, const DataBlob* dataBlob);
+    protected:
+        virtual void sendStream(const QString& streamName, const DataBlob* dataBlob);
 
     private:
         // Header helpers
@@ -35,11 +35,13 @@ class DedispersedDataWriter: public AbstractOutputStream
         std::vector<std::ofstream*> _files;
         std::vector<float> 		  	_dmValues;
         float         		  		_fch1, _foff, _tsamp, _refdm;
-        int _nTotalSubbands;
-        unsigned _nChannels, _nSubbands, _clock, _integration ;
+        float                       _clock;
+        unsigned                    _nChannels, _nSubbands, _integration, _nPols ;
+        int                         _nTotalSubbands;
 
 };
 
 PELICAN_DECLARE(AbstractOutputStream, DedispersedDataWriter)
 
-#endif // SIGPROCSTOKESWRITER_H
+#endif // DEDISPERSEDDATAWRITER_H
+

@@ -17,21 +17,19 @@
 DedispersedDataWriter::DedispersedDataWriter(const ConfigNode& configNode )
 : AbstractOutputStream(configNode)
 {
-    _nSubbands = configNode.getOption("subbandsPerPacket", "value", "0").toUInt();
-    _nTotalSubbands = configNode.getOption("totalComplexSubbands", "value", "0").toUInt();
-    _clock = configNode.getOption("clock", "value", "200").toUInt();
+    _nSubbands = configNode.getOption("subbandsPerPacket", "value", "1").toUInt();
+    _nTotalSubbands = configNode.getOption("totalComplexSubbands", "value", "1").toUInt();
+    _clock = configNode.getOption("clock", "value", "200").toFloat();
     _integration    = configNode.getOption("integrateTimeBins", "value", "1").toUInt();
-    _nChannels = configNode.getOption("outputChannelsPerSubband", "value", "512").toUInt();
+    _nChannels = configNode.getOption("outputChannelsPerSubband", "value", "128").toUInt();
+    _nPols = configNode.getOption("nRawPolarisations", "value", "2").toUInt();
 
     _filePrefix = configNode.getOption("file", "prefix", "MDSM_");
-    _fch1     = configNode.getOption("topChannelFrequency", "value", "0").toFloat();
-    //    _foff     = configNode.getOption("frequencyOffset", "value", "0").toFloat();
-    _foff = - float(_clock) / (2.0 * _nTotalSubbands) * float(_nSubbands);
-    //    _tsamp    = configNode.getOption("samplingTime", "value", "0").toFloat();
-    _tsamp =  (2.0 * _nTotalSubbands) * _nChannels * _integration / float(_clock) / 1e6;
+    _fch1       = configNode.getOption("topChannelFrequency", "value", "150").toFloat();
+    _foff       = - _clock / (_nPols * _nTotalSubbands) * float(_nSubbands);
+    _tsamp      =  (_nPols * _nTotalSubbands) * _nChannels * _integration / _clock / 1e6;
     QString dms = configNode.getOption("DMs", "values", "0");
 
-    // TODO: Process DMs string to extract proper values;
     QStringList dmList = dms.split(",", QString::SkipEmptyParts);
     std::cout << "DM Values to output: ";
     foreach(QString val, dmList) {
@@ -51,8 +49,6 @@ DedispersedDataWriter::DedispersedDataWriter(const ConfigNode& configNode )
     // Write header in all files
     for (unsigned i = 0; i < _files.size(); i++) {
         WriteString(_files[i], "HEADER_START");
-        //WriteString("Telescope");
-        //WriteString("LOFAR");
         WriteInt(_files[i], "machine_id", 0);    // Ignore for now
         WriteInt(_files[i], "telescope_id", 0);  // Ignore for now
         WriteInt(_files[i], "data_type", 1);     // Channelised Data
@@ -63,7 +59,7 @@ DedispersedDataWriter::DedispersedDataWriter(const ConfigNode& configNode )
         WriteDouble(_files[i], "tsamp", _tsamp);
         WriteInt(_files[i], "nbits", 32);
         WriteDouble(_files[i], "tstart", 0);      //TODO: Extract start time from first packet
-        WriteInt(_files[i], "nifs", 1);   		   // We have total power
+        WriteInt(_files[i], "nifs", 1);   		  // We have total power
         WriteString(_files[i], "HEADER_END");
         _files[i] -> flush();
     }
@@ -106,7 +102,7 @@ void DedispersedDataWriter::WriteLong(std::ofstream *file, QString name, long va
 // ---------------------------- Data helpers --------------------------
 
 // Write data blob to disk
-void DedispersedDataWriter::send(const QString&, const DataBlob* incoming)
+void DedispersedDataWriter::sendStream(const QString&, const DataBlob* incoming)
 {
     DedispersedTimeSeriesF32* timeData;
     DataBlob* blob = const_cast<DataBlob*>(incoming);
@@ -123,7 +119,6 @@ void DedispersedDataWriter::send(const QString&, const DataBlob* incoming)
             for(unsigned j = 0; j < timeData -> nDMs(); j++) {
                 if (fabs(timeData -> samples(j) -> dmValue() - _dmValues[i])  < 0.00001) {
                     DedispersedSeries<float>* series = timeData -> samples(j);
-		     std::cout << "Writing to file..." << series -> nSamples()<< std::endl;
                     _files[i] -> write(reinterpret_cast<char *>(series -> ptr()), series -> nSamples() * sizeof(float));
                     _files[i] -> flush();
                     break;

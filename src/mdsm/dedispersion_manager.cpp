@@ -401,7 +401,7 @@ void tearDownMDSM()
 }
 
 // Process one data chunk
-float *next_chunk(unsigned int data_read, unsigned &samples, long long timestamp = 0, long blockRate = 0)
+float *next_chunk(unsigned int data_read, unsigned &samples, double timestamp = 0, double blockRate = 0)
 {   
     int k;
 
