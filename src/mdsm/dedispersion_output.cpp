@@ -2,6 +2,9 @@
 #include "dedispersion_output.h"
 #include "unistd.h"
 #include "math.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 // C++ stuff
 #include <cstdlib>
@@ -9,7 +12,7 @@
 
 // Calaculate the mean and standard deviation for the data
 // NOTE: Performed only on output of first thread
-void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp)
+void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp, time_t start_time)
 {
     unsigned int i, j, iters, vals, mod_factor, shift = 0;
     double total;
@@ -56,12 +59,12 @@ void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp)
         // Store mean and stddev values in survey
         survey -> pass_parameters[i].mean = mean;
         survey -> pass_parameters[i].stddev = stddev;
-        printf("mean: %f, stddev: %f\n", mean, stddev);
+        printf("%d: Mean: %f, Stddev: %f [pass %d]\n", (int) (time(NULL) - start_time), mean, stddev, i);
         shift += vals;
     }
 }
 
-// Apply mean and stddev to apply thresholding
+// Apply tresholding using mean and stddev
 void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, double timestamp, double blockRate)
 {
     unsigned int i = 0, thread, k, l, ndms, nsamp, shift = 0;
@@ -87,7 +90,7 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
                     temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
                     if (temp_val >= stddev * 5 )
                         fprintf(output, "%lf, %f, %f\n", 
-                                timestamp + l * blockRate,
+                                timestamp + l * blockRate * survey -> pass_parameters[i].binsize,
                                 startdm + k * dmstep, temp_val + mean);
                 }
             
@@ -98,7 +101,7 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
 }
 
 // Apply mean and stddev to apply thresholding
-void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, double timestamp, double blockRate)
+void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, double timestamp, double blockRate, time_t start_time)
 {
 	unsigned int j, k, l, iters, vals, mod_factor;
 	float mean = 0, stddev = 0, temp_val;
@@ -138,7 +141,7 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
 	}
 	stddev = sqrt(stddev / iters); // Stddev for entire array
 
-    printf("mean: %f, stddev: %f\n", mean, stddev);
+    printf("%d: Mean: %f, Stddev: %f\n", (int) (time(NULL) - start_time), mean, stddev);
 
     // Subtract dm mean from all samples and apply threshold
 	unsigned thread;
@@ -160,13 +163,26 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
 void* process_output(void* output_params)
 {
     OUTPUT_PARAMS* params = (OUTPUT_PARAMS *) output_params;
+    SURVEY *survey = params -> survey;
     int i, iters = 0, ret, loop_counter = 0, pnsamp = params -> survey -> nsamp;
     int ppnsamp = params -> survey-> nsamp;
     time_t start = params -> start, beg_read;
-    long long pptimestamp = 0, ptimestamp = 0;
-    long ppblockRate = 0, pblockRate = 0;
+    double pptimestamp = 0, ptimestamp = 0;
+    double ppblockRate = 0, pblockRate = 0;
+    long written_samples = 0;
+    FILE *fp = NULL;
 
     printf("%d: Started output thread\n", (int) (time(NULL) - start));
+
+    // Single output file mode, create file
+    if (survey -> single_file_mode) {
+        char pathName[256];
+        strcpy(pathName, survey -> basedir);
+        strcat(pathName, "/");
+        strcat(pathName, survey -> fileprefix);
+        strcat(pathName, ".dat");
+        fp = fopen(pathName, "w");
+    }
 
     // Processing loop
     while (1) {
@@ -178,20 +194,59 @@ void* process_output(void* output_params)
 
         // Process output
         if (loop_counter >= params -> iterations) {
-            beg_read = time(NULL);
 
+            // Create new output file if required
+            if (written_samples == 0 && !(survey -> single_file_mode)) {
+                char pathName[256];
+                strcpy(pathName, survey -> basedir);
+                strcat(pathName, "/");
+                strcat(pathName, survey -> fileprefix);
+                strcat(pathName, "_");
+
+                // Format timestamp 
+                struct tm *tmp;
+                if (survey -> use_pc_time) {
+                    time_t currTime = time(NULL);
+                    tmp = localtime(&currTime);                    
+                }
+                else {
+                    time_t currTime = (time_t) pptimestamp;
+                    tmp = localtime(&currTime);
+                }       
+
+                char tempStr[30];
+                strftime(tempStr, sizeof(tempStr), "%F_%T", tmp);
+
+                strcat(pathName, tempStr);
+                strcat(pathName, "_");
+                sprintf(tempStr, "%d", survey -> secs_per_file);
+                strcat(pathName, tempStr);
+                strcat(pathName, ".dat");
+
+                fp = fopen(pathName, "w");
+            }
+
+            beg_read = time(NULL);
             if (params -> survey -> useBruteForce)
-            	process_brute(params -> output_buffer, params -> output_file, params -> survey,  ppnsamp,
-                              params -> dedispersed_size, pptimestamp, ppblockRate);
+            	process_brute(params -> output_buffer, fp, params -> survey,  ppnsamp,
+                              params -> dedispersed_size, pptimestamp, ppblockRate, start);
             else {
-				mean_stddev(params -> output_buffer, params -> survey, ppnsamp);
+				mean_stddev(params -> output_buffer, params -> survey, ppnsamp, start);
 				printf("%d: Calculated mean and stddev %d [output]: %d\n", (int) (time(NULL) - start), loop_counter,
 																		   (int) (time(NULL) - beg_read));
-				process_subband(params -> output_buffer, params -> output_file, params -> survey,  ppnsamp,
+				process_subband(params -> output_buffer, fp, params -> survey,  ppnsamp,
 						 	 	params -> dedispersed_size, pptimestamp, ppblockRate);
             }
             printf("%d: Processed output %d [output]: %d\n", (int) (time(NULL) - start), loop_counter,
             												 (int) (time(NULL) - beg_read));
+
+            if (!(survey -> single_file_mode)) {
+                written_samples += ppnsamp;
+                if (written_samples * ppblockRate > survey -> secs_per_file) {
+                    written_samples = 0;
+                    fclose(fp);
+                }
+            }
         }
 
         // Wait output barrier

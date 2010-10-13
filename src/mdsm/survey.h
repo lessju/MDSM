@@ -27,11 +27,16 @@ typedef struct {
     unsigned num_passes, nsubs;
     
     // Timing parameters
-    long long timestamp;
-    long blockRate;
+    double timestamp;
+    double blockRate;
 
-    // File pointer (to be substitued with QIODevice)
+    // Input file for standalone mode
     FILE *fp;
+
+    // Output parameters
+    char fileprefix[80], basedir[120];
+    unsigned secs_per_file;
+    char use_pc_time, single_file_mode;
 
     // Number of GPUs which are used
     unsigned num_threads;

@@ -28,8 +28,7 @@ class MdsmModule : public AbstractModule
         unsigned int _samples;
         unsigned int _gettime;
         unsigned int _counter;
-        long long    _timestamp;
-        long         _blockRate;
+        double       _timestamp, _blockRate;
         long         _iteration;
         bool         _invertChannels;
 };

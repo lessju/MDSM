@@ -22,9 +22,6 @@ typedef struct {
     // Timing
     time_t start;
 
-    // Output file
-    FILE* output_file;
-
     // Survey parameters
     SURVEY *survey;
 

@@ -88,6 +88,10 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
 
         float *outputBuffer = next_chunk(numSamp, samples, _timestamp, _blockRate);
 
+        // Copy remaining samples (if any) to MDSM input buffer
+        _gettime = _samples;
+        if (!start_processing(_samples))  return;
+
         if (outputBuffer != NULL && _createOutputBlob) {
         
             // Output available, create data blob
@@ -131,9 +135,6 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         else
             dedispersedData -> resize(0);
 
-        // Copy remaining samples (if any) to MDSM input buffer
-        _gettime = _samples;
-        if (!start_processing(_samples))  return;
         _counter++;
         _samples = 0;
         _gettime = _samples;

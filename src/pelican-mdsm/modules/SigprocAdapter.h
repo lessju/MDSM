@@ -35,6 +35,7 @@ class SigprocAdapter: public AbstractStreamAdapter
         unsigned _nSubbands;
         unsigned _nPolarisations;
         unsigned _nBits;
+        double   _tsamp;
         unsigned long int _iteration;
 };
 

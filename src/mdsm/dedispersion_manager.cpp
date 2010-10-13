@@ -32,7 +32,6 @@ OUTPUT_PARAMS output_params;
 int loop_counter = 0, num_devices, ret;
 bool outSwitch = true;
 unsigned pnsamp, ppnsamp;
-char outfilename[50];
 
 #include <iostream>
 
@@ -81,14 +80,17 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> pass_parameters = (SUBBAND_PASSES *) malloc(passes * sizeof(SUBBAND_PASSES));
     passes = 0;
 
-    // Assign default values;
+    // Assign default values
     survey -> useBruteForce = 0;
     survey -> nsamp = 0;
-    survey -> fp = NULL;
     survey -> nbits = 0;
     survey -> gpu_ids = NULL;
     survey -> num_gpus = 0;
-    strcpy(outfilename, "output.dat");
+    strcpy(survey -> fileprefix, "output");
+    strcpy(survey -> basedir, ".");
+    survey -> secs_per_file = 600;
+    survey -> use_pc_time = 1;
+    survey -> single_file_mode = 0;
 
     // Start parsing observation file and generate survey parameters
     n = root.firstChild();
@@ -116,8 +118,13 @@ SURVEY* processSurveyParameters(QString filepath)
             else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0)
 			   survey -> nsamp = e.attribute("number").toUInt();
             else if (QString::compare(e.tagName(), QString("output"), Qt::CaseInsensitive) == 0) {
-                char *temp = e.attribute("filename").toUtf8().data();
-			    strcpy(outfilename, temp);
+                char *temp = e.attribute("filePrefix", "output").toUtf8().data();
+			    strcpy(survey -> fileprefix, temp);
+                temp = e.attribute("baseDirectory", ".").toUtf8().data();
+                strcpy(survey -> basedir, temp);
+                survey -> secs_per_file = e.attribute("secondsPerFile", "600").toUInt();
+                survey -> use_pc_time = e.attribute("usePCTime", "1").toUInt();
+                survey -> single_file_mode = e.attribute("singleFileMode", "0").toUInt();
             }
         
             // Check if user has specified GPUs to use
@@ -325,7 +332,6 @@ float* initialiseMDSM(SURVEY* input_survey)
     output_params.input_barrier = &input_barrier;
     output_params.output_barrier = &output_barrier;
     output_params.start = start;
-    output_params.output_file = fopen(outfilename, "w");
     output_params.survey = survey;
 
     // Create output thread 
