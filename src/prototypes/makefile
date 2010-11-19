@@ -40,8 +40,16 @@ average:
 	$(NVCC) -o average average.cu $(LDFLAGS) $(INC) -L/lib
 	rm -f *.cu.o *.linkinfo
 
-dedisp_benchmark:
-	$(NVCC) -o dedisp_benchmark dedisp_benchmark.cu $(LDFLAGS) $(INC) -L/lib
+brute_dedisp:
+	$(NVCC) -o brute_dedisp brute_dedisp.cu --ptxas-options=-v $(LDFLAGS) $(INC) -L/lib
 	rm -f *.cu.o *.linkinfo
 	
+brute_dedisp_imp:
+	$(NVCC) -o brute_dedisp_imp brute_dedisp_imp.cu $(LDFLAGS) $(INC) -L/lib
+	rm -f *.cu.o *.linkinfo
+
+brute_dedisp_imp_tex:
+	$(NVCC) -o brute_dedisp_imp_tex brute_dedisp_imp_tex.cu  $(LDFLAGS) $(INC) -L/lib
+	rm -f *.cu.o *.linkinfo
+
 ################################################################################

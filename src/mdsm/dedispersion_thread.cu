@@ -55,9 +55,8 @@ DEVICES* initialise_devices(SURVEY* survey)
         }
     }
 
-    // TEMPORARY TESTING HACKS
-//    devices -> num_devices = 1;
-//    devices -> minTotalGlobalMem = 1024 * 1024 * 4;
+    if (devices -> num_devices == 0) 
+        { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
 
     return devices;
 }
@@ -144,22 +143,6 @@ void subband_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* params
 	cudaEventElapsedTime(&timestamp, event_start, event_stop);
 	printf("%d: Processed Subband Dedispersion %d: %lf\n", (int) (time(NULL) - start), tid, timestamp);
 
-	// CHECK OUTPUT
-//  cutilSafeCall(cudaMemcpy( params -> output, d_output, params -> outputsize, cudaMemcpyDeviceToHost) );
-//  int a, b, c, l, k;
-//  inshift = 0;
-//  for(i = 0; i < survey -> num_passes; i++) {
-//      a = (nsamp + tempval) / survey -> pass_parameters[i].binsize;
-//      b = survey -> nsubs;
-//      c = survey -> pass_parameters[i].ncalls / num_threads;
-//      for (l = 0; l < c; l++)          //ncalls
-//          for (j = 0; j < b; j++)      //nsubs
-//              for (k = 0; k < a; k++)  //nsamp
-//                  if (params -> output[inshift + l*a*b + j*a + k] > 7 * 1024)
-//                      {    printf("%d. ncall: %d, nsub: %d, samp: %d, %f\n", i, l, j, k, params -> output[inshift + l*a*b + j*a + k]);   }
-//      inshift = a * b * c;
-//  }
-
 	// Copy subband output as dedispersion input
 	cutilSafeCall( cudaMemcpy(d_input, d_output, params -> outputsize, cudaMemcpyDeviceToDevice) );
 
@@ -196,25 +179,11 @@ void subband_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* params
 	cudaEventSynchronize(event_stop);
 	cudaEventElapsedTime(&timestamp, event_start, event_stop);
 
-	// CHECK OUTPUT
-//  cutilSafeCall(cudaMemcpy( params -> output, d_output, params -> outputsize, cudaMemcpyDeviceToHost) );
-
-//  inshift = 0;
-//  for(i = 0; i < survey -> num_passes; i++) {
-//      a = survey -> nsamp / survey -> pass_parameters[i].binsize;
-//      b = (survey -> pass_parameters[i].ncalls / num_threads) * survey -> pass_parameters[i].calldms;
-//      for (j = 0; j < b; j++)
-//          for (k = 0; k < a; k++)
-//              if (params -> output[inshift + j * a + k] < 6 * 1024)
-//                  {    printf("%d.%d - ndm: %d, samp: %d, %d, %f\n", tid, i, j, k, inshift + j * a + k, params -> output[inshift + j * a + k]);   }
-//      inshift += a * b;
-//  }
-
 	printf("%d: Processed Deispersion %d: %lf\n", (int) (time(NULL) - start), tid, timestamp);
 }
 
 // Perform brute-froce dedisperion
-void brute_force_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* params, cudaEvent_t event_start, cudaEvent_t event_stop)
+void brute_force_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* params, cudaEvent_t event_start, cudaEvent_t event_stop, int maxshift)
 {
 	// Define function variables;
     SURVEY *survey = params -> survey;
@@ -222,17 +191,30 @@ void brute_force_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* pa
 
     // ------------------------------------- Perform dedispersion on GPU --------------------------------------
     cudaEventRecord(event_start, 0);
+	cudaEventSynchronize(event_stop);
+	cudaEventElapsedTime(&timestamp, event_start, event_stop);
+	printf("%d: Performed Brute-Force Dedispersion %d: %lf\n", (int) (time(NULL) - params -> start),
+															   params -> thread_num, timestamp);
 
     float startdm = survey -> lowdm + survey -> dmstep * survey -> tdms / survey -> num_threads * params -> thread_num;
+  
+    // Optimised kernel
+//    opt_dedisperse_loop<<< dim3(nsamp / 128, survey -> tdms / survey -> num_threads), 128 >>>
+//			(d_output, d_input, survey -> nsamp, survey -> nchans,
+//			 survey -> tsamp, survey -> lowdm, survey -> dmstep, maxshift);
+
+    // Original kernel
     dedisperse_loop<<< dim3(128, survey -> tdms / survey -> num_threads), 128 >>>
 			(d_output, d_input, survey -> nsamp, survey -> nchans,
 			 survey -> tsamp, 1, startdm, survey -> dmstep, 0, 0);
+
 
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
 	cudaEventElapsedTime(&timestamp, event_start, event_stop);
 	printf("%d: Performed Brute-Force Dedispersion %d: %lf\n", (int) (time(NULL) - params -> start),
 															   params -> thread_num, timestamp);
+
 }
 
 // Dedispersion algorithm
@@ -275,19 +257,15 @@ void* dedisperse(void* thread_params)
             if (loop_counter == 1) {
                 // First iteration, no available extra samples, so load everything to GPU memory
                 cutilSafeCall( cudaMemcpy(d_input, params -> input, (nsamp + maxshift) * nchans * sizeof(float), cudaMemcpyHostToDevice) );
-                memcpy(tempshift, params -> input + nsamp * nchans, maxshift * nchans * sizeof(float));
+                memcpy(tempshift, params -> input + nsamp * nchans, maxshift * nchans * sizeof(float)); // NOTE: Optimise
             }
             else {
                 // Shift buffers and load input buffer
                 cutilSafeCall( cudaMemcpy(d_input, tempshift, maxshift * nchans * sizeof(float), cudaMemcpyHostToDevice) );
                 cutilSafeCall( cudaMemcpy(d_input + (maxshift * nchans), params -> input,
                                           nsamp * nchans * sizeof(float), cudaMemcpyHostToDevice) );
-                memcpy(tempshift, params -> input + (nsamp - maxshift) * nchans, maxshift * nchans * sizeof(float));
+                memcpy(tempshift, params -> input + (nsamp - maxshift) * nchans, maxshift * nchans * sizeof(float)); // NOTE: Optimise
             }
-
-            // Copy maxshift value to temporary host store
-            // TODO: Inefficient, find better way
-//            memcpy(tempshift, params -> input + (nsamp - maxshift) * nchans, maxshift * nchans * sizeof(float));
 
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);
@@ -305,7 +283,7 @@ void* dedisperse(void* thread_params)
 
         if (loop_counter >= params -> iterations){
         	if (survey -> useBruteForce)
-        		brute_force_dedispersion(d_input,d_output, params, event_start, event_stop);
+        		brute_force_dedispersion(d_input,d_output, params, event_start, event_stop, maxshift);
         	else
         		subband_dedispersion(d_input, d_output, params, event_start, event_stop);
         }

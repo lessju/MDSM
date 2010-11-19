@@ -12,8 +12,32 @@ __device__ __constant__ float dm_shifts[8192];
 //#ifdef FERMI
 //	__device__ __shared__ float localvalue[8192];
 //#else
-	__device__ __shared__ float localvalue[4008];
+	__device__ __shared__ float localvalue[512];
 //#endif
+
+// -------------------------- Optimised Dedispersion Loop -----------------------------------
+__global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int nchans, float tsamp,
+                                float startdm, float dmstep, int maxshift)
+{
+    extern __shared__ float shared[];
+
+    int c, s = threadIdx.x + blockIdx.x * blockDim.x;
+    float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
+    
+    for (s = threadIdx.x + blockIdx.x * blockDim.x; 
+         s < nsamp; 
+         s += blockDim.x * gridDim.x) {
+
+        shared[threadIdx.x] = 0;
+     
+        for(c = 0; c < nchans; c++) {
+            int shift = c * (nsamp + maxshift) + floor(dm_shifts[c] * shift_temp);
+            shared[threadIdx.x] += buff[shift + s ];
+        }
+
+        outbuff[blockIdx.y * nsamp + s] = shared[threadIdx.x];
+    }
+}
 
 // -------------------------- The Dedispersion Loop -----------------------------------
 __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchans, float tsamp,

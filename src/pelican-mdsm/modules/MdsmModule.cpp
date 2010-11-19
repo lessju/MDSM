@@ -53,6 +53,9 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
     if (_gettime == 0) {
         _timestamp = streamData -> getLofarTimestamp();
         _blockRate = streamData -> getBlockRate();
+
+        if (_counter > 0)
+            _timestamp = streamData -> getLofarTimestamp() - _blockRate * _survey -> maxshift;
     }
 
     // Calculate number of required samples
@@ -71,8 +74,14 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         for (unsigned s = 0; s < nSubbands; s++) {
             data = streamData -> spectrumData(t, (_invertChannels) ? nSubbands - 1 - s : s, 0);
             for (unsigned c = 0; c < nChannels; c++)
-                _input_buffer[(_samples + t)* nSubbands * nChannels
+                _input_buffer[(_samples + t) * nSubbands * nChannels
                               + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
+
+                  // Corner turn first...
+//                _input_buffer[s * nChannels * reqSamp
+//                              + c * reqSamp
+//                              + (_samples + t)] = data[(_invertChannels) ? nChannels - 1 - c : c];
+
         }
     }
     _samples += copySamp;
@@ -143,8 +152,14 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
             for (unsigned s = 0; s < nSubbands; s++) {
                 data = streamData -> spectrumData(t, (_invertChannels) ? nSubbands - 1 - s : s, 0);
                 for(unsigned c = 0 ; c < nChannels ; ++c)
-                    _input_buffer[(t - copySamp) * nSubbands * nChannels
-                                  + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
+                      _input_buffer[(t - copySamp) * nSubbands * nChannels
+                                    + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
+
+                  // Corner turn first...
+//                    _input_buffer[s * nChannels * reqSamp
+//                                + c * reqSamp
+//                                + (_samples + t)] = data[(_invertChannels) ? nChannels - 1 - c : c];
+
             }
         }
         _samples += nSamples - copySamp;

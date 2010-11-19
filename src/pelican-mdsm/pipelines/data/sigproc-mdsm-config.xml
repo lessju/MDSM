@@ -13,38 +13,42 @@
         <adapters>
             <SigprocAdapter>
                 <sampleSize bits="8"/>
-                <subbands number="2048" />
-                <samplesPerRead number="2048" />
+                <subbands number="1024" />
+                <samplesPerRead number="1024" />
             </SigprocAdapter>
         </adapters>
 
         <clients>
             <FileDataClient>
-                <data type="SpectrumDataSetStokes" adapter="SigprocAdapter" file="/home/lessju/Code/lofarTest.fil"/>
+                <data type="SpectrumDataSetStokes" adapter="SigprocAdapter" file="/home/lessju/Code/MDSM/Tests/LOFAR/lofar_156_75_2.dat"/>
             </FileDataClient>
         </clients>
 
         <modules>
             <MdsmModule>
-                <observationfile filepath="/home/lessju/Code/lofarTest.xml" />
+                <observationfile filepath="/home/lessju/Code/MDSM/Tests/LOFAR/lofar_156_32.xml" />
                 <createOutputBlob value="1" />
+                <invertChannels value="0" />
             </MdsmModule>
         </modules>
 
         <output>
-            <dataStreams>
-                <stream name="DedispersedTimeSeries" listeners="DedispersedDataWriter"/>
-            </dataStreams>
-            <streamers>
-                <DedispersedDataWriter>
-                    <file prefix="lofaTest" />
-                    <params channelOneFrequency="126"
-                            frequencyOffset="-0.002954"
-                            numberOfChannels="1"
-                            samplingTime="330" />
-                    <DMs values="40,50,60" />
-                </DedispersedDataWriter>
-            </streamers>
+<!--            <dataStreams>-->
+<!--                <stream name="DedispersedTimeSeriesF32" listeners="DedispersedDataWriter"/>-->
+<!--            </dataStreams>-->
+<!--            <streamers>-->
+<!--                <DedispersedDataWriter>-->
+<!--                    <file prefix="lofarTest" />-->
+<!--                    <subbandsPerPacket value="1" />-->
+<!--                    <totalComplexSubbands value="1" />-->
+<!--                    <clock value="200" />-->
+<!--                    <integrateTimeBins value ="1" />-->
+<!--                    <outputChannelsPerSubband value="1024" />-->
+<!--                    <nRawPolarisations value="1" />-->
+<!--                    <topChannelFrequency value="156" />-->
+<!--                    <DMs values="76.8" />-->
+<!--                </DedispersedDataWriter>-->
+<!--            </streamers>-->
         </output>
 
     </pipeline>
