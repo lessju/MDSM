@@ -74,13 +74,18 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
         for (unsigned s = 0; s < nSubbands; s++) {
             data = streamData -> spectrumData(t, (_invertChannels) ? nSubbands - 1 - s : s, 0);
             for (unsigned c = 0; c < nChannels; c++)
-                _input_buffer[(_samples + t) * nSubbands * nChannels
-                              + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
+//                _input_buffer[(_samples + t) * nSubbands * nChannels
+//                              + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
 
                   // Corner turn first...
-//                _input_buffer[s * nChannels * reqSamp
-//                              + c * reqSamp
-//                              + (_samples + t)] = data[(_invertChannels) ? nChannels - 1 - c : c];
+                if (_counter == 0)
+                    _input_buffer[s * nChannels * (_survey -> nsamp + _survey -> maxshift)
+                                  + c * (_survey -> nsamp + _survey -> maxshift)
+                                  + (_samples + t)] = data[(_invertChannels) ? nChannels - 1 - c : c];
+                else
+                    _input_buffer[s * nChannels * (_survey -> nsamp + _survey -> maxshift)
+                                  + c * (_survey -> nsamp + _survey -> maxshift)
+                                  + _survey -> maxshift + _samples + t] = data[(_invertChannels) ? nChannels - 1 - c : c];
 
         }
     }
@@ -152,13 +157,13 @@ void MdsmModule::run(SpectrumDataSetStokes* streamData, DedispersedTimeSeriesF32
             for (unsigned s = 0; s < nSubbands; s++) {
                 data = streamData -> spectrumData(t, (_invertChannels) ? nSubbands - 1 - s : s, 0);
                 for(unsigned c = 0 ; c < nChannels ; ++c)
-                      _input_buffer[(t - copySamp) * nSubbands * nChannels
-                                    + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
+//                      _input_buffer[(t - copySamp) * nSubbands * nChannels
+//                                    + s * nChannels + c] = data[(_invertChannels) ? nChannels - 1 - c : c];
 
                   // Corner turn first...
-//                    _input_buffer[s * nChannels * reqSamp
-//                                + c * reqSamp
-//                                + (_samples + t)] = data[(_invertChannels) ? nChannels - 1 - c : c];
+                    _input_buffer[s * nChannels * (_survey -> nsamp + _survey -> maxshift)
+                                + c * (_survey -> nsamp + _survey -> maxshift)
+                                + _survey -> maxshift + _samples + t] = data[(_invertChannels) ? nChannels - 1 - c : c];
 
             }
         }

@@ -237,7 +237,6 @@ int calculate_nsamp_brute(int maxshift, size_t *inputsize, size_t* outputsize, u
     if (survey -> nsamp == 0)
     	survey -> nsamp = ((memory * 1000 * 0.99 / sizeof(float)) - maxshift * survey -> nchans) / (survey -> nchans + survey -> tdms / num_devices);
 
-std::cout << num_devices << std::endl;
     *inputsize = (survey -> nsamp + maxshift) * survey -> nchans * sizeof(float);
     *outputsize = survey -> nsamp * survey -> tdms * sizeof(float) / num_devices;
     printf("[Brute Force] Input size: %d MB, output size: %d MB\n", (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));

@@ -26,7 +26,7 @@
 
         <modules>
             <MdsmModule>
-                <observationfile filepath="/home/lessju/Code/MDSM/Tests/LOFAR/lofar_156_32.xml" />
+                <observationfile filepath="/home/lessju/Code/MDSM/Tests/LOFAR/lofar_156_32_2.xml" />
                 <createOutputBlob value="1" />
                 <invertChannels value="0" />
             </MdsmModule>

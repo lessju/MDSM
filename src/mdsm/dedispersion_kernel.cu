@@ -12,30 +12,35 @@ __device__ __constant__ float dm_shifts[8192];
 //#ifdef FERMI
 //	__device__ __shared__ float localvalue[8192];
 //#else
-	__device__ __shared__ float localvalue[512];
+	__device__ __shared__ float localvalue[1024];
 //#endif
 
 // -------------------------- Optimised Dedispersion Loop -----------------------------------
 __global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int nchans, float tsamp,
-                                float startdm, float dmstep, int maxshift)
+                                int chanfactor, float startdm, float dmstep, int maxshift, int inshift, int outshift)
 {
+    // Dynamic shared memory, amount specified in kernel configuration
     extern __shared__ float shared[];
 
-    int c, s = threadIdx.x + blockIdx.x * blockDim.x;
     float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
+    int c, s;
     
+    // Dedispersing over loop of samples (1 thread = 1+ samples)
     for (s = threadIdx.x + blockIdx.x * blockDim.x; 
          s < nsamp; 
          s += blockDim.x * gridDim.x) {
 
+        // Clear shared memory
         shared[threadIdx.x] = 0;
      
+        // Loop over all channels, calucate shift and sum for current sample
         for(c = 0; c < nchans; c++) {
-            int shift = c * (nsamp + maxshift) + floor(dm_shifts[c] * shift_temp);
-            shared[threadIdx.x] += buff[shift + s ];
+            int shift = c * (nsamp + maxshift) + floor(dm_shifts[c * chanfactor] * shift_temp);
+            shared[threadIdx.x] += buff[inshift + shift + s];
         }
 
-        outbuff[blockIdx.y * nsamp + s] = shared[threadIdx.x];
+        // Store output
+        outbuff[outshift + blockIdx.y * nsamp + s] = shared[threadIdx.x];
     }
 }
 
@@ -67,7 +72,6 @@ __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchan
 }
 
 // -------------------------- The Subband Dedispersion Loop -----------------------------------
-// TODO: Optimise (process each subband in a different thread, instead of a sample per thread)
 __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int nchans, int nsubs, 
                                    float startdm, float dmstep, float tsamp, int inshift, int outshift)
 {
@@ -98,6 +102,41 @@ __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int n
 
             // Store values in global memory
             outbuff[outshift + blockIdx.y * nsamp * nsubs + soffset * nsubs + sband] = localvalue[threadIdx.x * nsubs + sband];
+        }
+    }
+}
+
+// -------------------------- The Optimised Subband Dedispersion Loop -----------------------------------
+__global__ void opt_dedisperse_subband(float *outbuff, float *buff, int nsamp, int nchans, int nsubs, 
+                                   float startdm, float dmstep, float tsamp, int maxshift, int inshift, int outshift)
+{
+    extern __shared__ float shared[];
+    
+    int s, c, shift, sband, tempval, chans_per_sub = nchans / nsubs;
+    float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
+
+    // dedispersing loop over all samples in this buffer
+    for (s = threadIdx.x + blockIdx.x * blockDim.x; 
+         s < nsamp; 
+         s += blockDim.x * gridDim.x) {
+
+        // loop over the subbands
+        for (sband = 0; sband < nsubs; sband++) {  
+
+            // Clear array element for storing dedispersed subband
+            shared[threadIdx.x * nsubs + sband] = 0.0;
+
+            // Subband channels are shifted to sample location of the highest frequency
+            tempval = dm_shifts[sband * chans_per_sub] * shift_temp; 
+
+            // Add up channels within subband range
+            for (c = (sband * chans_per_sub); c < (sband + 1) * chans_per_sub; c++) {
+                shift = dm_shifts[c] * shift_temp - tempval;
+                shared[threadIdx.x * nsubs + sband] += buff[inshift + c * (nsamp + maxshift) + shift + s];
+            }
+
+            // Store values in global memory
+            outbuff[outshift + blockIdx.y * nsamp * nsubs + sband * nsamp + s] = shared[threadIdx.x * nsubs + sband];
         }
     }
 }

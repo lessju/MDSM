@@ -91,8 +91,8 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
                     if (temp_val >= stddev * 5 )
                         fprintf(output, "%lf, %f, %f\n", 
                                 timestamp + l * blockRate * survey -> pass_parameters[i].binsize,
-                                startdm + k * dmstep, temp_val + mean);
-                }
+                                startdm + k * dmstep, temp_val + mean); 
+;                }
             
             shift += nsamp * ndms;
         }
