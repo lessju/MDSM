@@ -1,4 +1,4 @@
-<observation><frequencies center="123.0" offset="-0.0029296875" />
+<observation><frequencies top="123.0" offset="-0.0029296875" />
 <dm lowDM="0" numDMs="100" dmStep="1" useBruteForce="1" />
 <samples number="65536" />
 <channels number="2048" subbands="32" />

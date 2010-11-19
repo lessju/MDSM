@@ -4,6 +4,7 @@
 #include "unistd.h"
 #include "time.h"
 #include "string.h"
+#include "sys/time.h"
 
 float fch1 = 126, foff = -6, tsamp = 5e-6, dmstep = 0.065, startdm = 0;
 int nchans = 128, nsamp = 1024, tdms = 128, threads = 1;
@@ -81,7 +82,10 @@ int main(int argc, char *argv[])
    // Dedisperse
    generate_data(input, nsamp + maxshift, nchans);
 
-   time_t start = time(NULL);
+   struct timeval start, end;
+   long mtime, seconds, useconds;    
+   gettimeofday(&start, NULL);
+
    for(n = 0; n < tdms; n++) {
        for(s = 0; s < nsamp; s++) {
            value = 0;
@@ -91,6 +95,11 @@ int main(int argc, char *argv[])
        }
     }
 
-    printf("Time: %d\n", (int) (time(NULL) - start));
+    gettimeofday(&end, NULL);
+    seconds  = end.tv_sec  - start.tv_sec;
+    useconds = end.tv_usec - start.tv_usec;
+
+    mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
+    printf("Time: %ld\n", mtime);
 }
 
