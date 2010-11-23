@@ -73,7 +73,7 @@ void subband_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* params
     float timestamp;
 
     // Define kernel thread configuration
-    int gridsize_dedisp = 128, blocksize_dedisp = 128;
+    int blocksize_dedisp = 128; // gridsize_dedisp = 128, 
     dim3 gridDim_bin(128, (nchans / 128.0) < 1 ? 1 : nchans / 128.0);
     dim3 blockDim_bin(min(nchans, 128), 1);
 
@@ -199,7 +199,7 @@ void brute_force_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* pa
     // Optimised kernel
     opt_dedisperse_loop<<< dim3(survey -> nsamp / 128, survey -> tdms / survey -> num_threads), 128 >>>
 			(d_output, d_input, survey -> nsamp, survey -> nchans,
-			 survey -> tsamp, 1, survey -> lowdm, survey -> dmstep, maxshift, 0, 0);
+			 survey -> tsamp, 1, startdm, survey -> dmstep, maxshift, 0, 0);
 
     // Original kernel
 //    dedisperse_loop<<< dim3(128, survey -> tdms / survey -> num_threads), 128 >>>
@@ -264,11 +264,11 @@ void* dedisperse(void* thread_params)
             else {
                 // Copy previous maxshift to input buffer
                 for(i = 0; i < nchans; i++)
-                    memcpy(params -> input + i * (nsamp + maxshift),  tempshift + (maxshift * i), maxshift * sizeof(float)); // NOTE: Optimise
+                    memcpy(params -> input + i * (nsamp + maxshift),  tempshift + maxshift * i, maxshift * sizeof(float)); // NOTE: Optimise
 
-                cutilSafeCall( cudaMemcpy(d_input, tempshift, maxshift * nchans * sizeof(float), cudaMemcpyHostToDevice) );
-                cutilSafeCall( cudaMemcpy(d_input + (maxshift * nchans), params -> input,
-                                          nsamp * nchans * sizeof(float), cudaMemcpyHostToDevice) );
+               // cutilSafeCall( cudaMemcpy(d_input, tempshift, maxshift * nchans * sizeof(float), cudaMemcpyHostToDevice) );
+                cutilSafeCall( cudaMemcpy(d_input, params -> input,
+                                          (nsamp + maxshift) * nchans * sizeof(float), cudaMemcpyHostToDevice) );
 
                 // Keep a copy of maxshift in memory
                 for(i = 0; i < nchans; i++)
