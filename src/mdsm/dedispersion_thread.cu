@@ -264,7 +264,7 @@ void* dedisperse(void* thread_params)
             else {
                 // Copy previous maxshift to input buffer
                 for(i = 0; i < nchans; i++)
-                    memcpy(params -> input + i * (nsamp + maxshift),  tempshift + maxshift * i, maxshift * sizeof(float)); // NOTE: Optimise
+                    memcpy(params -> input + i * (nsamp + maxshift), tempshift + maxshift * i, maxshift * sizeof(float)); // NOTE: Optimise
 
                // cutilSafeCall( cudaMemcpy(d_input, tempshift, maxshift * nchans * sizeof(float), cudaMemcpyHostToDevice) );
                 cutilSafeCall( cudaMemcpy(d_input, params -> input,

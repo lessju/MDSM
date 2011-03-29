@@ -150,7 +150,7 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
             for (k = 0; k < survey -> tdms / survey -> num_threads; k++) {
                 for(l = 0; l < survey -> nsamp; l++) {
                     temp_val = buffer[size * thread + k * survey -> nsamp + l] - mean;
-                    if (abs(temp_val) >= (stddev * 5) ){
+                    if (temp_val >= (stddev * 5) ){
                         fprintf(output, "%lf, %f, %f\n", timestamp + l * blockRate,
                                 survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep, temp_val + mean);
                     }   

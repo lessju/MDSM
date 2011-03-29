@@ -97,9 +97,31 @@ SURVEY* lofar_process_arguments(int argc, char *argv[])
 }
 
 // Load data from binary file
-unsigned long readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans)
-{  
-    return read_block(fp, nbits, buffer, (unsigned long) nsamp * nchans) / nchans;
+unsigned long readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans, int maxshift, int counter)
+{
+    float *temp_buffer = (float *) malloc(nchans * sizeof(float));
+    size_t tot_nsamp = 0;
+
+    int to_read = counter == 0 ? nsamp + maxshift : nsamp;
+    int shift = counter == 0 ? 0 : maxshift;
+
+    // Corner turn while reading data
+    for(int i = 0; i < to_read; i++) {
+
+        if (read_block(fp, nbits, temp_buffer, nchans) != nchans)
+            return tot_nsamp;
+
+        for(int j = 0; j < nchans; j++)
+            buffer[j * (nsamp + maxshift) + shift + i] = temp_buffer[j];
+
+        tot_nsamp++;
+    }
+
+    free(temp_buffer);
+
+    return tot_nsamp;
+
+//    return read_block(fp, nbits, buffer, (unsigned long) nsamp * nchans) / nchans;
 }
 
 // MDSM entry point
@@ -121,8 +143,8 @@ int main(int argc, char *argv[])
 		// READING DATA FROM FILE
 		if (counter == 0) {   // First read, read in maxshift (TODO: need to be changed to handle maxshift internally
 
-			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp + survey -> maxshift,
-									   survey -> nchans);
+			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp,
+									   survey -> nchans, survey -> maxshift, counter);
 			if (data_read < survey -> maxshift) {
 				fprintf(stderr, "Not enough samples in file to perform dediseprsion\n");
 				data_read = 0;
@@ -131,12 +153,12 @@ int main(int argc, char *argv[])
 				data_read -= survey -> maxshift;
 		}
 		else                 // Read in normally
-			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, survey -> nchans);
+			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, 
+                                       survey -> nchans, survey -> maxshift, counter);
 
         // Check if there is more processing to be done
-
 		unsigned int x;
-		next_chunk(data_read, x);
+		next_chunk(data_read, x, survey -> tsamp * survey -> nsamp * counter, survey -> tsamp);
 		if (!start_processing(data_read))  break;
        
         total += data_read;
