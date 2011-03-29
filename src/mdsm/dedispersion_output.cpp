@@ -9,14 +9,56 @@
 // C++ stuff
 #include <cstdlib>
 #include <iostream>
+// Calculate the median of five numbers for a median filter
+float medianOfFive(float n1, float n2, float n3, float n4, float n5){
+  float *a = &n1, *b = &n2, *c = &n3, *d = &n4, *e = &n5;
+  float *tmp;
+
+  // makes a < b and b < d
+  if(*b < *a){
+    tmp = a; a = b; b = tmp;
+  }
+
+  if(*d < *c){
+    tmp = c; c = d; d = tmp;
+  }
+
+  // eleminate the lowest
+  if(*c < *a){
+    tmp = b; b = d; d = tmp; 
+    c = a;
+  }
+
+  // gets e in
+  a = e;
+
+  // makes a < b and b < d
+  if(*b < *a){
+    tmp = a; a = b; b = tmp;
+  }
+
+  // eliminate another lowest
+  // remaing: a,b,d
+  if(*a < *c){
+    tmp = b; b = d; d = tmp; 
+    a = c;
+  }
+
+  if(*d < *a)
+    return *d;
+  else
+    return *a;
+
+}
+
 
 // Calaculate the mean and standard deviation for the data
 // NOTE: Performed only on output of first thread
 void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp, time_t start_time)
 {
     unsigned int i, j, iters, vals, mod_factor, shift = 0;
-    double total;
-    float mean = 0, stddev = 0;
+    double total, total2;
+    float mean = 0, stddev = 0, mean2 = 0;
 
     for(i = 0; i < survey -> num_passes; i++) {
 
@@ -28,33 +70,22 @@ void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp, time_t start_tim
 
         // Split value calculation in "kernels" to avoid overflows      
         // TODO: Join mean and stddev kernel in one loop  
-
-        // Calculate the mean
+        // Calculate the mean and stddev
         iters = 0;
         while(1) {
-            total  = 0;
-            for(j = 0; j < mod_factor; j++)
-                total += buffer[shift + iters * mod_factor + j];
-            mean += (total / j);
-
-            iters++;
-            if (iters * mod_factor + j >= vals) break;
+	  total  = 0;
+	  total2  = 0;
+	  for(j = 0; j < mod_factor; j++){
+	    total += buffer[shift + iters * mod_factor + j];
+	    total2 += pow(buffer[shift + iters * mod_factor + j], 2);
+	  };
+	  mean += (total / j);
+	  mean2 += (total2 / j);
+	  iters++;
+	  if (iters * mod_factor + j >= vals) break;
         }
         mean /= iters;  // Mean for entire array
-
-        // Calculate standard deviation
-        iters = 0;
-        while(1) {
-
-            total = 0;
-            for(j = 0; j < mod_factor; j++)
-                total += pow(buffer[shift + iters * mod_factor + j] - mean, 2);
-             stddev += (total / j);
-
-             iters++; 
-             if (iters * mod_factor + j >= vals) break;
-        }
-        stddev = sqrt(stddev / iters); // Stddev for entire array
+        stddev = sqrt(mean2/iters - pow(mean,2));
 
         // Store mean and stddev values in survey
         survey -> pass_parameters[i].mean = mean;
@@ -86,12 +117,20 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
 
             // Subtract dm mean from all samples and apply threshold
             for (k = 0; k < ndms; k++)
-                for(l = 0; l < nsamp; l++) {
-                    temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
-                    if (temp_val >= stddev * 5 )
+                for(l = 0; l < nsamp - 5; l++) {
+		  float themedian, a, b, c, d, e;
+		  //                    temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
+                    a = buffer[size * thread + shift + k * nsamp + l + 0];
+                    b = buffer[size * thread + shift + k * nsamp + l + 1];
+                    c = buffer[size * thread + shift + k * nsamp + l + 2];
+                    d = buffer[size * thread + shift + k * nsamp + l + 3];
+                    e = buffer[size * thread + shift + k * nsamp + l + 4];
+		    themedian = medianOfFive (a, b, c, d, e );
+		    // std::cout << themedian << std::endl;
+                    if (themedian - mean >= stddev * 4.0 )
                         fprintf(output, "%lf, %f, %f\n", 
                                 timestamp + l * blockRate * survey -> pass_parameters[i].binsize,
-                                startdm + k * dmstep, temp_val + mean); 
+                                startdm + k * dmstep, themedian); 
 ;                }
             
             shift += nsamp * ndms;
@@ -150,7 +189,7 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
             for (k = 0; k < survey -> tdms / survey -> num_threads; k++) {
                 for(l = 0; l < survey -> nsamp; l++) {
                     temp_val = buffer[size * thread + k * survey -> nsamp + l] - mean;
-                    if (temp_val >= (stddev * 5) ){
+                    if (abs(temp_val) >= (stddev * 5) ){
                         fprintf(output, "%lf, %f, %f\n", timestamp + l * blockRate,
                                 survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep, temp_val + mean);
                     }   
