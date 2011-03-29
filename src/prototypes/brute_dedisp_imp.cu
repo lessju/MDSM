@@ -4,7 +4,6 @@
 #include "unistd.h"
 #include "time.h"
 #include "string.h"
-#include <cutil_inline.h>
 
 // Stores temporary shift values
 __constant__ float dm_shifts[4096];
@@ -63,7 +62,7 @@ void process_arguments(int argc, char *argv[])
        else if (!strcmp(argv[i], "-blocksize"))
            blocksize = atoi(argv[++i]);
        else if (!strcmp(argv[i], "-tsamp"))
-           blocksize = atoi(argv[++i]);
+           tsamp = atof(argv[++i]);
        else if (!strcmp(argv[i], "-foff"))
            foff = -atof(argv[++i]);
        i++;
@@ -107,7 +106,7 @@ int main(int argc, char *argv[])
          }
 
     // Initialise CUDA stuff
-    cutilSafeCall( cudaSetDevice(1));
+    ( cudaSetDevice(1));
     cudaEvent_t event_start, event_stop;
     float timestamp, kernelTime;
 
@@ -118,16 +117,16 @@ int main(int argc, char *argv[])
            nsamp, nchans, tsamp, startdm, dmstep, tdms, fch1, foff, maxshift);
 
     // Allocate CUDA memory and copy dmshifts
-    cutilSafeCall( cudaMalloc((void **) &d_input, (nsamp + maxshift) * nchans * sizeof(float)));
-    cutilSafeCall( cudaMalloc((void **) &d_output, nsamp * tdms * sizeof(float)));
-    cutilSafeCall( cudaMemset(d_output, 0, nsamp * tdms * sizeof(float)));
-    cutilSafeCall( cudaMemcpyToSymbol(dm_shifts, dmshifts, nchans * sizeof(int)) );
+    ( cudaMalloc((void **) &d_input, (nsamp + maxshift) * nchans * sizeof(float)));
+    ( cudaMalloc((void **) &d_output, nsamp * tdms * sizeof(float)));
+    ( cudaMemset(d_output, 0, nsamp * tdms * sizeof(float)));
+    ( cudaMemcpyToSymbol(dm_shifts, dmshifts, nchans * sizeof(int)) );
 
     time_t start = time(NULL);
 
     // Copy input to GPU
     cudaEventRecord(event_start, 0);
-    cutilSafeCall( cudaMemcpy(d_input, input, (nsamp + maxshift) * nchans * sizeof(float), cudaMemcpyHostToDevice) );    
+    ( cudaMemcpy(d_input, input, (nsamp + maxshift) * nchans * sizeof(float), cudaMemcpyHostToDevice) );    
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);
     cudaEventElapsedTime(&timestamp, event_start, event_stop);
@@ -144,7 +143,7 @@ int main(int argc, char *argv[])
 
     // Copy output from GPU
     cudaEventRecord(event_start, 0);
-    cutilSafeCall( cudaMemcpy(output, d_output, nsamp * tdms * sizeof(float), cudaMemcpyDeviceToHost) );    
+    ( cudaMemcpy(output, d_output, nsamp * tdms * sizeof(float), cudaMemcpyDeviceToHost) );    
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);
     cudaEventElapsedTime(&timestamp, event_start, event_stop);
@@ -154,11 +153,12 @@ int main(int argc, char *argv[])
     int val = 0;
     for(i = 0; i < nchans; i++) val += i;
 
-    for(i = 0; i < tdms; i++)
+ /*   for(i = 0; i < tdms; i++)
         for(j = 0; j < nsamp; j++)
             if (output[i * nsamp + j] != val)
                 printf("Error: dm: %d nsamp: %d value:%f \n", i, j, output[i*nsamp+j]);
 
+*/
     printf("Total time: %d\n", (int) (time(NULL) - start));
     printf("Performance: %lf Gflops\n", (nchans * tdms) * (nsamp * 1.0 / kernelTime / 1.0e6));
 }

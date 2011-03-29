@@ -26,7 +26,7 @@ DEVICES* initialise_devices(SURVEY* survey)
         
         if (deviceProp.major == 9999 && deviceProp.minor == 9999)
             { fprintf(stderr, "No CUDA-capable device found"); exit(0); }
-        else if (deviceProp.totalGlobalMem / 1024 > 1024 * 3.5 * 1024) {
+        else if (deviceProp.totalGlobalMem / 1024 > 1024 * 2.5 * 1024) {
 
             // Check if device is in user specfied list, if any
             if (survey -> gpu_ids != NULL) {
@@ -130,7 +130,7 @@ void subband_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* params
 
 		// Perform subband dedispersion
 		opt_dedisperse_subband <<< dim3((nsamp + tempval) / binsize / blocksize_dedisp, ncalls), 
-                                   blocksize_dedisp, blocksize_dedisp * survey -> nsubs >>>
+                                   blocksize_dedisp >>>
 			    (d_output, d_input, (nsamp + tempval) / binsize, nchans, survey -> nsubs,
 			     startdm, survey -> pass_parameters[i].sub_dmstep,
 			     tsamp * binsize, maxshift - tempval, inshift, outshift);

@@ -4,7 +4,6 @@
 #include "unistd.h"
 #include "time.h"
 #include "string.h"
-#include <cutil_inline.h>
 
 // Stores output value computed in inner loop for each thread
 __shared__ float localvalue[4008];
@@ -116,7 +115,7 @@ int main(int argc, char *argv[])
     output = (float *) malloc( nsamp * tdms * sizeof(float));
 
     // Initialise CUDA stuff
-    cutilSafeCall( cudaSetDevice(0));
+    ( cudaSetDevice(0));
     cudaEvent_t event_start, event_stop;
     float timestamp, kernelTime;
     dim3 gridDim(gridsize, tdms);  
@@ -125,16 +124,16 @@ int main(int argc, char *argv[])
     cudaEventCreate(&event_stop);
 
     // Allocate CUDA memory and copy dmshifts
-    cutilSafeCall( cudaMalloc((void **) &d_input, (nsamp + maxshift) * nchans * sizeof(float)));
-    cutilSafeCall( cudaMalloc((void **) &d_output, nsamp * tdms * sizeof(float)));
-    cutilSafeCall( cudaMemset(d_output, 0, nsamp * tdms * sizeof(float)));
-    cutilSafeCall( cudaMemcpyToSymbol(dm_shifts, dmshifts, nchans * sizeof(int)) );
+    ( cudaMalloc((void **) &d_input, (nsamp + maxshift) * nchans * sizeof(float)));
+    ( cudaMalloc((void **) &d_output, nsamp * tdms * sizeof(float)));
+    ( cudaMemset(d_output, 0, nsamp * tdms * sizeof(float)));
+    ( cudaMemcpyToSymbol(dm_shifts, dmshifts, nchans * sizeof(int)) );
 
     time_t start = time(NULL);
 
     // Copy input to GPU
     cudaEventRecord(event_start, 0);
-    cutilSafeCall( cudaMemcpy(d_input, input, (nsamp + maxshift) * nchans * sizeof(float), cudaMemcpyHostToDevice) );    
+    ( cudaMemcpy(d_input, input, (nsamp + maxshift) * nchans * sizeof(float), cudaMemcpyHostToDevice) );    
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);
     cudaEventElapsedTime(&timestamp, event_start, event_stop);
@@ -151,7 +150,7 @@ int main(int argc, char *argv[])
 
     // Copy output from GPU
     cudaEventRecord(event_start, 0);
-    cutilSafeCall( cudaMemcpy(output, d_output, nsamp * tdms * sizeof(float), cudaMemcpyDeviceToHost) );    
+    ( cudaMemcpy(output, d_output, nsamp * tdms * sizeof(float), cudaMemcpyDeviceToHost) );    
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);
     cudaEventElapsedTime(&timestamp, event_start, event_stop);

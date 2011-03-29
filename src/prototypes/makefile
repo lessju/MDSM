@@ -13,7 +13,7 @@ CUDA_SDK_PATH 	:= /usr/local/cudaSDK/C
 INC		:= -I. -I${CUDA_SDK_PATH}/common/inc -I${CUDA_PATH}/include
 LDFLAGS 	:= -L${CUDA_PATH}/lib -L${CUDA_PATH}/lib64 -L${CUDA_SDK_PATH}/lib \
 	          -L${CUDA_SDK_PATH}/common/lib -L/lib \
-        	  -lcuda -lcudart -lcutil -lm
+        	  -lcuda -lcudart  -lm
 	
 ############################ CUDA DEDISPERSE ###################################
 
