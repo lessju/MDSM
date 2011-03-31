@@ -7,8 +7,6 @@
 __device__ __constant__ float dm_shifts[8192];
 //__device__ float dm_shifts[8192];
 
-// Stores output value computed in inner loop for each sample
-__device__ __shared__ float localsharedvalue[4096];
 
 // -------------------------- Optimised Dedispersion Loop -----------------------------------
 __global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int nchans, float tsamp,
@@ -16,8 +14,7 @@ __global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int 
 {
     float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
     int c, s;
-    //float localkernelvalue[4096];
-    float localkernelvalue;
+    float localvalue[4096];
 	
 
     // Dedispersing over loop of samples (1 thread = 1+ samples)
@@ -27,16 +24,16 @@ __global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int 
     
 
         // Clear shared memory
-        localkernelvalue = 0;
+        localvalue[threadIdx.x] = 0;
      
         // Loop over all channels, calucate shift and sum for current sample
         for(c = 0; c < nchans; c++) {
             int shift = c * (nsamp + maxshift) + floor(dm_shifts[c * chanfactor] * shift_temp);
-            localkernelvalue += buff[inshift + shift + s];
+            localvalue[threadIdx.x] += buff[inshift + shift + s];
         }
 
         // Store output
-        outbuff[outshift + blockIdx.y * nsamp + s] = localkernelvalue;
+        outbuff[outshift + blockIdx.y * nsamp + s] = localvalue[threadIdx.x];
     }
 }
 
@@ -46,7 +43,7 @@ __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchan
 {
     register int samp, s, c, indx, soffset;
     register float shift_temp;
-    float localkernelvalue;
+    float localvalue[4096];
 
     /* dedispersing loop over all samples in this buffer */
     s = threadIdx.x + blockIdx.x * blockDim.x;
@@ -56,15 +53,15 @@ __global__ void dedisperse_loop(float *outuff, float *buff, int nsamp, int nchan
         soffset = (s + samp);
         
         /* clear array element for storing dedispersed subband */
-        localkernelvalue = 0.0;
+        localvalue[threadIdx.x] = 0.0;
 
         /* loop over the channels */
         for (c = 0; c < nchans; c ++) {
             indx = (soffset + (int) (dm_shifts[c * chanfactor] * shift_temp)) * nchans + c;
-            localkernelvalue += buff[inshift + indx];
+            localvalue[threadIdx.x] += buff[inshift + indx];
         }
 
-        outuff[outshift + blockIdx.y * nsamp + soffset] = localkernelvalue;
+        outuff[outshift + blockIdx.y * nsamp + soffset] = localvalue[threadIdx.x];
     }
 }
 
@@ -74,7 +71,7 @@ __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int n
 {
     int samp, s, c, indx, soffset, sband, tempval, chans_per_sub = nchans / nsubs;
     float shift_temp;
-    float localkernelvalue;
+    float localvalue[4096];
 
     s = threadIdx.x + blockIdx.x * blockDim.x;
     shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
@@ -87,7 +84,7 @@ __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int n
         for (sband = 0; sband < nsubs; sband++) {  
 
             // Clear array element for storing dedispersed subband
-            localkernelvalue = 0.0;
+            localvalue[threadIdx.x * nsubs + sband] = 0.0;
 
             // Subband channels are shifted to sample location of the highest frequency
             tempval = (int) (dm_shifts[sband * chans_per_sub] * shift_temp); 
@@ -95,11 +92,11 @@ __global__ void dedisperse_subband(float *outbuff, float *buff, int nsamp, int n
             // Add up channels within subband range
             for (c = (sband * chans_per_sub); c < (sband + 1) * chans_per_sub; c++) {
                 indx = (soffset + (int) (dm_shifts[c] * shift_temp - tempval)) * nchans + c;
-                localkernelvalue += buff[inshift + indx];
+                localvalue[threadIdx.x * nsubs + sband] += buff[inshift + indx];
             }
 
             // Store values in global memory
-            outbuff[outshift + blockIdx.y * nsamp * nsubs + soffset * nsubs + sband] = localkernelvalue;
+            outbuff[outshift + blockIdx.y * nsamp * nsubs + soffset * nsubs + sband] = localvalue[threadIdx.x * nsubs + sband];
         }
     }
 }
@@ -110,7 +107,7 @@ __global__ void opt_dedisperse_subband(float *outbuff, float *buff, int nsamp, i
 {
     int s, c, shift, sband, tempval, chans_per_sub = nchans / nsubs;
     float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
-    float localkernelvalue;
+    float localvalue[4096];
 
     // dedispersing loop over all samples in this buffer
     for (s = threadIdx.x + blockIdx.x * blockDim.x; 
@@ -121,7 +118,7 @@ __global__ void opt_dedisperse_subband(float *outbuff, float *buff, int nsamp, i
         for (sband = 0; sband < nsubs; sband++) {  
 
             // Clear array element for storing dedispersed subband
-            localkernelvalue = 0.0;
+            localvalue[threadIdx.x * nsubs + sband] = 0.0;
 
             // Subband channels are shifted to sample location of the highest frequency
             tempval = dm_shifts[sband * chans_per_sub] * shift_temp; 
@@ -129,11 +126,11 @@ __global__ void opt_dedisperse_subband(float *outbuff, float *buff, int nsamp, i
             // Add up channels within subband range
             for (c = (sband * chans_per_sub); c < (sband + 1) * chans_per_sub; c++) {
                 shift = dm_shifts[c] * shift_temp - tempval;
-                localkernelvalue += buff[inshift + c * (nsamp + maxshift) + shift + s];
+                localvalue[threadIdx.x * nsubs + sband] += buff[inshift + c * (nsamp + maxshift) + shift + s];
             }
 
             // Store values in global memory
-            outbuff[outshift + blockIdx.y * nsamp * nsubs + sband * nsamp + s] = localkernelvalue;
+            outbuff[outshift + blockIdx.y * nsamp * nsubs + sband * nsamp + s] = localvalue[threadIdx.x * nsubs + sband];
         }
     }
 }
@@ -143,18 +140,19 @@ __global__ void channel_binning_kernel(float *input, int nchans, int binsize)
 {
     int b, c, channel;
     float total;
+    float localvalue[4096];
 
     channel = threadIdx.x + blockDim.x * blockIdx.x;
     for(c = 0; c + channel < nchans; c += gridDim.x * blockDim.x) {
 
-        localsharedvalue[threadIdx.x] = input[c + channel];
+        localvalue[threadIdx.x] = input[c + channel];
     
         __syncthreads();
  
         if (threadIdx.x % binsize == 0) {       
             total = 0;
             for(b = 0; b < binsize; b++)       
-               total += localsharedvalue[threadIdx.x + b];
+               total += localvalue[threadIdx.x + b];
             input[c + channel] = total;
         }
 
@@ -166,6 +164,7 @@ __global__ void channel_binning_kernel(float *input, int nchans, int binsize)
 __global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize, int inshift, int outshift)
 {
     int b, c, channel, shift;
+    float localvalue[4096];
 
     // Loop over all values (nsamp * nchans)
     shift = threadIdx.x + blockIdx.y * (nchans / gridDim.y);
@@ -173,14 +172,14 @@ __global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize,
     for(c = 0; c + channel < nsamp * nchans; c += gridDim.x * blockDim.x * gridDim.y * binsize) {
 
         // Load data from binsize samples into shared memory
-        localsharedvalue[threadIdx.x] = 0;
+        localvalue[threadIdx.x] = 0;
 
         for(b = 0; b < binsize; b++)
-            localsharedvalue[threadIdx.x] += input[inshift + c + blockIdx.x * gridDim.y * 
+            localvalue[threadIdx.x] += input[inshift + c + blockIdx.x * gridDim.y * 
                                              blockDim.x * binsize + nchans * b + shift];
  
         // Copy data to global memory
-        input[outshift + channel + c/binsize] = localsharedvalue[threadIdx.x] / binsize;
+        input[outshift + channel + c/binsize] = localvalue[threadIdx.x] / binsize;
     }
 }
 
@@ -188,6 +187,7 @@ __global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize,
 __global__ void inplace_binning_kernel(float *input, int nsamp, int nchans, int binsize)
 {
     int b, c, channel, shift;
+    float localvalue[4096];
 
     // Loop over all values (nsamp * nchans)
     shift = threadIdx.x + blockIdx.y * (nchans / gridDim.y);
@@ -195,20 +195,21 @@ __global__ void inplace_binning_kernel(float *input, int nsamp, int nchans, int 
     for(c = 0; c + channel < nsamp * nchans; c += gridDim.x * blockDim.x * gridDim.y * binsize) {
 
         // Load data from binsize samples into shared memory
-        localsharedvalue[shift] = 0;
+        localvalue[shift] = 0;
 
         for(b = 0; b < binsize; b++)
-            localsharedvalue[shift] += input[c + blockIdx.x * gridDim.y * blockDim.x * 
+            localvalue[shift] += input[c + blockIdx.x * gridDim.y * blockDim.x * 
                                        binsize + nchans * b + shift];
 
         // Copy data to global memory
-        input[c +  channel] = localsharedvalue[shift] / binsize;
+        input[c +  channel] = localvalue[shift] / binsize;
     }
 }
 
 __global__ void inplace_memory_reorganisation(float *input, int nsamp, int nchans, int binsize)
 {
     int c, channel, shift;
+    float localvalue[4096];
 
     // Loop over all values (nsamp * nchans)
     shift = threadIdx.x + blockIdx.y * (nchans / gridDim.y);
@@ -216,10 +217,10 @@ __global__ void inplace_memory_reorganisation(float *input, int nsamp, int nchan
     for(c = 0; c + channel < nsamp * nchans; c += gridDim.x * blockDim.x * gridDim.y * binsize) {
 
         // Load data from binsize samples into shared memory
-        localsharedvalue[shift] = input[c + blockIdx.x * gridDim.y * blockDim.x * binsize + shift];
+        localvalue[shift] = input[c + blockIdx.x * gridDim.y * blockDim.x * binsize + shift];
  
         // Copy data to global memory
-        input[channel + c/binsize] = localsharedvalue[shift];
+        input[channel + c/binsize] = localvalue[shift];
     }
 }
 
