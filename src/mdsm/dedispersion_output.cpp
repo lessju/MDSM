@@ -127,7 +127,8 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
                     e = buffer[size * thread + shift + k * nsamp + l + 4];
 		    themedian = medianOfFive (a, b, c, d, e );
 		    // std::cout << themedian << std::endl;
-                    if (themedian - mean >= stddev * 4.0 )
+		    // 3.5 sigma filter
+                    if (themedian - mean >= stddev * 3.5 )
                         fprintf(output, "%lf, %f, %f\n", 
                                 timestamp + l * blockRate * survey -> pass_parameters[i].binsize,
                                 startdm + k * dmstep, themedian); 
