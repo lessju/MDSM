@@ -128,7 +128,7 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
 		  printf(" Mean:%f StdDev:%f ", mean,stddev);
 		if ( mean > 0 ){
                 for(l = 0; l < nsamp - 5; l++) {
-		  float themedian, a, b, c, d, e;
+		  float themedian, a, b, c, d, e, thisdm;
 		  //                    temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
                     a = buffer[size * thread + shift + k * nsamp + l + 0];
                     b = buffer[size * thread + shift + k * nsamp + l + 1];
@@ -138,10 +138,11 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
 		    themedian = medianOfFive (a, b, c, d, e );
 		    // std::cout << themedian << std::endl;
 		    // 3.5 sigma filter
-                    if (themedian - mean >= stddev * 3.5 )
+                    thisdm = startdm + k * dmstep;
+                    if (themedian - mean >= stddev * 3.5 && thisdm > 1.0 )
                         fprintf(output, "%lf, %f, %f\n", 
                                 timestamp + l * blockRate * survey -> pass_parameters[i].binsize,
-                                startdm + k * dmstep, themedian); 
+                                thisdm, themedian); 
                 }
 		}
 	    }            
