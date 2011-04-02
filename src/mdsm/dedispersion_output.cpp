@@ -116,7 +116,17 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
             stddev  = survey -> pass_parameters[i].stddev;
 
             // Subtract dm mean from all samples and apply threshold
-            for (k = 0; k < ndms; k++)
+            for (k = 0; k < ndms; k++) {
+	        double total = 0.0, total2 = 0.0;
+		for(l = 0; l < nsamp ; l++) {
+		  total += buffer[size * thread + shift + k * nsamp + l];
+		  total2 += pow(buffer[size * thread + shift + k * nsamp + l], 2);
+                }
+		mean = total / nsamp;
+		stddev = sqrt(total2/nsamp - pow(mean,2));
+		if ( k == 100)
+		  printf(" Mean:%f StdDev:%f ", mean,stddev);
+		if ( mean > 0 ){
                 for(l = 0; l < nsamp - 5; l++) {
 		  float themedian, a, b, c, d, e;
 		  //                    temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
@@ -128,12 +138,13 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
 		    themedian = medianOfFive (a, b, c, d, e );
 		    // std::cout << themedian << std::endl;
 		    // 3.5 sigma filter
-                    if (themedian - mean >= stddev * 3.5 )
+                    if (themedian - mean >= stddev * 3.0 )
                         fprintf(output, "%lf, %f, %f\n", 
                                 timestamp + l * blockRate * survey -> pass_parameters[i].binsize,
                                 startdm + k * dmstep, themedian); 
-;                }
-            
+                }
+		}
+	    }            
             shift += nsamp * ndms;
         }
         
@@ -271,7 +282,7 @@ void* process_output(void* output_params)
             	process_brute(params -> output_buffer, fp, params -> survey,  ppnsamp,
                               params -> dedispersed_size, pptimestamp, ppblockRate, start);
             else {
-				mean_stddev(params -> output_buffer, params -> survey, ppnsamp, start);
+	      //				mean_stddev(params -> output_buffer, params -> survey, ppnsamp, start);
 				printf("%d: Calculated mean and stddev %d [output]: %d\n", (int) (time(NULL) - start), loop_counter,
 																		   (int) (time(NULL) - beg_read));
 				process_subband(params -> output_buffer, fp, params -> survey,  ppnsamp,
