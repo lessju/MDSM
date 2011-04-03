@@ -104,7 +104,7 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
     for(thread = 0; thread < survey -> num_threads; thread++) {
 
         for(shift = 0, i = 0; i < survey -> num_passes; i++) {
-
+	    int index_dm0 = size * thread + shift;
             // Calaculate parameters
             nsamp   = read_nsamp / survey -> pass_parameters[i].binsize;
             startdm = survey -> pass_parameters[i].lowdm + survey -> pass_parameters[i].sub_dmstep 
@@ -112,29 +112,30 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
             dmstep  = survey -> pass_parameters[i].dmstep;
             ndms    = (survey -> pass_parameters[i].ncalls / survey -> num_threads) 
                       * survey -> pass_parameters[i].calldms;
-            mean    = survey -> pass_parameters[i].mean;
-            stddev  = survey -> pass_parameters[i].stddev;
+	    //            mean    = survey -> pass_parameters[i].mean;
+	    //            stddev  = survey -> pass_parameters[i].stddev;
 
             // Subtract dm mean from all samples and apply threshold
-            for (k = 0; k < ndms; k++) {
+            for (k = 1; k < ndms; k++) {
+	        int index_dm = index_dm0 + k * nsamp;
 	        double total = 0.0, total2 = 0.0;
 		for(l = 0; l < nsamp ; l++) {
-		  total += buffer[size * thread + shift + k * nsamp + l];
-		  total2 += pow(buffer[size * thread + shift + k * nsamp + l], 2);
+		  buffer[index_dm + l] -= buffer[index_dm0 + l];
+		  total += buffer[index_dm + l];
+		  total2 += pow(buffer[index_dm + l], 2);
                 }
 		mean = total / nsamp;
 		stddev = sqrt(total2/nsamp - pow(mean,2));
 		if ( k == 100)
 		  printf(" Mean:%f StdDev:%f ", mean,stddev);
-		if ( mean > 0 ){
                 for(l = 0; l < nsamp - 5; l++) {
 		  float themedian, a, b, c, d, e, thisdm;
-		  //                    temp_val = buffer[size * thread + shift + k * nsamp + l] - mean;
-                    a = buffer[size * thread + shift + k * nsamp + l + 0];
-                    b = buffer[size * thread + shift + k * nsamp + l + 1];
-                    c = buffer[size * thread + shift + k * nsamp + l + 2];
-                    d = buffer[size * thread + shift + k * nsamp + l + 3];
-                    e = buffer[size * thread + shift + k * nsamp + l + 4];
+		  //                    temp_val = buffer[index_dm + l] - mean;
+                    a = buffer[index_dm + l + 0];
+                    b = buffer[index_dm + l + 1];
+                    c = buffer[index_dm + l + 2];
+                    d = buffer[index_dm + l + 3];
+                    e = buffer[index_dm + l + 4];
 		    themedian = medianOfFive (a, b, c, d, e );
 		    // std::cout << themedian << std::endl;
 		    // 3.5 sigma filter
@@ -144,7 +145,6 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
                                 timestamp + l * blockRate * survey -> pass_parameters[i].binsize,
                                 thisdm, themedian); 
                 }
-		}
 	    }            
             shift += nsamp * ndms;
         }
