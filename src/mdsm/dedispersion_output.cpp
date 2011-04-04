@@ -156,7 +156,7 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
 			// std::cout << themedian << std::endl;
 			// 3.5 sigma filter
 			thisdm = startdm + k * dmstep;
-			if (themedian - mean >= stddev * 3.0 && thisdm > 1.0 ) {
+			if (themedian - mean >= stddev * 3.5 && thisdm > 1.0 ) {
 			  fprintf(output, "%lf, %f, %f\n", 
 				  timestamp + timebin * blockRate * survey -> pass_parameters[i].binsize,
 				  thisdm, themedian);
