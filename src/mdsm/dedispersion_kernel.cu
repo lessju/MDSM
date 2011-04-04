@@ -10,7 +10,7 @@ __device__ __constant__ float dm_shifts[8192];
 
 // -------------------------- Optimised Dedispersion Loop -----------------------------------
 __global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int nchans, float tsamp,
-                                int chanfactor, float startdm, float dmstep, int maxshift, int inshift, int outshift)
+                                int chanfactor, float startdm, float dmstep, int maxshift, int inshift, int outshift )
 {
     float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
     int c, s;
@@ -21,15 +21,13 @@ __global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int 
     for (s = threadIdx.x + blockIdx.x * blockDim.x; 
          s < nsamp; 
          s += blockDim.x * gridDim.x) {
-    
-
         // Clear shared memory
         localvalue[threadIdx.x] = 0;
      
         // Loop over all channels, calucate shift and sum for current sample
         for(c = 0; c < nchans; c++) {
             int shift = c * (nsamp + maxshift) + floor(dm_shifts[c * chanfactor] * shift_temp);
-            localvalue[threadIdx.x] += buff[inshift + shift + s];
+	    localvalue[threadIdx.x] += buff[inshift + shift + s];
         }
 
         // Store output
@@ -116,6 +114,7 @@ __global__ void opt_dedisperse_subband(float *outbuff, float *buff, int nsamp, i
 
         // loop over the subbands
         for (sband = 0; sband < nsubs; sband++) {  
+	    int bin = 0;
 
             // Clear array element for storing dedispersed subband
             localvalue[threadIdx.x * nsubs + sband] = 0.0;
@@ -126,11 +125,14 @@ __global__ void opt_dedisperse_subband(float *outbuff, float *buff, int nsamp, i
             // Add up channels within subband range
             for (c = (sband * chans_per_sub); c < (sband + 1) * chans_per_sub; c++) {
                 shift = dm_shifts[c] * shift_temp - tempval;
+	    if ( buff[inshift + c * (nsamp + maxshift) + shift + s]  < 300.0 ) {
                 localvalue[threadIdx.x * nsubs + sband] += buff[inshift + c * (nsamp + maxshift) + shift + s];
+		bin++;
+		}
             }
 
             // Store values in global memory
-            outbuff[outshift + blockIdx.y * nsamp * nsubs + sband * nsamp + s] = localvalue[threadIdx.x * nsubs + sband];
+            outbuff[outshift + blockIdx.y * nsamp * nsubs + sband * nsamp + s] = localvalue[threadIdx.x * nsubs + sband]/bin;
         }
     }
 }
