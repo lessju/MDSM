@@ -58,6 +58,7 @@ class DDStream1 : public AbstractPipeline
         SpectrumDataSetStokes* stokes;
         SpectrumDataSetStokes* intStokes;
         DedispersedTimeSeriesF32* dedispersedData;
+        WeightedSpectrumDataSet* weightedIntStokes;
 
         unsigned _iteration;
 };

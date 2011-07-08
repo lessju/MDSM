@@ -3,7 +3,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set(pipeline_lib_src
     src/MdsmPipeline.cpp
     src/SigprocMdsmPipeline.cpp
-    src/AtaMdsmPipeline.cpp
     src/DDStream1.cpp
     src/DDStream2.cpp
 )
@@ -56,19 +55,9 @@ target_link_libraries(sigprocPipeline
     pelicanMdsm
 )
 
-add_executable(ataPipeline src/ataMain.cpp)
-
-# Link with openmp.
-set_target_properties(ataPipeline PROPERTIES
-    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
-    LINK_FLAGS "${OpenMP_CXX_FLAGS}"
-)
-
-target_link_libraries(ataPipeline
-    pelicanMdsm
-)
-
 install(TARGETS mdsmPipeline DESTINATION ${BINARY_INSTALL_DIR})
+install(TARGETS DDStream1 DESTINATION ${BINARY_INSTALL_DIR})
+install(TARGETS DDStream2 DESTINATION ${BINARY_INSTALL_DIR})
 
 include(CopyFiles)
 copy_files(${CMAKE_CURRENT_SOURCE_DIR}/data/*.xml . mdsmXmlFiles)

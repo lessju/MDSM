@@ -38,6 +38,7 @@ class MdsmPipeline : public AbstractPipeline
         TimeSeriesDataSetC32* timeSeries;
         SpectrumDataSetStokes* stokes;
         DedispersedTimeSeriesF32* dedispersedData;
+        WeightedSpectrumDataSet* weightedIntStokes;
 
         unsigned _iteration;
 };

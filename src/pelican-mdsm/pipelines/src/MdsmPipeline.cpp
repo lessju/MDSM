@@ -1,5 +1,6 @@
 #include "MdsmPipeline.h"
 #include "DedispersedDataWriter.h"
+#include "WeightedSpectrumDataSet.h"
 #include <iostream>
 
 MdsmPipeline::MdsmPipeline()
@@ -23,6 +24,8 @@ void MdsmPipeline::init()
     // Create local datablobs
     spectra = (SpectrumDataSetC32*) createBlob("SpectrumDataSetC32");
     stokes = (SpectrumDataSetStokes*) createBlob("SpectrumDataSetStokes");
+    weightedIntStokes = (WeightedSpectrumDataSet*) createBlob("WeightedSpectrumDa\
+taSet");
     dedispersedData = (DedispersedTimeSeriesF32*) createBlob("DedispersedTimeSeriesF32");
 
     // Request remote data
@@ -49,7 +52,9 @@ void MdsmPipeline::run(QHash<QString, DataBlob*>& remoteData)
     ppfChanneliser->run(timeSeries, spectra);
     stokesGenerator->run(spectra, stokes);
     // Clips RFI and modifies blob in place                                                                      
-    rfiClipper->run(stokes);
+    weightedIntStokes->reset(stokes);
+
+    rfiClipper->run(weightedIntStokes);
 
     mdsm->run(stokes, dedispersedData);
 
