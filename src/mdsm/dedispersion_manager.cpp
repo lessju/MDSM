@@ -408,7 +408,8 @@ void tearDownMDSM()
 }
 
 // Process one data chunk
-float *next_chunk(unsigned int data_read, unsigned &samples, double timestamp = 0, double blockRate = 0)
+float *next_chunk(unsigned int data_read, unsigned &samples, double timestamp = 0, double blockRate = 0,
+                  float* mean = NULL, float* rms = NULL)
 {   
     int k;
 
@@ -456,6 +457,11 @@ float *next_chunk(unsigned int data_read, unsigned &samples, double timestamp = 
       //  Update timing parameters
       survey -> timestamp = timestamp;
       survey -> blockRate = blockRate;
+      // Update the noise definition;
+
+      survey -> noiseMean = mean;
+      survey -> noiseRMS  = rms;
+
     }
 
     // Release rw_lock

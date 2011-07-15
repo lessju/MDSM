@@ -30,6 +30,13 @@ typedef struct {
     double timestamp;
     double blockRate;
 
+    // Noise definition
+    float* noiseMean;
+    float* noiseRMS;
+
+    // Number of samples per input block
+    unsigned samplesPerChunk;
+
     // Input file for standalone mode
     FILE *fp;
 

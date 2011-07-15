@@ -1,5 +1,9 @@
 #ifndef MDSM_MODULE_H
 #define MDSM_MODULE_H
+// The following is related to the number of data blocks that MDSM is
+// processing at any moment: 3 comes from 1 for input, 1 for processing,
+// 1 for output
+#define MDSM_STAGES 3 
 
 #include "pelican/modules/AbstractModule.h"
 #include "DedispersedTimeSeries.h"
@@ -19,18 +23,22 @@ class MdsmModule : public AbstractModule
         ~MdsmModule();
 
         /// Perform Dedispersion;
-        void run(SpectrumDataSetStokes* timeData, DedispersedTimeSeriesF32* dedispersedData);
+        void run(DataBlob* timeData, DedispersedTimeSeriesF32* dedispersedData);
 
     private:
         SURVEY       *_survey;
         bool		 _createOutputBlob;
         float        *_input_buffer;
+        float        _bufferMean;
+        float        _bufferRMS;
         unsigned int _samples;
         unsigned int _gettime;
         unsigned int _counter;
         double       _timestamp, _blockRate;
         long         _iteration;
         bool         _invertChannels;
+        float       *_means[MDSM_STAGES]; // 3 
+        float       *_rmss[MDSM_STAGES]; 
 };
 
 // Declare this class as a pelican module.

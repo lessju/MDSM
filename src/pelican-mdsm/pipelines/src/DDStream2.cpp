@@ -56,7 +56,7 @@ void DDStream2::run(QHash<QString, DataBlob*>& remoteData)
 
     rfiClipper->run(weightedIntStokes);
 
-    mdsm->run(stokes, dedispersedData);
+    mdsm->run(weightedIntStokes, dedispersedData);
 
     // Output channelised data
     //    dataOutput(stokes, "DedispersedDataWriter");
