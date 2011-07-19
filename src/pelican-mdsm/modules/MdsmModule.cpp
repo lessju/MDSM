@@ -62,21 +62,25 @@ void MdsmModule::run(DataBlob* incoming, DedispersedTimeSeriesF32* dedispersedDa
       blobMean = weightedData -> mean();
       blobRMS = weightedData -> rms();
       // If you are in the very first block, initialise everything
+      
       if (_means[0]==NULL){
         unsigned chunksPerBlock = (_survey -> nsamp + _survey -> maxshift)
           /streamData -> nTimeBlocks();
-        _survey -> samplesPerChunk = streamData -> nTimeBlocks();
         
+        _survey -> samplesPerChunk = streamData -> nTimeBlocks();
+
+        /*
         std::cout << ">>>>>>> MdsmModule: chunksPerBlock: " << chunksPerBlock 
                   << " _survey -> nchans:   " << _survey -> nchans
                   << std::endl; 
-
+        */
         for (unsigned i=0; i < MDSM_STAGES; ++i) {
           // allocate memory for means and rmss of as many chunks fit in an MDSM block
-          _means[i] = (float*) malloc(chunksPerBlock * sizeof(float));
-          _rmss[i] = (float*) malloc(chunksPerBlock * sizeof(float));
+          _means[i] = (float*) malloc((chunksPerBlock+1) * sizeof(float));
+          _rmss[i] = (float*) malloc((chunksPerBlock+1) * sizeof(float));
         }
       }
+
       // Compute where we are in the array of means and rmss,
       // depending on whether we have a maxhift bit at the front
       
@@ -167,10 +171,10 @@ void MdsmModule::run(DataBlob* incoming, DedispersedTimeSeriesF32* dedispersedDa
         numSamp = (_counter == 0) ? _samples - _survey -> maxshift : _samples;
         
         std::cout<< " Sending data to MDSM" 
-                 << " Old Mean is: " << _bufferMean/blobsPerBlock
-                 << " New First Mean is: " << _means[_counter%MDSM_STAGES][0] 
+                 << " Average Mean is: " << _bufferMean/blobsPerBlock
+                 << " First Mean is: " << _means[_counter%MDSM_STAGES][0] 
                  << " RMS is : " <<  _bufferRMS/blobsPerBlock
-                 << " blobsPerBlock : " <<  blobsPerBlock
+                 << " Chunks in Block : " <<  blobsPerBlock
                  << std::endl;
         float *outputBuffer = next_chunk(numSamp, samples, _timestamp, _blockRate, 
                                          _means[_counter%MDSM_STAGES], _rmss[_counter%MDSM_STAGES] );
@@ -231,12 +235,14 @@ void MdsmModule::run(DataBlob* incoming, DedispersedTimeSeriesF32* dedispersedDa
 
         // take the means and rmss from the maxshift part of the
         // previous block and copy them to the start of the next block
-        memcpy(_means[_counter%MDSM_STAGES], 
-               _means[(_counter-1)%MDSM_STAGES]+_survey -> nsamp / nSamples,
-               (_survey -> maxshift / nSamples) * sizeof(float));
-        memcpy(_rmss[_counter%MDSM_STAGES], 
-               _rmss[(_counter-1)%MDSM_STAGES]+_survey -> nsamp / nSamples,
-               (_survey -> maxshift / nSamples) * sizeof(float));
+        if (_means[0] != NULL){
+          memcpy(_means[_counter%MDSM_STAGES], 
+                 _means[(_counter-1)%MDSM_STAGES]+_survey -> nsamp / nSamples,
+                 (_survey -> maxshift / nSamples) * sizeof(float));
+          memcpy(_rmss[_counter%MDSM_STAGES], 
+                 _rmss[(_counter-1)%MDSM_STAGES]+_survey -> nsamp / nSamples,
+                 (_survey -> maxshift / nSamples) * sizeof(float));
+        }
 
         // Copy remaining samples of last chunk into next block for
         // processing

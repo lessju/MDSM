@@ -157,14 +157,14 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
                   // 4 sigma filter
                   thisdm = startdm + k * dmstep;
                   if (mean == NULL){
-                    if (themedian - localmean >= localrms * 4.0 && thisdm > 1.0 )
+                    if (themedian - localmean >= localrms * survey -> detection_threshold && thisdm > 1.0 )
                       fprintf(output, "%lf, %f, %f\n", 
                               timestamp + t * blockRate * survey -> pass_parameters[i].binsize,
                               thisdm, themedian / localrms);
                   }
                   else{
                     if (themedian - mean[t / survey -> samplesPerChunk] >= 
-                      rms[t / survey -> samplesPerChunk] * 4.0 && thisdm > 1.0 )
+                      rms[t / survey -> samplesPerChunk] * survey -> detection_threshold && thisdm > 1.0 )
                       fprintf(output, "%lf, %f, %f\n", 
                               timestamp + t * blockRate * survey -> pass_parameters[i].binsize,
                               thisdm, themedian / rms[t / survey -> samplesPerChunk]);
@@ -187,8 +187,8 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
 	double total, total2, mean2;
 
         std::cout << "----- Mdsm output -----" << std::endl
-                  << " First Mean from datablob: " << mean[0] 
-                  << " First RMS from datablob: " << rms[0] 
+          //                  << " First Mean from datablob: " << mean[0] 
+          //                  << " First RMS from datablob: " << rms[0] 
                   << " Samples per Chunk: " << survey -> samplesPerChunk 
                   << std::endl
                   << "----------------------"
@@ -240,18 +240,20 @@ void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, 
               // 4 sigma filter
               thisdm = survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep;
               if (mean == NULL){
-                if (themedian - localmean >= localrms * 4.0 && thisdm > 1.0 )
+                if (themedian - localmean >= localrms * survey -> detection_threshold && thisdm > 1.0 )
                   fprintf(output, "%lf, %f, %f\n", 
                           timestamp + l * blockRate,
                           thisdm, themedian/localrms);
               }
               else{
                 if (themedian - mean[l / survey -> samplesPerChunk] >= 
-                    rms[l / survey -> samplesPerChunk] * 4.0 && thisdm > 1.0 )
-                  fprintf(output, "%lf, %f, %f  \n", 
+                    rms[l / survey -> samplesPerChunk] * survey -> detection_threshold && thisdm > 1.0 )
+                  fprintf(output, "%lf, %f, %f, %f, %f  \n", 
                           timestamp + l * blockRate, thisdm,
                           (themedian - mean[l / survey -> samplesPerChunk])
-                          / rms[l / survey -> samplesPerChunk]);
+                          / rms[l / survey -> samplesPerChunk],
+                          mean[l / survey -> samplesPerChunk],
+                          rms[l / survey -> samplesPerChunk]);
               }
             }
           }   
