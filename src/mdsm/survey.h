@@ -45,6 +45,9 @@ typedef struct {
     unsigned secs_per_file;
     char use_pc_time, single_file_mode;
 
+    // Detection parameters
+    float detection_threshold;
+
     // Number of GPUs which are used
     unsigned num_threads;
     unsigned *gpu_ids;

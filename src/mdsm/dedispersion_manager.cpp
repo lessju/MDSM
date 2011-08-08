@@ -86,6 +86,7 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> nbits = 0;
     survey -> gpu_ids = NULL;
     survey -> num_gpus = 0;
+    survey -> detection_threshold = 5.0;
     strcpy(survey -> fileprefix, "output");
     strcpy(survey -> basedir, ".");
     survey -> secs_per_file = 600;
@@ -117,6 +118,8 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> tsamp = e.attribute("tsamp").toFloat();
             else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0)
 			   survey -> nsamp = e.attribute("number").toUInt();
+            else if (QString::compare(e.tagName(), QString("detection"), Qt::CaseInsensitive) == 0)
+			   survey -> detection_threshold = e.attribute("threshold").toFloat();
             else if (QString::compare(e.tagName(), QString("output"), Qt::CaseInsensitive) == 0) {
                 char *temp = e.attribute("filePrefix", "output").toUtf8().data();
 			    strcpy(survey -> fileprefix, temp);
