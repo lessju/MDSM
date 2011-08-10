@@ -2,11 +2,50 @@
 #define DEDISPERSE_KERNEL_H_
 
 #include <cutil_inline.h>
+#include "cache_brute_force.h"
 
 // Stores temporary shift values
 __device__ __constant__ float dm_shifts[8192];
-//__device__ float dm_shifts[8192];
 
+// ---------------------- level_one_cache_with_accumulators_brute_force -------------------------------------
+__global__ void global_for_time_dedisperse_loop(float *outbuff, float *buff, const int nsamp, const int	nchans, const float mstartdm,
+						const float mdmstep, const int maxshift)
+{
+
+	// NOTE: inshift AND outshift are set to 0 (zero) in the kernel call and so is
+	// removed from this kernel.
+	
+	int   shift;	
+	float local_kernel_t[NUMREG];
+
+	int t  = blockIdx.x * NUMREG * blockDim.x  + threadIdx.x;
+	
+	// Initialise the time accumulators
+	for(int i = 0; i < NUMREG; i++) local_kernel_t[i] = 0.0f;
+
+	//float shift_temp = mstartdm + ((blockIdx.y * DIVINDM + threadIdx.y) * mdmstep);
+	float shift_temp = mstartdm + ((blockIdx.y * blockDim.y + threadIdx.y) * mdmstep);
+	
+	// Loop over the frequency channels.
+        for(int c = 0; c < nchans; c++) {
+
+
+		// Calculate the initial shift for this given frequency
+		// channel (c) at the current despersion measure (dm) 
+		// ** dm is constant for this thread!!**
+		shift = (c * (nsamp + maxshift) + t) + __float2int_rz (dm_shifts[c] * shift_temp);
+		
+		for(int i = 0; i < NUMREG; i++) {
+			local_kernel_t[i] += buff[shift + (i * DIVINT) ];
+		}
+	}
+
+	// Write the accumulators to the output array. 
+		
+	for(int i = 0; i < NUMREG; i++) {
+		outbuff[((blockIdx.y * DIVINDM) + threadIdx.y)* nsamp + (i * DIVINT) + (NUMREG * DIVINT * blockIdx.x) + threadIdx.x] = local_kernel_t[i];
+	}
+}
 
 // -------------------------- Optimised Dedispersion Loop -----------------------------------
 __global__ void opt_dedisperse_loop(float *outbuff, float *buff, int nsamp, int nchans, float tsamp,

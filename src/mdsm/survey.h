@@ -18,9 +18,10 @@ typedef struct {
     
     // Switch between brute-froce & subband dedisp
     bool useBruteForce;
+    bool useL1Cache;
 
     // Brute Force parameters
-	float lowdm, dmstep;
+    float lowdm, dmstep;
 
     // subband dedispersion paramters
     SUBBAND_PASSES *pass_parameters;

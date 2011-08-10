@@ -82,6 +82,7 @@ SURVEY* processSurveyParameters(QString filepath)
 
     // Assign default values
     survey -> useBruteForce = 0;
+    survey -> useL1Cache = 1;
     survey -> nsamp = 0;
     survey -> nbits = 0;
     survey -> gpu_ids = NULL;
@@ -109,6 +110,7 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> tdms = e.attribute("numDMs").toUInt();
                 survey -> dmstep = e.attribute("dmStep").toFloat();
                 survey -> useBruteForce = (bool) e.attribute("useBruteForce").toInt();
+                survey -> useL1Cache = (bool) e.attribute("useL1Cache").toInt();
             }
             else if (QString::compare(e.tagName(), QString("channels"), Qt::CaseInsensitive) == 0) {
                 survey -> nchans = e.attribute("number").toUInt();

@@ -61,6 +61,38 @@ DEVICES* initialise_devices(SURVEY* survey)
     return devices;
 }
 
+void level_one_cache_with_accumulators_brute_force(float *d_input, float *d_output, THREAD_PARAMS* params, cudaEvent_t event_start, cudaEvent_t event_stop, int maxshift)
+{
+    
+    SURVEY *survey = params -> survey;
+
+    int num_reg         = NUMREG;
+    int divisions_in_t  = DIVINT;
+    int divisions_in_dm = DIVINDM;
+    int num_blocks_t    = (survey -> nsamp/(divisions_in_t * num_reg));
+    int num_blocks_dm   = survey -> tdms / divisions_in_dm;
+
+    float timestamp;
+    float startdm = survey -> lowdm + survey -> dmstep * survey -> tdms / survey -> num_threads * params -> thread_num;
+       
+    dim3 threads_per_block(divisions_in_t, divisions_in_dm);
+    dim3 num_blocks(num_blocks_t,num_blocks_dm); 
+
+    cudaEventRecord(event_start, 0);	
+
+    global_for_time_dedisperse_loop<<< num_blocks, threads_per_block >>>
+    			(d_output, d_input, survey -> nsamp, survey -> nchans,
+    			 startdm/survey -> tsamp, survey
+			 -> dmstep/survey -> tsamp,
+			 maxshift);
+
+    cudaEventRecord(event_stop, 0);
+    cudaEventSynchronize(event_stop);
+    cudaEventElapsedTime(&timestamp, event_start, event_stop);
+    printf("%d: Performed Brute-Force Dedispersion %d: %lf\n", (int) (time(NULL) - params -> start), params -> thread_num, timestamp);
+
+}
+
 // Perform subband dedispersion
 void subband_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* params, cudaEvent_t event_start, cudaEvent_t event_stop)
 {
@@ -201,11 +233,6 @@ void brute_force_dedispersion(float *d_input, float *d_output, THREAD_PARAMS* pa
 			(d_output, d_input, survey -> nsamp, survey -> nchans,
 			 survey -> tsamp, 1, startdm, survey -> dmstep, maxshift, 0, 0);
 
-    // Original kernel
-//    dedisperse_loop<<< dim3(128, survey -> tdms / survey -> num_threads), 128 >>>
-//			(d_output, d_input, survey -> nsamp, survey -> nchans,
-//			 survey -> tsamp, 1, startdm, survey -> dmstep, 0, 0);
-
 
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
@@ -303,9 +330,14 @@ void* dedisperse(void* thread_params)
             { fprintf(stderr, "Error during barrier synchronisation 1 [thread]\n"); exit(0); }
 
         if (loop_counter >= params -> iterations){
-        	if (survey -> useBruteForce)
-        		brute_force_dedispersion(d_input,d_output, params, event_start, event_stop, maxshift);
-        	else
+        	if (survey -> useBruteForce){
+			if(survey -> useL1Cache){
+				level_one_cache_with_accumulators_brute_force(d_input,d_output, params, event_start, event_stop, maxshift);
+			} else {
+		        	brute_force_dedispersion(d_input,d_output, params, event_start, event_stop, maxshift);
+			}
+		}
+		else
         		subband_dedispersion(d_input, d_output, params, event_start, event_stop);
         }
 
