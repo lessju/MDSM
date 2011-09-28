@@ -1,8 +1,8 @@
 #ifndef DEDISPERSION_MANAGER_H_
 #define DEDISPERSION_MANAGER_H_
 
-#include <QString>
 #include "survey.h"
+#include <QString>
 
 SURVEY *processSurveyParameters(QString filepath);
 float* initialiseMDSM(SURVEY* input_survey);

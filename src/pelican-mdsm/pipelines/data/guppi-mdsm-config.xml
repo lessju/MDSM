@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pelican>
+
+<configuration version="1.0">
+
+    <pipeline>
+        <buffers>
+           <SpectrumDataSetStokes>
+               <buffer maxSize="100000000" maxChunkSize="100000000"/>
+           </SpectrumDataSetStokes>
+        </buffers>
+
+        <adapters>
+            <GuppiAdapter>
+                <outputChannelsPerSubband value="8" />
+                <samplesPerRead number="2048" />
+            </GuppiAdapter>
+        </adapters>
+
+        <clients>
+            <FileDataClient>
+                <data type="TimeSeriesDataSetC32" adapter="GuppiAdapter" file="/home/lessju/Code/SETI/crabData.raw"/>
+            </FileDataClient>
+        </clients>
+
+        <modules>
+
+            <PPFChanneliser>
+                <outputChannelsPerSubband value = "8" />
+                <processingThreads value = "8" />
+                <filter nTaps = "8" filterWindow = "kaiser"/>
+            </PPFChanneliser>
+
+            <StokesGenerator />
+
+            <MdsmModule>
+                <observationfile filepath="/home/lessju/Code/MDSM/release/pelican-mdsm/pipelines/data/obs.xml" />
+                <createOutputBlob value="0" />
+                <invertChannels value="1" />
+            </MdsmModule>
+        </modules>
+
+        <output>
+<!--            <dataStreams>-->
+<!--                <stream name="DedispersedTimeSeriesF32" listeners="DedispersedDataWriter"/>-->
+<!--            </dataStreams>-->
+<!--            <streamers>-->
+<!--                <DedispersedDataWriter>-->
+<!--                    <file prefix="lofarTest" />-->
+<!--                    <subbandsPerPacket value="1" />-->
+<!--                    <totalComplexSubbands value="1" />-->
+<!--                    <clock value="200" />-->
+<!--                    <integrateTimeBins value ="1" />-->
+<!--                    <outputChannelsPerSubband value="1024" />-->
+<!--                    <nRawPolarisations value="1" />-->
+<!--                    <topChannelFrequency value="156" />-->
+<!--                    <DMs values="76.8" />-->
+<!--                </DedispersedDataWriter>-->
+<!--            </streamers>-->
+        </output>
+
+    </pipeline>
+</configuration>

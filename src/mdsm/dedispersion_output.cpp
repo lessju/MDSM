@@ -9,6 +9,7 @@
 // C++ stuff
 #include <cstdlib>
 #include <iostream>
+
 // Calculate the median of five numbers for a median filter
 float medianOfFive(float n1, float n2, float n3, float n4, float n5){
   float *a = &n1, *b = &n2, *c = &n3, *d = &n4, *e = &n5;
@@ -51,62 +52,13 @@ float medianOfFive(float n1, float n2, float n3, float n4, float n5){
 
 }
 
-
-// Calaculate the mean and standard deviation for the data
-// NOTE: Performed only on output of first thread
-// WARNING :: OBSOLETE!
-
-void mean_stddev(float *buffer, SURVEY *survey, int read_nsamp, time_t start_time, float noiseMean, float noiseRMS)
-{
-    unsigned int i, j, iters, vals, mod_factor, shift = 0;
-    double total, total2;
-    float mean = 0, stddev = 0, mean2 = 0;
-
-
-
-
-    for(i = 0; i < survey -> num_passes; i++) {
-
-        // Calculate the total number of values
-        vals = read_nsamp / survey -> pass_parameters[i].binsize 
-               * (survey -> pass_parameters[i].ncalls / survey -> num_threads) 
-               * survey -> pass_parameters[i].calldms;
-        mod_factor = vals < 32 * 1024 ? vals : 32 * 1024;
-
-        // Split value calculation in "kernels" to avoid overflows      
-        // TODO: Join mean and stddev kernel in one loop  
-        // Calculate the mean and stddev
-        iters = 0;
-        while(1) {
-	  total  = 0;
-	  total2  = 0;
-	  for(j = 0; j < mod_factor; j++){
-	    total += buffer[shift + iters * mod_factor + j];
-	    total2 += pow(buffer[shift + iters * mod_factor + j], 2);
-	  };
-	  mean += (total / j);
-	  mean2 += (total2 / j);
-	  iters++;
-	  if (iters * mod_factor + j >= vals) break;
-        }
-        mean /= iters;  // Mean for entire array
-        stddev = sqrt(mean2/iters - pow(mean,2));
-
-        // Store mean and stddev values in survey
-        survey -> pass_parameters[i].mean = mean;
-        survey -> pass_parameters[i].stddev = stddev;
-        printf("---- %d: Mean: %f, Stddev: %f [pass %d]\n", (int) (time(NULL) - start_time), mean, stddev, i);
-        shift += vals;
-    }
-}
-
 // Process subband dedispersion if that has been chosen
 void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, double timestamp, double blockRate,
                      float* mean, float* rms )
 {
     unsigned int i = 0, thread, k, t, ndms, nsamp, shift = 0;
-    float temp_val, startdm, dmstep;
-    float localmean, localrms;
+    float startdm, dmstep;
+    float localmean = 0, localrms = 0;
 
     std::cout << " First Mean from datablob: " << mean[0] << std::endl;
     std::cout << " First RMS from datablob: " << rms[0] << std::endl;
@@ -114,9 +66,9 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
     for(thread = 0; thread < survey -> num_threads; thread++) {
 
         for(shift = 0, i = 0; i < survey -> num_passes; i++) {
-	    int index_dm0 = size * thread + shift;
-	    int timebin;
-	  // ntimes is the number of samples over which to calculate the mean and rms
+	        int index_dm0 = size * thread + shift;
+
+	        // ntimes is the number of samples over which to calculate the mean and rms
             // Calaculate parameters
             nsamp   = read_nsamp / survey -> pass_parameters[i].binsize;
             startdm = survey -> pass_parameters[i].lowdm + survey -> pass_parameters[i].sub_dmstep 
@@ -129,136 +81,135 @@ void process_subband(float *buffer, FILE* output, SURVEY *survey, int read_nsamp
             for (k = 0; k < ndms; k++) {
 
 	        int index_dm = index_dm0 + k * nsamp;
-		//		std::cout << "index_dm " <<  index_dm << std::endl;
-		//		for(l = 0; l < nsamp/ntimes ; l++) {
                 // Do we have useful values for the mean and rms?
                 // If not, work something out for each DM
                 if (mean == NULL) {
-                  double total = 0.0, total2 = 0.0;
-                  for (t = 0; t < nsamp; t++) {
-                    total += buffer[index_dm + t];
-                    total2 += pow(buffer[index_dm + t], 2);
-                  }
-                  localmean = total / nsamp;
-                  localrms = sqrt(total2/nsamp - pow(localmean,2));
+
+                    double total = 0.0, total2 = 0.0;
+                    for (t = 0; t < nsamp; t++) {
+                        total += buffer[index_dm + t];
+                        total2 += pow(buffer[index_dm + t], 2);
+                    }
+
+                    localmean = total / nsamp;
+                    localrms = sqrt(total2/nsamp - pow(localmean,2));
                 }
 
                 if ( k == 100)
-                  printf(" Mean:%f StdDev:%f \n", localmean,localrms);
+                    printf(" Mean:%f StdDev:%f \n", localmean,localrms);
+
                 for(t = 0; t < nsamp - 4; t++) {
-                  float themedian, a, b, c, d, e, thisdm;
-                  a = buffer[index_dm + t + 0];
-                  b = buffer[index_dm + t + 1];
-                  c = buffer[index_dm + t + 2];
-                  d = buffer[index_dm + t + 3];
-                  e = buffer[index_dm + t + 4];
-                  themedian = medianOfFive (a, b, c, d, e );
-                  // std::cout << themedian << std::endl;
-                  // 4 sigma filter
-                  thisdm = startdm + k * dmstep;
-                  if (mean == NULL){
-                    if (themedian - localmean >= localrms * survey -> detection_threshold && thisdm > 1.0 )
-                      fprintf(output, "%lf, %f, %f\n", 
-                              timestamp + t * blockRate * survey -> pass_parameters[i].binsize,
-                              thisdm, themedian / localrms);
+                    float themedian, a, b, c, d, e, thisdm;
+                    a = buffer[index_dm + t + 0];
+                    b = buffer[index_dm + t + 1];
+                    c = buffer[index_dm + t + 2];
+                    d = buffer[index_dm + t + 3];
+                    e = buffer[index_dm + t + 4];
+                    themedian = medianOfFive (a, b, c, d, e );
+
+                    // detection_threshold sigma filter
+                    thisdm = startdm + k * dmstep;
+                    if (mean == NULL)
+                    {
+                        if (themedian - localmean >= localrms * survey -> detection_threshold && thisdm > 1.0 )
+                            
+                            fprintf(output, "%lf, %f, %f\n", 
+                                    timestamp + t * blockRate * survey -> pass_parameters[i].binsize,
+                                    thisdm, themedian / localrms);
+                    }
+                    else 
+                        if (themedian - mean[t / survey -> samplesPerChunk] >= 
+                            rms[t / survey -> samplesPerChunk] * survey -> detection_threshold && thisdm > 1.0 )
+                            
+                            fprintf(output, "%lf, %f, %f\n", 
+                                    timestamp + t * blockRate * survey -> pass_parameters[i].binsize,
+                                    thisdm, themedian / rms[t / survey -> samplesPerChunk]);
                   }
-                  else{
-                    if (themedian - mean[t / survey -> samplesPerChunk] >= 
-                      rms[t / survey -> samplesPerChunk] * survey -> detection_threshold && thisdm > 1.0 )
-                      fprintf(output, "%lf, %f, %f\n", 
-                              timestamp + t * blockRate * survey -> pass_parameters[i].binsize,
-                              thisdm, themedian / rms[t / survey -> samplesPerChunk]);
-                  }
-                }
-            }
-        }
+              }
+         }
     }
     shift += nsamp * ndms;
 }
 
 // Process brute force dedispersion if that was chosen
-
 void process_brute(float *buffer, FILE* output, SURVEY *survey, int read_nsamp, size_t size, double timestamp, double blockRate, time_t start_time,
                    float* mean, float* rms)
 {
-	unsigned int j, k, l, iters, vals, mod_factor;
-	float temp_val;
-        float localmean, localrms;
+    unsigned int j, k, l, iters, vals, mod_factor;
+    float localmean = 0, localrms = 0;
 	double total, total2, mean2;
 
-        std::cout << "----- Mdsm output -----" << std::endl
-          //                  << " First Mean from datablob: " << mean[0] 
-          //                  << " First RMS from datablob: " << rms[0] 
-                  << " Samples per Chunk: " << survey -> samplesPerChunk 
-                  << std::endl
-                  << "----------------------"
-                  << std::endl;
-
-        // Do we have useful values for the mean and rms?
-        // If not, work something out for each DM
-        if (mean == NULL) {
-          // Calculate the total number of values
-          vals = read_nsamp * survey -> tdms;
-          mod_factor = vals < 32 * 1024 ? vals : 32 * 1024;
-          
-          // Calculate the mean
-          iters = 0;
-          mean2 = 0;
-          localmean = 0;
-          while(1) {
+    // Do we have useful values for the mean and rms?
+    // If not, work something out for each DM
+    if (mean == NULL) {
+      
+        // Calculate the total number of values
+        vals = read_nsamp * survey -> tdms;
+        mod_factor = vals < 32 * 1024 ? vals : 32 * 1024;
+      
+        // Calculate the mean
+        iters = 0;
+        mean2 = 0;
+        localmean = 0;
+        while(1) {
             total  = 0;
             total2 = 0;
             for(j = 0; j < mod_factor; j++){
-              total += buffer[iters * mod_factor + j];
-              total2 += pow(buffer[iters * mod_factor + j],2);
+               total += buffer[iters * mod_factor + j];
+                total2 += pow(buffer[iters * mod_factor + j],2);
             }
-            localmean += (total / j);
-            mean2 += (total2/j);
-            iters++;
-            if (iters * mod_factor + j >= vals) break;
-          }
-          localmean /= iters;  // Mean for entire array
-          localrms = sqrt(mean2/iters - localmean*localmean);
-          printf("%d: Mean: %f, Stddev: %f\n", (int) (time(NULL) - start_time), localmean, localrms);
+          localmean += (total / j);
+          mean2 += (total2/j);
+          iters++;
+          if (iters * mod_factor + j >= vals) break;
         }
+
+        localmean /= iters;  // Mean for entire array
+        localrms = sqrt(mean2/iters - localmean*localmean);
+        printf("%d: Mean: %f, Stddev: %f\n", (int) (time(NULL) - start_time), localmean, localrms);
+    }
         
     // Subtract dm mean from all samples and apply threshold
 	unsigned thread;
 	int thread_shift = survey -> tdms * survey -> dmstep / survey -> num_threads;
+
 	for(thread = 0; thread < survey -> num_threads; thread++) {
-          for (k = 0; k < survey -> tdms / survey -> num_threads; k++) {
+        for (k = 0; k < survey -> tdms / survey -> num_threads; k++) {
+
             int index = size * thread + k * survey -> nsamp;
             for(l = 0; l < survey -> nsamp - 4; l++) {
-              float themedian, a, b, c, d, e, thisdm;
-              a = buffer[index + l + 0];
-              b = buffer[index + l + 1];
-              c = buffer[index + l + 2];
-              d = buffer[index + l + 3];
-              e = buffer[index + l + 4];
-              themedian = medianOfFive (a, b, c, d, e );
-              // std::cout << themedian << std::endl;
-              // 4 sigma filter
-              thisdm = survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep;
-              if (mean == NULL){
-                if (themedian - localmean >= localrms * survey -> detection_threshold && thisdm > 1.0 )
-                  fprintf(output, "%lf, %f, %f\n", 
+
+                float themedian, a, b, c, d, e, thisdm;
+                a = buffer[index + l + 0];
+                b = buffer[index + l + 1];
+                c = buffer[index + l + 2];
+                d = buffer[index + l + 3];
+                e = buffer[index + l + 4];
+                themedian = medianOfFive (a, b, c, d, e );
+
+                // detection_threshold sigma filter
+                thisdm = survey -> lowdm + (thread_shift * thread) + k * survey -> dmstep;
+                if (mean == NULL) {
+                  if (themedian - localmean >= localrms * survey -> detection_threshold && thisdm > 1.0 )
+                      fprintf(output, "%lf, %f, %f\n", 
                           timestamp + l * blockRate,
                           thisdm, themedian/localrms);
-              }
-              else{
-                if (themedian - mean[l / survey -> samplesPerChunk] >= 
-                    rms[l / survey -> samplesPerChunk] * survey -> detection_threshold && thisdm > 1.0 )
-                  fprintf(output, "%lf, %f, %f, %f, %f  \n", 
-                          timestamp + l * blockRate, thisdm,
-                          (themedian - mean[l / survey -> samplesPerChunk])
-                          / rms[l / survey -> samplesPerChunk],
-                          mean[l / survey -> samplesPerChunk],
-                          rms[l / survey -> samplesPerChunk]);
-              }
+
+                }
+                else
+                    if (themedian - mean[l / survey -> samplesPerChunk] >= 
+                            rms[l / survey -> samplesPerChunk] * survey -> detection_threshold && thisdm > 1.0 )
+
+                    fprintf(output, "%lf, %f, %f, %f, %f  \n", 
+                                  timestamp + l * blockRate, thisdm,
+                                  (themedian - mean[l / survey -> samplesPerChunk])
+                                  / rms[l / survey -> samplesPerChunk],
+                                  mean[l / survey -> samplesPerChunk],
+                                  rms[l / survey -> samplesPerChunk]);
             }
-          }   
-        }
-        fflush(output);
+        }   
+    }
+    fflush(output);
 }
 
 // Process dedispersion output

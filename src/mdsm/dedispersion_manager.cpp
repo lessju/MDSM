@@ -3,9 +3,9 @@
 #include "unistd.h"
 
 // QT stuff
+#include <QFile>
 #include <QStringList>
 #include <QDomElement>
-#include <QFile>
 
 // Forward declarations
 extern "C" void* call_dedisperse(void* thread_params);

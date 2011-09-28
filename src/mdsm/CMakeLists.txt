@@ -24,6 +24,7 @@ add_library(mdsm STATIC ${dedispersion_SRC})
 
 target_link_libraries(mdsm
     ${QT_QTCORE_LIBRARY}
+    ${QT_QTXML_LIBRARY}
     mdsm-cuda
 )
  

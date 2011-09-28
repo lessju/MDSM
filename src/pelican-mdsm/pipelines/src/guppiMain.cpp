@@ -1,8 +1,7 @@
 #include "pelican/core/PipelineApplication.h"
 #include "LofarTypes.h"
-#include "AtaMdsmPipeline.h"
-#include "RawVoltageAdapter.h"
-#include "DedispersedDataWriter.h"
+#include "GuppiMdsmPipeline.h"
+#include "GuppiAdapter.h"
 #include <QtCore/QCoreApplication>
 #include <iostream>
 #include <map>
@@ -20,7 +19,7 @@ int main(int argc, char* argv[])
         PipelineApplication pApp(argc, argv);
 
         // Register the pipelines that can run.
-        pApp.registerPipeline(new AtaMdsmPipeline);
+        pApp.registerPipeline(new GuppiMdsmPipeline);
 
         // Set the data client.
         pApp.setDataClient("FileDataClient");

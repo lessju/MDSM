@@ -1,10 +1,9 @@
 set(mdsm_modules_SRC
     MdsmModule.cpp
-    MedicinaChunker.cpp
-    MedicinaStreamDataClient.cpp
     DedispersedDataWriter.cpp
     RawVoltageAdapter.cpp
     SigprocAdapter.cpp
+    GuppiAdapter.cpp
 )
 
 add_library(mdsm-modules ${mdsm_modules_SRC})

@@ -71,6 +71,8 @@ include_directories(${PELICAN_INCLUDE_DIR})
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/pelican-mdsm/modules")
 include_directories(${QT_QTXML_INCLUDE_DIR})
+include_directories(${QT_QTCORE_INCLUDE_DIR})
+include_directories(${QT_INCLUDE_DIR})
 include(modules.cmake)
 
 

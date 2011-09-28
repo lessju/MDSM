@@ -1,6 +1,11 @@
-<observation><frequencies top="123.0" offset="-0.0029296875" />
-<dm lowDM="0" numDMs="100" dmStep="1" useBruteForce="1" />
-<samples number="65536" />
-<channels number="2048" subbands="32" />
-<timing tsamp="0.00033" />
+<observation>
+    <frequencies top="1198.4375" offset="-0.390625" />
+    <dm lowDM="0" numDMs="1024" dmStep="0.1" useBruteForce="1" useL1Cache="1" />
+    <samples number="131040" />
+    <channels number="256" subbands="32" />
+    <timing tsamp="0.00000256" />
+    <detection threshold="5" />
+    <output filePrefix="GUPPI" baseDirectory="." secondsPerFile="180" 
+            usePCTime="0" singleFileMode="1" />
+    <gpus ids="0" />
 </observation>

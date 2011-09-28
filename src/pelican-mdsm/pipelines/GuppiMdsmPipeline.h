@@ -1,25 +1,24 @@
-#ifndef AtaMdsmPipeline_H
-#define AtaMdsmPipeline_H
+#ifndef GuppiMdsmPipeline_H
+#define GuppiMdsmPipeline_H
 
 #include "pelican/core/AbstractPipeline.h"
-#include "SigprocStokesWriter.h"
 #include "pelican/data/DataBlob.h"
-#include "SpectrumDataSet.h"
+#include "TimeSeriesDataSet.h"
 #include "DedispersedTimeSeries.h"
-#include "MdsmModule.h"
-#include "RFI_Clipper.h"
+#include "DedispersedDataWriter.h"
+#include "SpectrumDataSet.h"
 #include "PPFChanneliser.h"
 #include "StokesGenerator.h"
-#include "TimeSeriesDataSet.h"
+#include "MdsmModule.h"
 
 using namespace pelican;
 using namespace pelican::lofar;
 
-class AtaMdsmPipeline : public AbstractPipeline
+class GuppiMdsmPipeline : public AbstractPipeline
 {
     public:
-        AtaMdsmPipeline();
-        ~AtaMdsmPipeline();
+        GuppiMdsmPipeline();
+        ~GuppiMdsmPipeline();
 
         /// Initialises the pipeline.
         void init();
@@ -32,15 +31,15 @@ class AtaMdsmPipeline : public AbstractPipeline
         MdsmModule* mdsm;
         PPFChanneliser* ppfChanneliser;
         StokesGenerator* stokesGenerator;
-        RFI_Clipper* rfiClipper;
 
         /// Local data blobs
-        SpectrumDataSetStokes* stokes;
         DedispersedTimeSeriesF32* dedispersedData;
+        TimeSeriesDataSetC32* timeSeriesData;
+        SpectrumDataSetStokes* intStokes;
+        SpectrumDataSetStokes* stokes;
         SpectrumDataSetC32* spectra;
-        TimeSeriesDataSetC32* timeSeries;
 
         unsigned _iteration;
 };
 
-#endif // AtaMdsmPipeline_H
+#endif // GuppiMdsmPipeline_H
