@@ -60,7 +60,7 @@ void MdsmModule::run(DataBlob* incoming, DedispersedTimeSeriesF32* dedispersedDa
         streamData = weightedData -> dataSet();
         blobMean = weightedData -> mean();
         blobRMS = weightedData -> rms();
-      
+        
         // If you are in the very first block, initialise everything
         if (_means[0] == NULL) {
             unsigned chunksPerBlock = (_survey -> nsamp + _survey -> maxshift)
@@ -86,10 +86,13 @@ void MdsmModule::run(DataBlob* incoming, DedispersedTimeSeriesF32* dedispersedDa
                                              floor(_survey -> maxshift/(float) streamData -> nTimeBlocks());
 
         _means[_counter % MDSM_STAGES][index] = 
-        weightedData -> mean() * _survey -> nchans;
-
+          blobMean;
+          //        weightedData -> mean() * _survey -> nchans;
         _rmss[_counter % MDSM_STAGES][index] = 
-        weightedData -> rms() * _survey -> nchans;
+          blobRMS;
+        //        weightedData -> rms() * _survey -> nchans;
+        //        std::cout << "MDSM Mean and RMS:" << blobMean << " " << blobRMS << std::endl;
+
     }
 
     else if ((spectrumData = (SpectrumDataSetStokes*) dynamic_cast<SpectrumDataSetStokes*> (incoming)))
