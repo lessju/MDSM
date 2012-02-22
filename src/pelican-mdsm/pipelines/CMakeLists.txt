@@ -6,6 +6,7 @@ set(pipeline_lib_src
     src/SigprocMdsmPipeline.cpp
     src/DDStream1.cpp
     src/DDStream2.cpp
+    src/MedicinaMdsmPipeline.cpp
 )
 
 # ------------- Create pipeline library ------------------
@@ -73,6 +74,19 @@ set_target_properties(guppiPipeline PROPERTIES
 )
 
 target_link_libraries(guppiPipeline
+    pelicanMdsm
+)
+
+# ------------- Create Medicina pipeline executable ------------------
+add_executable(medicinaPipeline src/medicinaMain.cpp)
+
+# Link with openmp.
+set_target_properties(medicinaPipeline PROPERTIES
+    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "${OpenMP_CXX_FLAGS}"
+)
+
+target_link_libraries(medicinaPipeline
     pelicanMdsm
 )
 
