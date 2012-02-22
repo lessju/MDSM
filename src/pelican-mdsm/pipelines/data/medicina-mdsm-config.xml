@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pelican>
+
+<configuration version="1.0">
+
+    <pipeline>
+        <buffers>
+           <TimeSeriesDataSetC32>
+               <buffer maxSize="100000000" maxChunkSize="100000000"/>
+           </TimeSeriesDataSetC32>
+        </buffers>
+
+        <chunkers>
+           <SpeadBeamChunker>
+               <data type="TimeSeriesDataSetC32"/>
+               <connection host="127.0.0.1" port="10000"/>
+               <params samplesPerSubband="128"
+                       subbandsPerHeap="1024"
+                       numberOfBeams="1"
+                       packetsPerHeap="128"
+                       bitsPerSample="32"
+                       heapsPerChunk = "4" />
+           </SpeadBeamChunker>
+        </chunkers>
+
+        <adapters>
+            <SpeadBeamAdapterTimeSeries>
+                <subbandsPerHeap value="1024" />
+                <samplesPerSubband value="128" />
+                <bitsPerSample value="32" />
+                <numberOfPolarisations value="1" />
+                <heapsPerBlock value="4" />
+                <numberOfBeams value="1" />
+            </SpeadBeamAdapterTimeSeries>
+        </adapters>
+
+         <clients>
+            <SpeadBeamDataClient>
+                <data type="TimeSeriesDataSetC32" adapter="SpeadBeamAdapterTimeSeries" />
+            </SpeadBeamDataClient>
+        </clients>
+
+        <modules>
+
+            <PPFChanneliser>
+                <outputChannelsPerSubband value = "2" />
+                <processingThreads value = "4" />
+                <filter nTaps = "8" filterWindow = "kaiser"/>
+            </PPFChanneliser>
+
+            <StokesGenerator />
+
+            <MdsmModule>
+                <observationfile filepath="/home/lessju/Code/MDSM/release/pelican-mdsm/pipelines/data/obs.xml" />
+                <createOutputBlob value="0" />
+                <invertChannels value="1" />
+            </MdsmModule>
+        </modules>
+
+        <output>
+<!--            <dataStreams>-->
+<!--                <stream name="DedispersedTimeSeriesF32" listeners="DedispersedDataWriter"/>-->
+<!--            </dataStreams>-->
+<!--            <streamers>-->
+<!--                <DedispersedDataWriter>-->
+<!--                    <file prefix="lofarTest" />-->
+<!--                    <subbandsPerPacket value="1" />-->
+<!--                    <totalComplexSubbands value="1" />-->
+<!--                    <clock value="200" />-->
+<!--                    <integrateTimeBins value ="1" />-->
+<!--                    <outputChannelsPerSubband value="1024" />-->
+<!--                    <nRawPolarisations value="1" />-->
+<!--                    <topChannelFrequency value="156" />-->
+<!--                    <DMs values="76.8" />-->
+<!--                </DedispersedDataWriter>-->
+<!--            </streamers>-->
+        </output>
+
+    </pipeline>
+</configuration>
