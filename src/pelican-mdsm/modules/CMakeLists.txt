@@ -7,7 +7,6 @@ set(mdsm_modules_SRC
     SpeadBeamChunker.cpp
     SpeadBeamAdapterTimeSeries.cpp
     SpeadBeamDataClient.cpp
-    HeapBuffer.cpp
 )
 
 add_library(mdsm-modules ${mdsm_modules_SRC})
