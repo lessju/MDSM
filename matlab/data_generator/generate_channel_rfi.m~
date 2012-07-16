@@ -1,0 +1,17 @@
+function [ output_args ] = generate_channel_rfi( input_args )
+%GENERATE_CHANNEL_RFI
+
+fcarr = 1.26e6;
+rfi = cos(2 * pi * fcarr * ([0:1:size(voltage,2)-1] .* 1/8e6));
+rfi = fft(rfi);
+if (fcarr < bandwidth / 2)
+    rfi(size(rfi,2)/2:end) = 0;
+else
+    rfi(1:size(rfi,2)/2) = 0;
+end
+rfi = ifft(rfi);
+voltage = voltage + 0.1 * rfi;
+
+
+end
+

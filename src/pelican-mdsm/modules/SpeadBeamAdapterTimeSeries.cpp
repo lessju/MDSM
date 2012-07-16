@@ -19,7 +19,7 @@ namespace lofar {
 
 //
 SpeadBeamAdapterTimeSeries::SpeadBeamAdapterTimeSeries(const ConfigNode& config)
-:AbstractStreamAdapter(config)
+:AbstractStreamAdapter(config), _iteration(0)
 {
     if (config.type() != "SpeadBeamAdapterTimeSeries")
         throw QString("SpeadBeamAdapterTimeSeries::SpeadBeamAdapterTimeSeries(): Invalid configuration");
@@ -29,9 +29,11 @@ SpeadBeamAdapterTimeSeries::SpeadBeamAdapterTimeSeries(const ConfigNode& config)
     _subbandsPerHeap   = config.getOption("subbandsPerHeap", "value").toInt();
     _numberOfBeams     = config.getOption("numberOfBeams", "value", "1").toInt();
     _bitsPerSample     = config.getOption("bitsPerSample", "value").toInt();
-    _heapsPerBlock     = config.getOption("heapsPerBlock", "value", "1").toInt();
+    _samplesPerBlock   = config.getOption("samplesPerBlock", "value").toInt();
+    _heapsPerChunk     = config.getOption("heapsPerChunk", "value", "1").toInt();
     _nPolarisations    = config.getOption("numberOfPolarisations", "value", "1").toInt();
     _numberOfBeams     = config.getOption("numberOfBeams", "value", "1").toInt();
+    _samplingTime      = config.getOption("samplingTime", "value", "0").toFloat();
 
     // Resize temporary heap placeholder
     _heapSize = _samplesPerSubband * _subbandsPerHeap * 
@@ -39,7 +41,7 @@ SpeadBeamAdapterTimeSeries::SpeadBeamAdapterTimeSeries(const ConfigNode& config)
     _heapData.resize(_heapSize);
 }
 
-//
+// Deserialise Spead heaps
 void SpeadBeamAdapterTimeSeries::deserialise(QIODevice* in)
 {
     // Sanity check on data blob dimensions and chunk size.
@@ -47,7 +49,7 @@ void SpeadBeamAdapterTimeSeries::deserialise(QIODevice* in)
 
     // Loop over heaps
     char *heapData = &_heapData[0];
-    for(unsigned h = 0; h < _heapsPerBlock; ++h)
+    for(unsigned h = 0; h < _heapsPerChunk; ++h)
     {
         // Loop until entire heap is read from QIODevice
         unsigned bytesRead = 0;
@@ -62,26 +64,35 @@ void SpeadBeamAdapterTimeSeries::deserialise(QIODevice* in)
         // Interpret heap data
         adaptHeap(h, heapData, _timeData);
     }
+
+    // Set timing
+    _timeData -> setLofarTimestamp(_samplingTime * _iteration * _samplesPerSubband);
+    _timeData -> setBlockRate(_samplingTime);
+
+    _iteration++;
 }
 
 void SpeadBeamAdapterTimeSeries::adaptHeap(unsigned heap, char* buffer,
                                          TimeSeriesDataSetC32* data)
 {
-    // NOTE: Ignores polarisation for now
+    // NOTE: Ignores polarisation for now, and assume 1 beam
     switch(_bitsPerSample)
     {
         case 32:
         {
-            TYPES::i16complex *complexBuffer = reinterpret_cast<TYPES::i16complex*>(buffer);
-            for(unsigned s = 0; s < _subbandsPerHeap; s++)
-            {
-                Complex* times = data -> timeSeriesData(heap, s, 0);
-                for(unsigned t = 0; t < _samplesPerSubband; t++)
-                {
-                    TYPES::i16complex value = complexBuffer[s * _samplesPerSubband + t];
-                    times[t] = makeComplex(value);
-                }
-            }
+            // NOTE: ASSUMES THAT _samplesPerBlock is 1
+	        TYPES::i16complex *complexBuffer = reinterpret_cast<TYPES::i16complex *>(buffer);
+            Complex *times = data -> data();
+	        for(unsigned s = 0; s < _subbandsPerHeap; s++)
+		        for(unsigned t = 0; t < _samplesPerSubband; t++)
+		        {
+//                    unsigned index = heap * _samplesPerSubband + t;
+//		            Complex *times = data -> timeSeriesData(index / _samplesPerBlock, s, 0);
+//		            TYPES::i16complex value = complexBuffer[s * _samplesPerSubband + t];
+//		            times[index % _samplesPerBlock] = makeComplex(value);
+		            times[s * _samplesPerSubband + t] = 
+                            makeComplex(complexBuffer[s * _samplesPerSubband + t]);
+		        }
         }
         default:
             break;
@@ -104,15 +115,18 @@ void SpeadBeamAdapterTimeSeries::checkData()
     if (!_data) throw err("Cannot deserialise into an unallocated blob!.");
 
     // Check the chunk size matches the expected number of UDPPackets.
-    if (_chunkSize != _heapsPerBlock * _numberOfBeams * _samplesPerSubband * 
+    if (_chunkSize != _heapsPerChunk * _numberOfBeams * _samplesPerSubband * 
                       _subbandsPerHeap * _bitsPerSample / 8)
+    {
         throw err("Chunk size '%1' != '%2.")
-                   .arg(_chunkSize).arg(_heapsPerBlock * _numberOfBeams * _samplesPerSubband * 
+                   .arg(_chunkSize).arg(_heapsPerChunk * _numberOfBeams * _samplesPerSubband * 
                                         _subbandsPerHeap * _bitsPerSample / 8);
+    }
 
     // Resize the time stream data blob to match the adapter dimensions.
     _timeData = (TimeSeriesDataSetC32*) _data;
-    _timeData -> resize(_heapsPerBlock, _subbandsPerHeap, _nPolarisations, _samplesPerSubband);
+    _timeData -> resize(_heapsPerChunk * _samplesPerSubband / _samplesPerBlock, 
+                        _subbandsPerHeap, _nPolarisations, _samplesPerBlock);
 }
 
 inline QString SpeadBeamAdapterTimeSeries::err(const QString& message)

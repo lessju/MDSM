@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
     cudaEventCreate(&event_start); 
     cudaEventCreate(&event_stop);
 
-   printf("nsamp: %d, nchans: %d, tsamp: %f, startdm: %f, dmstep: %f, tdms: %d, fch1: %f, foff: %f, maxshift: %d\n",
+    printf("nsamp: %d, nchans: %d, tsamp: %f, startdm: %f, dmstep: %f, tdms: %d, fch1: %f, foff: %f, maxshift: %d\n",
            nsamp, nchans, tsamp, startdm, dmstep, tdms, fch1, foff, maxshift);
 
     // Allocate CUDA memory and copy dmshifts

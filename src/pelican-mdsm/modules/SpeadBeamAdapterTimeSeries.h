@@ -45,12 +45,15 @@ class SpeadBeamAdapterTimeSeries : public AbstractStreamAdapter
 
     private:
         TimeSeriesDataSetC32* _timeData;
+        float    _samplingTime;
         unsigned _samplesPerSubband;
         unsigned _bitsPerSample;
         unsigned _subbandsPerHeap;
         unsigned _numberOfBeams;
-        unsigned _heapsPerBlock;
+        unsigned _heapsPerChunk;
+    	unsigned _samplesPerBlock;
         unsigned _nPolarisations;
+        unsigned _iteration;
 
         // Temporary heap placeholder
         unsigned          _heapSize;

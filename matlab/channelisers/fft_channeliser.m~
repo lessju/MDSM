@@ -1,0 +1,29 @@
+function [ channeliser_voltages ] = fft_channeliser( voltages, nchans )
+%FFT_CHANNELISER Simple FFT channeliser
+
+channeliser_voltages = zeros(nchans, size(voltages, 2) / nchans);
+spectra_per_channel  = size(voltages, 2) / nchans;
+disp(spectra_per_channel);
+for i=1:spectra_per_channel
+    spectrum = fft(channeliser_voltages( (i-1) * nchans + 1 : i * nchans));
+    disp(size(i-1) * nchans + 1 : i * nchans);
+    channeliser_voltages(:,i) = spectrum;
+end
+
+% channeliser_voltages = zeros(nchans, spectra_per_channel);
+% ffted_voltages       = fft(voltages);
+% for i = 1 : spectra_per_channel
+%     channeliser_voltages(:,i) = ffted_voltages((i-1)*nchans+1);
+% end
+% for i = 1 : nchans
+%     for j = 1 : spectra_per_channel
+%         channeliser_voltages(i,j) = ffted_voltages((j-1) * nchans + i);
+%     end
+% end
+
+% for i = 1 : nchans
+%     channeliser_voltages(i) = ifft(channeliser_voltages(i));
+% end
+
+end
+

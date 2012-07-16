@@ -4,6 +4,8 @@
 
 #include <cstdio>
 #include <iostream>
+#include <pthread.h>
+
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -14,8 +16,6 @@ namespace lofar {
 /**
  * @details
  * Constructs a new SpeadBeamChunker.
- *
- * TODO: this assumes variable packet size. make this a configuration option.
  */
 SpeadBeamChunker::SpeadBeamChunker(const ConfigNode& config) : 
     AbstractChunker(config), _currHeapNumber(0), _hasPendingPacket(false)
@@ -36,6 +36,16 @@ SpeadBeamChunker::SpeadBeamChunker(const ConfigNode& config) :
         throw QString("SpeadBeamChunker::SpeadBeamChunker(): Data type unspecified.");
 
     _packet = (char *) malloc(SPEAD_MAX_PACKET_LEN);
+
+    // Set thread affinity
+//    pthread_t thread = pthread_self();
+//    cpu_set_t cpuset;
+//    CPU_ZERO(&cpuset);
+//    CPU_SET(0, &cpuset);
+//    CPU_SET(1, &cpuset);
+
+//    if ((pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset)) != 0)
+//        perror("Cannot set pthread affinity");
 }
 
 
@@ -46,13 +56,13 @@ QIODevice* SpeadBeamChunker::newDevice()
 {
     QUdpSocket* socket = new QUdpSocket;
 
-    if (!socket->bind(port()))
+    if (!socket -> bind(port()))
         cerr << "SpeadBeamBuffer::newDevice(): Unable to bind to UDP port!" << endl;
 
     // Get native socket pointer and set buffer size
-    int v = 1024 * 1024;
+    int v = 1024 * 1024 * 16;
     if (::setsockopt(socket -> socketDescriptor(), SOL_SOCKET,
-                     SO_RCVBUF, (char *)&v, sizeof(v)) == -1) {
+                     SO_RCVBUF, (char *) &v, sizeof(v)) == -1) {
         std::cerr << "SpeadBeamBuffer::newDevice(): Unable to set socket buffer" << std::endl;
     }
 
@@ -70,13 +80,15 @@ void SpeadBeamChunker::next(QIODevice* device)
     WritableData writableData = getDataStorage(_heapsPerChunk * _samplesPerSubband * _subbandsPerHeap * 
                                                _numberOfBeams * _bitsPerSample / 8);
 
+uint64_t prev_offset = 0;
     if (writableData.isValid())
     {
-        // Reda multiple heaps for each chunk
+        // Read multiple heaps for each chunk
         for(unsigned i = 0; i < _heapsPerChunk; i++)
         {
             _currHeapNumber = 0;
             _numPackets = 0;
+            unsigned lost = 0;
 
             // Loop until we have received all packets for current heap
             while (_numPackets != _packetsPerHeap)
@@ -86,7 +98,7 @@ void SpeadBeamChunker::next(QIODevice* device)
                 {
                     // Wait for next packet to be available
                     while(!socket -> hasPendingDatagrams())
-                        socket -> waitForReadyRead(10);
+                        socket -> waitForReadyRead(5);
 
                     // Read next packet
                     if (socket -> readDatagram(_packet, SPEAD_MAX_PACKET_LEN) <= 0)
@@ -94,7 +106,7 @@ void SpeadBeamChunker::next(QIODevice* device)
                 }
                 else
                     _hasPendingPacket = false; 
-                
+
                 // Unpack packet header (64 bits)
                 uint64_t hdr;
                 hdr = SPEAD_HEADER(_packet);
@@ -131,6 +143,7 @@ void SpeadBeamChunker::next(QIODevice* device)
                 item = SPEAD_ITEM(_packet, 5);
                 beamId = SPEAD_ITEM_ID(item) - 6000 * 8; // -6000 * 8 for beam id .... for some reason
 
+
                 // Some sanity checking
                 if (_currHeapNumber == 0)
                     _currHeapNumber = heapNumber;
@@ -141,6 +154,7 @@ void SpeadBeamChunker::next(QIODevice* device)
                     else 
                     {
                         // We are processing a packet from a new heap
+                        std::cout << "Processing packet from heap " << heapNumber << " current heap: " <<_currHeapNumber << std::endl;
                         _hasPendingPacket = true;
                         break;
                     }
@@ -151,11 +165,18 @@ void SpeadBeamChunker::next(QIODevice* device)
                                    _subbandsPerHeap * _bitsPerSample / 8 + payloadOffset;
                 writePacket(&writableData, payload, payloadLen, offset);
 
+
+                if (offset != 00 && offset - prev_offset != 8192)
+                    //std::cout << "Offset mismatch: " << offset << ", " << prev_offset << ", " << offset - prev_offset  << std::endl;
+                    lost++;
+
+                std::cout << _numPackets << " " << heapNumber << " " << heapSize << " =" << payloadOffset << "= " << payloadLen << " " << beamId << " " << offset << " " << offset - prev_offset << " "  << std::endl;
+                prev_offset = offset;
                 _numPackets++;
             }
 
             if (_numPackets != _packetsPerHeap)
-                std::cout << "Only read " << _numPackets << " from heap" << std::endl;
+                std::cout << "Only read " << _numPackets << " from heap [" << _currHeapNumber << "], lost: " << lost  << std::endl;
         }
     }
     else

@@ -1,0 +1,867 @@
+function varargout = DedispersionPipelineSimulator(varargin)
+% DEDISPERSIONPIPELINESIMULATOR M-file for DedispersionPipelineSimulator.fig
+%      DEDISPERSIONPIPELINESIMULATOR, by itself, creates a new DEDISPERSIONPIPELINESIMULATOR or raises the existing
+%      singleton*.
+%
+%      H = DEDISPERSIONPIPELINESIMULATOR returns the handle to a new DEDISPERSIONPIPELINESIMULATOR or the handle to
+%      the existing singleton*.
+%
+%      DEDISPERSIONPIPELINESIMULATOR('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in DEDISPERSIONPIPELINESIMULATOR.M with the given input arguments.
+%
+%      DEDISPERSIONPIPELINESIMULATOR('Property','Value',...) creates a new DEDISPERSIONPIPELINESIMULATOR or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before DedispersionPipelineSimulator_OpeningFcn gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to DedispersionPipelineSimulator_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @DedispersionPipelineSimulator_OpeningFcn, ...
+                   'gui_OutputFcn',  @DedispersionPipelineSimulator_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+
+% --- Executes just before DedispersionPipelineSimulator is made visible.
+function DedispersionPipelineSimulator_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to DedispersionPipelineSimulator (see VARARGIN)
+
+% Choose default command line output for DedispersionPipelineSimulator
+handles.output = hObject;
+
+% Update handles structure
+guidata(hObject, handles);
+
+% Update path and appdata
+addpath('data_generator','dedispersers','post_processors', 'rfi_filters', 'channelisers', 'utils');
+setappdata(handles.generate_signal_button, 'signal_generated', 0);
+
+% UIWAIT makes DedispersionPipelineSimulator wait for user response (see UIRESUME)
+% uiwait(handles.main);
+
+
+% --- Outputs from this function are returned to the command line.
+function varargout = DedispersionPipelineSimulator_OutputFcn(hObject, eventdata, handles) 
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+
+
+% --------------------------------------------------------------------
+function menu_open_Callback(hObject, eventdata, handles)
+
+% Open an existing menu object
+
+
+% --------------------------------------------------------------------
+function menu_exit_Callback(hObject, eventdata, handles)
+
+close()
+
+
+% --- Executes on button press in generate_signal_button.
+function generate_signal_button_Callback(hObject, eventdata, handles)
+
+statusbar(handles.main, 'Switching to "Generate Signal" tab');
+
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+set(handles.generate_signal_panel, 'Visible', 'on');
+set(handles.channelisation_panel, 'Visible', 'off');
+set(handles.dedispersion_panel, 'Visible', 'of');
+
+% If signal has been generated, plot
+if getappdata(handles.generate_signal_button, 'signal_generated') == 1
+    
+    voltage = getappdata(handles.main, 'voltage');
+    transients = getappdata(handles.main, 'transients');
+    axes(handles.axes2);
+    specgram(voltage);
+
+    % Display current transient
+    setappdata(handles.generate_signal_button, 'signal_generated', 1);
+    if size(transients,2) == 0
+        set(handles.axes3, 'Visible', 'off');
+    else
+        display_transient(handles, int32(getappdata(handles.main, 'curr_transient')));
+    end
+end
+
+statusbar;
+
+
+% --- Executes on button press in apply_bandpass_button.
+function apply_bandpass_button_Callback(hObject, eventdata, handles)
+
+
+% --- Executes on button press in channelisation_button.
+function channelisation_button_Callback(hObject, eventdata, handles)
+
+statusbar(handles.main, 'Switching to "Channelisation" tab');
+
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+set(handles.generate_signal_panel, 'Visible', 'off');
+set(handles.dedispersion_panel, 'Visible', 'of');
+set(handles.channelisation_panel, 'Visible', 'on');
+
+% If signal has already been channelised
+if size(getappdata(handles.main, 'channelised_voltage'), 2) ~= 0
+    channelised_voltage = getappdata(handles.main, 'channelised_voltage');
+    axes(handles.axes2);
+    imagesc(abs(channelised_voltage));
+end
+
+statusbar;
+
+
+% --- Executes on button press in rfi_mitigation_button.
+function rfi_mitigation_button_Callback(hObject, eventdata, handles)
+
+
+% --- Executes on button press in dedispersion_button.
+function dedispersion_button_Callback(hObject, eventdata, handles)
+
+statusbar(handles.main, 'Switching to "Dedispersion" tab');
+
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+set(handles.dedispersion_panel, 'Visible', 'on');
+set(handles.generate_signal_panel, 'Visible', 'off');
+set(handles.channelisation_panel, 'Visible', 'off');
+
+% If signal has been generated, plot
+if getappdata(handles.generate_signal_button, 'dedispersed_series') == 1
+    
+%     voltage = getappdata(handles.main, 'voltage');
+%     transients = getappdata(handles.main, 'transients');
+%     axes(handles.axes2);
+%     specgram(voltage);
+% 
+%     % Display current transient
+%     setappdata(handles.generate_signal_button, 'signal_generated', 1);
+%     if size(transients,2) == 0
+%         set(handles.axes3, 'Visible', 'off');
+%     else
+%         display_transient(handles, int32(getappdata(handles.main, 'curr_transient')));
+%     end
+end
+
+statusbar;
+
+
+% --- Executes on button press in post_processing_button.
+function post_processing_button_Callback(hObject, eventdata, handles)
+
+
+% ============================ TRANSIENT SECTION =========================
+
+% --- Executes on button press in add_transient_button.
+
+function reset_simulator(handles)
+
+% Remove all app data
+setappdata(handles.generate_signal_button, 'signal_generated', 0);
+setappdata(handles.main, 'channelised_voltage', []);
+
+% Update UI
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.change_signal_button, 'Visible', 'off');
+set(handles.apply_bandpass_button);
+set(handles.channelisation_button, 'Enable', 'off');
+set(handles.apply_bandpass_button, 'Enable', 'off');
+set(handles.rfi_mitigation_button, 'Enable', 'off');
+set(handles.post_processing_button, 'Enable', 'off');
+set(handles.dedispersion_button, 'Enable', 'off');
+
+
+function display_transient(handles, num)
+% Display the required transiens
+
+total = getappdata(handles.main, 'num_transients');
+
+% Get transient data
+transients = getappdata(handles.main, 'transients');
+transient = transients(num);
+
+% Set UI controls
+total = getappdata(handles.main, 'num_transients');
+set(handles.transient_info_panel, 'Title', strcat('Transient #', ...
+                                     num2str(int32(transient.num))));
+set(handles.number_transients_text, 'String', ...
+     strcat(num2str(transient.num), ' of. ', num2str(total), ' transients'));
+                                 
+set(handles.dm_edit, 'String', num2str(transient.dm));
+set(handles.snr_edit, 'String', num2str(transient.snr));
+set(handles.dm_edit, 'Enable', 'inactive');
+set(handles.snr_edit, 'Enable', 'inactive');
+
+if transient.timestamp ~= -1
+    set(handles.timestamp_checkbox, 'Value', 1.0);
+    set(handles.timestamp_edit, 'Value', transient.timestamp);
+else
+    set(handles.timestamp_checkbox, 'Value', 0.0);
+end
+set(handles.timestamp_checkbox, 'Enable', 'inactive');
+set(handles.timestamp_edit, 'Enable', 'inactive');
+
+if transient.width ~= -1
+    set(handles.width_checkbox, 'Value', 1.0);
+    set(handles.width_edit, 'Value', transient.width);
+else
+    set(handles.width_checkbox, 'Value', 0.0);
+end
+set(handles.width_checkbox, 'Enable', 'inactive');
+set(handles.width_edit, 'Enable', 'inactive');
+
+if transient.period ~= -1
+    set(handles.periodic_checkbox, 'Value', 1.0);
+    set(handles.period_edit, 'Value', transient.period);
+else
+    set(handles.periodic_checkbox, 'Value', 0.0);
+end
+set(handles.periodic_checkbox, 'Enable', 'inactive');
+set(handles.period_edit, 'Enable', 'inactive');
+
+set(handles.scattering_checkbox, 'Value', transient.scatter);
+set(handles.scattering_checkbox, 'Enable', 'inactive');
+
+% Update directional UI controls
+if num == 1 || total <= 1
+    set(handles.left_transient_button, 'Enable', 'off')
+end
+
+if num == total || total <= 1
+    set(handles.right_transient_button, 'Enable', 'off');
+end
+    
+if total > 1 && num < total
+    set(handles.right_transient_button, 'Enable', 'on');
+end
+
+if total > 1 && num > 1
+    set(handles.left_transient_button, 'Enable', 'on');
+end
+
+% Plot transients
+if getappdata(handles.generate_signal_button, 'signal_generated') == 1
+    if size(transient.signal) ~= 0
+        set(handles.axes3, 'Visible', 'on');
+        axes(handles.axes3);
+        specgram(transient.signal);
+    end
+end
+
+
+function add_transient_button_Callback(hObject, eventdata, handles)
+
+% Reset transient information
+set(handles.transient_info_panel, 'Visible', 'on')
+
+set(handles.timestamp_checkbox, 'Value', 0.0);
+set(handles.width_checkbox, 'Value', 0.0);
+set(handles.periodic_checkbox, 'Value', 0.0);
+set(handles.scattering_checkbox, 'Value', 0.0);
+set(handles.timestamp_checkbox, 'Enable', 'on');
+set(handles.width_checkbox, 'Enable', 'on');
+set(handles.scattering_checkbox, 'Enable', 'on');
+set(handles.periodic_checkbox, 'Enable', 'on');
+
+set(handles.dm_edit, 'String', '1');
+set(handles.snr_edit, 'String' ,'1');
+set(handles.timestamp_edit, 'String', '0');
+set(handles.width_edit, 'String', '1');
+set(handles.period_edit, 'String', '500');
+
+set(handles.timestamp_edit, 'Visible', 'off');
+set(handles.width_edit, 'Visible', 'off');
+set(handles.period_edit, 'Visible', 'off');
+
+set(handles.dm_edit, 'Enable', 'on');
+set(handles.snr_edit, 'Enable', 'on');
+set(handles.timestamp_edit, 'Enable', 'on');
+set(handles.width_edit, 'Enable', 'on');
+set(handles.period_edit, 'Enable', 'on');
+
+set(handles.done_transient_button, 'Visible', 'on');
+set(handles.transient_info_panel, 'Title', 'New Transient');
+
+% --- Executes on button press in left_transient_button.
+function left_transient_button_Callback(hObject, eventdata, handles)
+
+curr = getappdata(handles.main, 'curr_transient');
+num  = getappdata(handles.main, 'num_transients');
+
+% Display the transient
+curr = curr - 1;
+display_transient(handles, curr);
+
+% Set current transient
+setappdata(handles.main, 'curr_transient', curr);
+
+% --- Executes on button press in right_transient_button.
+function right_transient_button_Callback(hObject, eventdata, handles)
+
+curr = getappdata(handles.main, 'curr_transient');
+num  = getappdata(handles.main, 'num_transients');
+
+% Display the transient
+curr = curr + 1;
+display_transient(handles, curr);
+
+% Set current transient
+setappdata(handles.main, 'curr_transient', curr);
+
+% --- Executes on button press in remove_transient_button.
+function remove_transient_button_Callback(hObject, eventdata, handles)
+
+transients     = getappdata(handles.main, 'transients');
+num_transients = int32(getappdata(handles.main, 'num_transients'));
+curr_transient = int32(getappdata(handles.main, 'curr_transient'));
+transients(curr_transient) = [];
+
+% Update transient data
+for i=1:num_transients-1
+    transients(i).num = i;
+end
+
+% Update app data
+num_transients = num_transients - 1;
+setappdata(handles.main, 'transients', transients);
+setappdata(handles.main, 'num_transients', num_transients);
+
+if num_transients == 0
+    % Deleted last transient, reset UIs
+    set(handles.transient_info_panel, 'Visible', 'off');
+    set(handles.number_transients_text, 'String', strcat('0 of 0 transients'));
+    set(handles.remove_transient_button, 'Enable', 'off');
+    set(handles.left_transient_button, 'Enable', 'off');
+    set(handles.right_transient_button, 'Enable', 'off');
+    curr_transient = 0;
+else
+    % Display previous transient
+    if curr_transient == num_transients + 1
+        curr_transient = curr_transient - 1;
+    end
+   display_transient(handles, curr_transient);
+end
+
+% Set current transient
+setappdata(handles.main, 'curr_transient', curr_transient);
+
+% --- Executes on button press in done_transient_button.
+function done_transient_button_Callback(hObject, eventdata, handles)
+
+% Get transient parameters from UI controls
+dm = str2double(get(handles.dm_edit, 'String'));
+snr = str2double(get(handles.snr_edit, 'String'));
+
+if get(handles.timestamp_checkbox, 'Value') == 1.0
+    timestamp = str2double(get(handles.timestamp_edit, 'String'));
+else
+    timestamp = -1;
+end
+
+if get(handles.width_checkbox, 'Value') == 1.0
+    width= str2double(get(handles.snr_edit, 'String'));
+else
+    width = -1;
+end
+
+if get(handles.periodic_checkbox, 'Value') == 1.0
+    period = str2double(get(handles.period_edit, 'String'));
+else
+    period = -1;
+end
+
+scatter = get(handles.scattering_checkbox, 'Value');
+
+% Set application globals
+if size(getappdata(handles.main, 'num_transients')) == [0 0]
+    setappdata(handles.main, 'num_transients', 0);
+end
+
+% Create transient struct and add to app data
+transients = getappdata(handles.main, 'transients');
+num        = int32(getappdata(handles.main, 'num_transients'));
+
+transient = struct('dm', dm, 'snr', snr, 'timestamp', timestamp,   ...
+                   'width', width, 'period', period, 'num', num+1, ...
+                   'scatter', scatter, 'signal', []);
+if size(transients) == [0 0']
+    setappdata(handles.main, 'transients', [transient]);
+else
+    transients(num+1) = transient;
+    setappdata(handles.main, 'transients', transients);
+end
+
+% Update app data
+num = num + 1;
+setappdata(handles.main, 'curr_transient', num);
+setappdata(handles.main, 'num_transients', num);
+
+% Update text
+set(handles.number_transients_text, 'String', strcat(num2str(num), ...
+                                    ' of. ', '', num2str(num), ' transients'));
+
+% Set visibility buttons
+if num > 1
+    set(handles.left_transient_button, 'Enable', 'on');
+end
+set(handles.remove_transient_button, 'Enable', 'on');
+
+set(handles.transient_info_panel, 'Title', strcat('Transient # ', num2str(num)));
+set(hObject, 'Visible', 'off');
+
+% Update transient display
+display_transient(handles, num);
+
+% --- Executes on button press in timestamp_checkbox.
+function timestamp_checkbox_Callback(hObject, eventdata, handles)
+
+if get(hObject, 'Value') == 0.0
+    set(handles.timestamp_edit, 'Visible', 'off');
+else
+    set(handles.timestamp_edit, 'Visible', 'on');
+end
+
+
+% --- Executes on button press in width_checkbox.
+function width_checkbox_Callback(hObject, eventdata, handles)
+
+if get(hObject, 'Value') == 0.0
+    set(handles.width_edit, 'Visible', 'off');
+else
+    set(handles.width_edit, 'Visible', 'on');
+end
+
+
+% --- Executes on button press in periodic_checkbox.
+function periodic_checkbox_Callback(hObject, eventdata, handles)
+
+if get(hObject, 'Value') == 0.0
+    set(handles.period_edit, 'Visible', 'off');
+    set(handles.timestamp_checkbox, 'Enable', 'on');
+else
+    set(handles.period_edit, 'Visible', 'on');
+    set(handles.timestamp_checkbox, 'Enable', 'off');
+    set(handles.timestamp_checkbox, 'Value', 0.0);
+    set(handles.timestamp_edit, 'Visible', 'off');
+end
+
+
+% --- Executes on button press in channel_rfi_checkbox.
+function channel_rfi_checkbox_Callback(hObject, eventdata, handles)
+
+if get(hObject, 'Value') == 0.0
+    set(handles.text12, 'Enable', 'off');
+    set(handles.text13, 'Enable', 'off');
+    set(handles.channel_rfi_freqs_edit, 'Enable', 'off');
+    set(handles.channel_rfi_snr_edit, 'Enable', 'off');
+else
+    set(handles.text12, 'Enable', 'on');
+    set(handles.text13, 'Enable', 'on');
+    set(handles.channel_rfi_freqs_edit, 'Enable', 'on');
+    set(handles.channel_rfi_snr_edit, 'Enable', 'on');
+end
+    
+
+% --- Executes on button press in rfi_spike_checkbox.
+function rfi_spike_checkbox_Callback(hObject, eventdata, handles)
+
+if get(hObject, 'Value') == 0.0
+    set(handles.text14, 'Enable', 'off');
+    set(handles.text15, 'Enable', 'off');
+    set(handles.rfi_spike_freq_edit, 'Enable', 'off');
+    set(handles.rfi_spike_params_edit, 'Enable', 'off');
+else
+    set(handles.text14, 'Enable', 'on');
+    set(handles.text15, 'Enable', 'on');
+    set(handles.rfi_spike_freq_edit, 'Enable', 'on');
+    set(handles.rfi_spike_params_edit, 'Enable', 'on');
+end
+
+
+% --- Executes on button press in generate_button.
+function generate_button_Callback(hObject, eventdata, handles)
+
+% Clear plots
+arrayfun(@cla,findall(0,'type','axes'))
+
+% Collect observing frequency data and save to appdata
+center_frequency = str2double(get(handles.fch_edit, 'String')) * 1e6;
+bandwidth = str2double(get(handles.bw_edit, 'String')) * 1e6;
+observation_length = str2double(get(handles.obs_len_edit, 'String'));
+
+obs_params = struct('center_frequency', center_frequency, ...
+                    'bandwidth', bandwidth, ...
+                    'number_channels', 1, ...
+                    'channel_bandwidth', bandwidth, ...
+                    'sampling_time', 1 / bandwidth, ...
+                    'observation_length', observation_length);
+setappdata(handles.main, 'observation_parameters', obs_params);
+
+% Collect channel RFI parameters
+chan_freqs = []; chan_snr = [];
+if get(handles.channel_rfi_checkbox, 'Value') == 1.0
+    eval(['chan_freqs = [' get(handles.channel_rfi_freqs_edit, 'String') '] * 1e6;']);
+    eval(['chan_snr   = [' get(handles.channel_rfi_snr_edit, 'String') '] * 1e6;']);
+    
+    if size(chan_freqs) ~= size(chan_snr)
+        msgbox(['Invalid Channel-RFI options. Number of items in "frequency channels"'...
+                'and channel RFI SNR should be the same'], 'Input Error', 'error');
+        return;
+    end
+    
+   if (size(chan_freqs(chan_freqs < center_frequency - bandwidth/2),2) > 0) || ...
+      (size(chan_freqs(chan_freqs > center_frequency + bandwidth/2),2) > 0)
+       msgbox('Invalid Channel-RFI options, frequency out of band', ...
+               'Input Error', 'error');
+       return;
+   end
+    
+    % Save RFI parameters to appdata
+    if size(chan_freqs,2) >= 1
+        x = struct('frequency',chan_freqs(1), 'chan_snr', chan_snr(1));
+        channel_rfi = [x];
+        for j=2:size(chan_freqs, 2)
+            channel_rfi(j) = struct('frequency', chan_freqs(j), 'chan_snr', chan_snr(j));
+        end
+    end
+
+    setappdata(handles.main, 'channel_rfi', channel_rfi);
+    
+end
+
+% Collect RFI spikes parameters
+if get(handles.rfi_spike_checkbox, 'Value') == 1.0
+    num_spikes = str2num(get(handles.rfi_spike_freq_edit, 'String'));
+    eval(['spike_snr = [' get(handles.rfi_spike_params_edit, 'String') '];']);
+    
+    if size(spike_snr, 2) ~= 2 && size(spike_snr) ~= []
+        msgbox('Invalid SNR spikes parameters.', 'Input Error', 'error');
+        return;
+    end
+    
+    if size(num_spikes,2) == []
+        msgbox('Invalid number of SNR spikes.', 'Input Error', 'error');
+        return;
+    end
+    
+    % Save RFI parameters to appdata
+    setappdata(handles.main, 'spike_rfi', struct('num',num_spikes,'snr',spike_snr));
+    
+end
+
+% Clear existing plots
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+
+% Start generating data... Start with raw voltage data
+h = waitbar(0, 'Generating raw voltage stream');
+voltage = generate_voltage_stream(obs_params);
+
+% Generate required chirps
+h = waitbar(0.1, h, 'Generating chirps');
+transients = getappdata(handles.main, 'transients');
+
+% Loop all transients
+for i=1:size(transients, 2)
+    
+    % Generate chirp
+    chirp = generate_chirp(voltage, obs_params, transients(i).dm);
+    
+    if transients(i).period ~= -1  % Periodic transient
+        if transients(i).period < 0
+            msgbox(['Invalid period for transient ' num2str(i)], ...
+                    'Input Error', 'error');
+            return;
+        end
+        
+        period      = transients(i).period * 1e-3 * bandwidth;
+        first_pos   = int32(rand * period);
+        num_periods = floor(((observation_length * bandwidth) - size(chirp,2)) / period);
+        transients(i).timestamp = first_pos / bandwidth * 1e3;
+
+        for j=1:num_periods
+            start_pos = first_pos + period * (j-1);
+            end_pos   = first_pos + period * (j-1) + size(chirp, 2) - 1;
+            voltage(start_pos:end_pos) = voltage(start_pos:end_pos) + ...
+                                         transients(i).snr * chirp;
+        end
+    else     % Non-periodic transient
+        if transients(i).timestamp ~= -1  % Timestamp set by user
+            ts = transients(i).timestamp * 1e-3 * bandwidth + 1;
+        else                              % Timestamp
+            ts = int32(rand * (size(voltage,2) + size(chirp, 2)) - size(chirp, 2));
+            transients(i).timestamp = ts / bandwidth * 1e3;
+        end
+        
+        % Add single chirp to voltage stream
+        voltage(ts:ts+size(chirp,2)-1) = voltage(ts:ts+size(chirp,2)-1) + ...
+                                         transients(i).snr * chirp;
+    end
+    
+    transients(i).signal = chirp;
+end
+
+% Generate required channel-RFI signals
+waitbar(0.6, h, 'Generating RFI');
+for i=1:size(chan_freqs)
+    voltage = generate_channel_rfi(voltage, obs_params, chan_freqs(i), chan_snr(i));
+end
+
+% Generate required RFI spikes
+waitbar(0.8, h, 'Generating RFI');
+if get(handles.rfi_spike_checkbox, 'Value') == 1.0
+    snr = normrnd(spike_snr(1), spike_snr(2), 1, num_spikes);
+    width = abs(normrnd(10e-3 * bandwidth, 1e-3 * bandwidth, 1, num_spikes));
+    for i=1:num_spikes
+        t = int32(rand * (bandwidth * observation_length - width(i)));
+        voltage(t:t+width(i)-2) = snr(i) * voltage(t:t+width(i)-2); 
+    end
+end
+
+% Save data to appdata
+waitbar(0.9, h, 'Generating Plots');
+setappdata(handles.main, 'voltage', voltage);
+setappdata(handles.main, 'transients', transients);
+
+% Done generating voltage, plot
+axes(handles.axes2);
+specgram(voltage);
+
+% Display current transient
+setappdata(handles.generate_signal_button, 'signal_generated', 1);
+if size(transients,2) == 0
+    set(handles.axes3, 'Visible', 'off');
+else
+    display_transient(handles, int32(getappdata(handles.main, 'curr_transient')));
+end
+
+set(handles.channelisation_button, 'Enable', 'on');
+set(handles.change_signal_button, 'Visible', 'on');
+set(handles.add_transient_button, 'Enable', 'off');
+set(handles.remove_transient_button, 'Enable', 'off');
+set(handles.dedispersion_button, 'Enable', 'on');
+
+% Done
+close(h)
+
+
+% --- Executes on button press in change_signal_button.
+function change_signal_button_Callback(hObject, eventdata, handles)
+% hObject    handle to change_signal_button (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+set(handles.add_transient_button, 'Enable', 'on');
+if size(getappdata(handles.main, 'transients')) ~= 0
+    set(handles.remove_transient_button, 'Enable', 'on');
+end
+
+
+% Reset simulator
+reset_simulator(handles);
+generate_signal_button_Callback(hObject, eventdata, handles);
+
+% =========================== CHANNELISATION =============================
+
+
+% --- Executes on selection change in chan_technique_dropdown.
+function chan_technique_dropdown_Callback(hObject, eventdata, handles)
+
+% Get selected option
+contents = cellstr(get(hObject, 'String'));
+option = contents{get(hObject, 'Value')};
+
+switch option;
+    case 'FFT Channeliser'
+    case 'PPF Channeliser'
+        msgbox('PPF Channeliser not yet supported', 'Option Error', 'error');     
+end
+
+
+% --- Executes on button press in fft_channelise_button.
+function fft_channelise_button_Callback(hObject, eventdata, handles)
+
+num_chans = str2num(get(handles.fft_num_channels_edit, 'String'));
+
+% Check if number of channels is a power of 2
+[f,e] = log2(num_chans);
+if f ~= 0.5
+    msgbox('FFT Channeliser requires number of channels to be a power of 2', ...
+           'Invalid Channelisation options', 'error');
+       return;
+end
+
+statusbar(handles.main, 'Channelising...');
+
+% Channelise
+voltage = getappdata(handles.main, 'voltage');
+params  = getappdata(handles.main, 'observation_parameters');
+channelised_voltage = fft_channeliser(voltage, num_chans);
+
+% Adjust parameters
+params.number_channels   = num_chans;
+params.sampling_time     = params.sampling_time * num_chans;
+params.channel_bandwidth = params.bandwidth / num_chans;
+
+% Plot channelised data
+set(handles.axes2, 'Visible', 'on');
+axes(handles.axes2);
+imagesc(abs(channelised_voltage));
+
+% Save to appdata
+setappdata(handles.main, 'channelised_voltage', channelised_voltage);
+setappdata(handles.main, 'observation_parameters', params);
+
+statusbar;
+
+% =========================== DEDISPERSION =============================
+
+function display_dedispersed_series(handles, dm_index)
+
+% Get app data
+dedisped_data = getappdata(handles.main, 'dedispersed_series');
+start_dm      = getappdata(handles.main, 'start_dm');
+dm_step       = getappdata(handles.main, 'dm_step');
+num_dms       = getappdata(handles.main, 'num_dms');
+
+% Display the current dedispered_time_series
+if 0 > dm_index > num_dms
+    return;
+end
+
+set(handles.axes2, 'Visible', 'on');
+set(handles.axes3, 'Visible', 'on');
+axes(handles.axes3);
+plot(reshape(sum(dedisped_data(dm_index,:,:), 2), 1, size(dedisped_data, 3)));
+axes(handles.axes2);
+imagesc(reshape(dedisped_data(dm_index,:,:), size(dedisped_data, 2), size(dedisped_data, 3) ));
+
+% Update directional UI controls
+if dm_index == 1 || num_dms <= 1
+    set(handles.brute_left_button, 'Enable', 'off')
+end
+
+if dm_index == num_dms || num_dms <= 1
+    set(handles.brute_right_button, 'Enable', 'off');
+end
+    
+if num_dms > 1 && dm_index < num_dms
+    set(handles.brute_right_button, 'Enable', 'on');
+end
+
+if num_dms > 1 && dm_index > 1
+    set(handles.brute_left_button, 'Enable', 'on');
+end
+
+text = ['DM ' num2str(dm_index) ' of ' num2str(num_dms) ' (' ...
+        num2str(start_dm + dm_index * dm_step) ')' ];
+set(handles.brute_curr_dm_text, 'String', text);
+
+% Update appdata
+setappdata(handles.brute_force_dedisp_panel, 'curr_dm_index', dm_index);
+
+
+
+% --- Executes on selection change in dedisp_technique_popup.
+function dedisp_technique_popup_Callback(hObject, eventdata, handles)
+
+% Get selected option
+contents = cellstr(get(hObject, 'String'));
+option = contents{get(hObject, 'Value')};
+
+switch option;
+    case 'Brute-Force Dedispersion'
+end
+
+
+% --- Executes on button press in brute_dedisp_button.
+function brute_dedisp_button_Callback(hObject, eventdata, handles)
+
+% Brute-force dedispersion requires channelised data
+if size(getappdata(handles.main, 'channelised_voltage'), 2) == 0
+    msgbox('Brute-Force Dedispersion requires channelised data', ...
+           'Invalid input', 'error');
+    return;
+end
+
+% Reset brute-force dedispersion UI
+set(handles.brute_dedisp_plotter_panel, 'Visible', 'off');
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+
+% Get dedispersion parameters
+start_dm = str2double(get(handles.brute_start_dm_edit, 'String'));
+dm_step  = str2double(get(handles.brute_dm_step_edit, 'String'));
+num_dms  = int32(str2double(get(handles.brute_num_dms_edit, 'String')));
+
+power_series = abs(getappdata(handles.main, 'channelised_voltage')).^2;
+params       = getappdata(handles.main, 'observation_parameters');
+
+% Perform brute-force dedispersion
+h = waitbar(0, 'Performing brute-force dedispersion');
+dedisped_data = zeros([num_dms size(power_series, 1) size(power_series, 2)]);
+for i=1:num_dms
+    waitbar(double(i)/double(num_dms), h,['Dedispersing ' num2str(i) ' of ' num2str(num_dms)]);
+    dedisped_data(i,:,:) = brute_force_dedisperser( power_series, params, double(start_dm + dm_step * (i-1)) );
+end
+close(h);
+
+% Save to appdata
+setappdata(handles.main, 'dedispersed_series', dedisped_data);
+setappdata(handles.main, 'start_dm', start_dm);
+setappdata(handles.main, 'dm_step', dm_step);
+setappdata(handles.main, 'num_dms', num_dms);
+setappdata(handles.brute_force_dedisp_panel, 'curr_dm_index', 1);
+
+% Display dedispersed time series
+display_dedispersed_series(handles, 1);
+
+% Update UI
+set(handles.brute_dedisp_plotter_panel, 'Visible', 'on');
+set(handles.brute_left_button, 'Enable', 'off');
+
+if num_dms < 1
+    set(handles.brute_right_button, 'Enable', 'off');    
+end
+
+% --- Executes on button press in brute_left_button.
+function brute_left_button_Callback(hObject, eventdata, handles)
+
+display_dedispersed_series(handles, ...
+    getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index') - 1);
+
+
+% --- Executes on button press in brute_right_button.
+function brute_right_button_Callback(hObject, eventdata, handles)
+
+display_dedispersed_series(handles, ...
+    getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index') + 1)

@@ -7,6 +7,8 @@ set(pipeline_lib_src
     src/DDStream1.cpp
     src/DDStream2.cpp
     src/MedicinaMdsmPipeline.cpp
+    src/MedicinaCoherentPipeline.cpp
+    src/CoherentTestPipeline.cpp
 )
 
 # ------------- Create pipeline library ------------------
@@ -90,6 +92,20 @@ target_link_libraries(medicinaPipeline
     pelicanMdsm
 )
 
+# ------------- Create Medicina coherent pipeline executable ------------------
+add_executable(medicinaCoherentPipeline src/coherentMedicinaMain.cpp)
+
+target_link_libraries(medicinaCoherentPipeline
+    pelicanMdsm
+)
+
+# ------------- Create Test pipeline executable ------------------
+add_executable(coherentTestPipeline src/coherentTestMain.cpp)
+
+target_link_libraries(coherentTestPipeline
+    pelicanMdsm
+)
+
 # ------------- Add install paths  ------------------
 
 install(TARGETS mdsmPipeline DESTINATION ${BINARY_INSTALL_DIR})
@@ -97,8 +113,3 @@ install(TARGETS DDStream1 DESTINATION ${BINARY_INSTALL_DIR})
 install(TARGETS DDStream2 DESTINATION ${BINARY_INSTALL_DIR})
 
 include(CopyFiles)
-copy_files(${CMAKE_CURRENT_SOURCE_DIR}/data/*.xml . mdsmXmlFiles)
-copy_files(${CMAKE_CURRENT_SOURCE_DIR}/data/*.dat . channeliserDatFiles)
-
-
-#add_subdirectory(test)

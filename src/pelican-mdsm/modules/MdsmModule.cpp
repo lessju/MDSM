@@ -6,6 +6,7 @@
 // Pelican stuff
 #include "pelican/data/DataBlob.h"
 #include "WeightedSpectrumDataSet.h"
+
 // C++ stuff
 #include <iostream>
 #include <complex>
