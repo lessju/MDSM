@@ -44,7 +44,7 @@ function DedispersionPipelineSimulator_OpeningFcn(hObject, eventdata, handles, v
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-% varargin   command line arguments to DedispersionPipelineSimulator (see VARARGIN)
+% varargin   command line arguments to DedispersionPipelinGeSimulator (see VARARGIN)
 
 % Choose default command line output for DedispersionPipelineSimulator
 handles.output = hObject;
@@ -66,7 +66,7 @@ function varargout = DedispersionPipelineSimulator_OutputFcn(hObject, eventdata,
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 
-
+% ----------------------- GLOBAL CALLBACKS --------------------------
 
 % --------------------------------------------------------------------
 function menu_open_Callback(hObject, eventdata, handles)
@@ -79,6 +79,26 @@ function menu_exit_Callback(hObject, eventdata, handles)
 
 close()
 
+% --------------------------------------------------------------------
+function detach_axes_ClickedCallback(hObject, eventdata, handles)
+
+figure; % Open a new figure with handle f1
+h = gca();
+copyobj(allchild(handles.axes2), h); % Copy axes object h into figure f1
+
+
+% --- Executes on button press in plot1_button.
+function plot1_button_Callback(hObject, eventdata, handles)
+set(handles.panel_axes2, 'Visible', 'on');
+set(handles.panel_axes3, 'Visible', 'off');
+
+
+% --- Executes on button press in plot2_button.
+function plot2_button_Callback(hObject, eventdata, handles)
+set(handles.panel_axes2, 'Visible', 'off');
+set(handles.panel_axes3, 'Visible', 'on');
+
+% ----------------------- ACTION CALLBACKS --------------------------
 
 % --- Executes on button press in generate_signal_button.
 function generate_signal_button_Callback(hObject, eventdata, handles)
@@ -91,6 +111,12 @@ set(handles.axes3, 'Visible', 'off');
 set(handles.generate_signal_panel, 'Visible', 'on');
 set(handles.channelisation_panel, 'Visible', 'off');
 set(handles.dedispersion_panel, 'Visible', 'of');
+set(handles.post_processing_panel, 'Visible', 'off');
+set(handles.rfi_mitigation_panel, 'Visible', 'off');
+set(handles.panel_axes2, 'Visible', 'off');
+set(handles.panel_axes3, 'Visible', 'off');
+set(handles.plot1_button, 'Visible', 'off');
+set(handles.plot2_button, 'Visible', 'off');
 
 % If signal has been generated, plot
 if getappdata(handles.generate_signal_button, 'signal_generated') == 1
@@ -99,12 +125,16 @@ if getappdata(handles.generate_signal_button, 'signal_generated') == 1
     transients = getappdata(handles.main, 'transients');
     axes(handles.axes2);
     specgram(voltage);
+    
+    set(handles.plot1_button, 'Visible', 'on');
+    plot1_button_Callback(hObject, eventdata, handles);
 
     % Display current transient
     setappdata(handles.generate_signal_button, 'signal_generated', 1);
     if size(transients,2) == 0
         set(handles.axes3, 'Visible', 'off');
     else
+        set(handles.plot2_button, 'Visible', 'on');
         display_transient(handles, int32(getappdata(handles.main, 'curr_transient')));
     end
 end
@@ -127,12 +157,21 @@ set(handles.axes3, 'Visible', 'off');
 set(handles.generate_signal_panel, 'Visible', 'off');
 set(handles.dedispersion_panel, 'Visible', 'of');
 set(handles.channelisation_panel, 'Visible', 'on');
+set(handles.post_processing_panel, 'Visible', 'off');
+set(handles.rfi_mitigation_panel, 'Visible', 'off');
+set(handles.panel_axes2, 'Visible', 'off');
+set(handles.panel_axes3, 'Visible', 'off');
+set(handles.plot1_button, 'Visible', 'off');
+set(handles.plot2_button, 'Visible', 'off');
 
 % If signal has already been channelised
 if size(getappdata(handles.main, 'channelised_voltage'), 2) ~= 0
     channelised_voltage = getappdata(handles.main, 'channelised_voltage');
     axes(handles.axes2);
     imagesc(abs(channelised_voltage));
+    
+    set(handles.plot1_button, 'Visible', 'on');
+    plot1_button_Callback(hObject, eventdata, handles);
 end
 
 statusbar;
@@ -140,6 +179,43 @@ statusbar;
 
 % --- Executes on button press in rfi_mitigation_button.
 function rfi_mitigation_button_Callback(hObject, eventdata, handles)
+
+statusbar(handles.main, 'Switching to "RFI Mitigation" tab');
+
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+set(handles.generate_signal_panel, 'Visible', 'off');
+set(handles.dedispersion_panel, 'Visible', 'off');
+set(handles.channelisation_panel, 'Visible', 'off');
+set(handles.post_processing_panel, 'Visible', 'off');
+set(handles.rfi_mitigation_panel, 'Visible', 'on');
+set(handles.panel_axes2, 'Visible', 'off');
+set(handles.panel_axes3, 'Visible', 'off');
+set(handles.plot1_button, 'Visible', 'off');
+set(handles.plot2_button, 'Visible', 'off');
+
+% If signal has already been channelised
+if size(getappdata(handles.main, 'channelised_voltage'), 2) ~= 0
+    channelised_voltage = getappdata(handles.main, 'channelised_voltage');
+    axes(handles.axes2);
+    imagesc(abs(channelised_voltage));
+    
+    set(handles.plot1_button, 'Visible', 'on');
+    plot1_button_Callback(hObject, eventdata, handles);
+end
+
+% If signal has already been rfi mitigated
+if size(getappdata(handles.main, 'channel_power'), 2) ~= 0
+    channel_power = getappdata(handles.main, 'channel_power');
+    axes(handles.axes3);
+    imagesc(channel_power);
+    
+    set(handles.plot2_button, 'Visible', 'on');
+    plot1_button_Callback(hObject, eventdata, handles);
+end
+
+statusbar;
 
 
 % --- Executes on button press in dedispersion_button.
@@ -153,22 +229,22 @@ set(handles.axes3, 'Visible', 'off');
 set(handles.dedispersion_panel, 'Visible', 'on');
 set(handles.generate_signal_panel, 'Visible', 'off');
 set(handles.channelisation_panel, 'Visible', 'off');
+set(handles.post_processing_panel, 'Visible', 'off');
+set(handles.rfi_mitigation_panel, 'Visible', 'off');
+set(handles.panel_axes2, 'Visible', 'off');
+set(handles.panel_axes3, 'Visible', 'off');
+set(handles.plot1_button, 'Visible', 'off');
+set(handles.plot2_button, 'Visible', 'off');
 
 % If signal has been generated, plot
-if getappdata(handles.generate_signal_button, 'dedispersed_series') == 1
+if size(getappdata(handles.main, 'dedispersed_series'), 2) ~= 0
+    set(handles.brute_dedisp_plotter_panel, 'Visible', 'on');
+    display_dedispersed_series(handles, getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index'));
     
-%     voltage = getappdata(handles.main, 'voltage');
-%     transients = getappdata(handles.main, 'transients');
-%     axes(handles.axes2);
-%     specgram(voltage);
-% 
-%     % Display current transient
-%     setappdata(handles.generate_signal_button, 'signal_generated', 1);
-%     if size(transients,2) == 0
-%         set(handles.axes3, 'Visible', 'off');
-%     else
-%         display_transient(handles, int32(getappdata(handles.main, 'curr_transient')));
-%     end
+    set(handles.plot1_button, 'Visible', 'on');
+    plot1_button_Callback(hObject, eventdata, handles);
+else
+    set(handles.brute_dedisp_plotter_panel, 'Visible', 'off');
 end
 
 statusbar;
@@ -177,6 +253,27 @@ statusbar;
 % --- Executes on button press in post_processing_button.
 function post_processing_button_Callback(hObject, eventdata, handles)
 
+statusbar(handles.main, 'Switching to "Post-Processing" tab');
+
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+set(handles.generate_signal_panel, 'Visible', 'off');
+set(handles.dedispersion_panel, 'Visible', 'of');
+set(handles.channelisation_panel, 'Visible', 'off');
+set(handles.channelisation_panel, 'Visible', 'off');
+set(handles.post_processing_panel, 'Visible', 'on');
+set(handles.rfi_mitigation_panel, 'Visible', 'off');
+set(handles.panel_axes2, 'Visible', 'off');
+set(handles.panel_axes3, 'Visible', 'off');
+set(handles.plot1_button, 'Visible', 'off');
+set(handles.plot2_button, 'Visible', 'off');
+
+% If signal has already been post_processed
+%if size(getappdata(handles.main, 'channelised_voltage'), 2) ~= 0
+%end
+
+statusbar;
 
 % ============================ TRANSIENT SECTION =========================
 
@@ -187,6 +284,12 @@ function reset_simulator(handles)
 % Remove all app data
 setappdata(handles.generate_signal_button, 'signal_generated', 0);
 setappdata(handles.main, 'channelised_voltage', []);
+setappdata(handles.main, 'dedispersed_series', []);
+setappdata(handles.main, 'channel_power', []);
+setappdata(handles.main, 'start_dm', 0);
+setappdata(handles.main, 'dm_step', 0);
+setappdata(handles.main, 'num_dms', 0);
+setappdata(handles.brute_force_dedisp_panel, 'curr_dm_index', 0);
 
 % Update UI
 arrayfun(@cla,findall(0,'type','axes'))
@@ -197,6 +300,12 @@ set(handles.apply_bandpass_button, 'Enable', 'off');
 set(handles.rfi_mitigation_button, 'Enable', 'off');
 set(handles.post_processing_button, 'Enable', 'off');
 set(handles.dedispersion_button, 'Enable', 'off');
+set(handles.post_processing_button, 'Enable', 'off');
+set(handles.rfi_mitigation_button, 'Enable', 'off');
+set(handles.panel_axes2, 'Visible', 'off');
+set(handles.panel_axes3, 'Visible', 'off');
+set(handles.plot1_button, 'Visible', 'off');
+set(handles.plot2_button, 'Visible', 'off');
 
 
 function display_transient(handles, num)
@@ -473,37 +582,14 @@ else
     set(handles.timestamp_edit, 'Visible', 'off');
 end
 
-
-% --- Executes on button press in channel_rfi_checkbox.
-function channel_rfi_checkbox_Callback(hObject, eventdata, handles)
-
-if get(hObject, 'Value') == 0.0
-    set(handles.text12, 'Enable', 'off');
-    set(handles.text13, 'Enable', 'off');
-    set(handles.channel_rfi_freqs_edit, 'Enable', 'off');
-    set(handles.channel_rfi_snr_edit, 'Enable', 'off');
-else
-    set(handles.text12, 'Enable', 'on');
-    set(handles.text13, 'Enable', 'on');
-    set(handles.channel_rfi_freqs_edit, 'Enable', 'on');
-    set(handles.channel_rfi_snr_edit, 'Enable', 'on');
-end
-    
-
-% --- Executes on button press in rfi_spike_checkbox.
-function rfi_spike_checkbox_Callback(hObject, eventdata, handles)
-
-if get(hObject, 'Value') == 0.0
-    set(handles.text14, 'Enable', 'off');
-    set(handles.text15, 'Enable', 'off');
-    set(handles.rfi_spike_freq_edit, 'Enable', 'off');
-    set(handles.rfi_spike_params_edit, 'Enable', 'off');
-else
-    set(handles.text14, 'Enable', 'on');
-    set(handles.text15, 'Enable', 'on');
-    set(handles.rfi_spike_freq_edit, 'Enable', 'on');
-    set(handles.rfi_spike_params_edit, 'Enable', 'on');
-end
+% --- Executes on button press in generate_rfi_button.
+function generate_rfi_button_Callback(hObject, eventdata, handles)
+ 
+% Call generate RFI window
+center_frequency = str2double(get(handles.fch_edit, 'String')) * 1e6;
+bandwidth = str2double(get(handles.bw_edit, 'String')) * 1e6;
+rfi = RFIForm(center_frequency, bandwidth);
+setappdata(handles.main, 'rfi', rfi);
 
 
 % --- Executes on button press in generate_button.
@@ -516,65 +602,28 @@ arrayfun(@cla,findall(0,'type','axes'))
 center_frequency = str2double(get(handles.fch_edit, 'String')) * 1e6;
 bandwidth = str2double(get(handles.bw_edit, 'String')) * 1e6;
 observation_length = str2double(get(handles.obs_len_edit, 'String'));
+sampling_time = 1.0 / bandwidth; %;str2double(get(handles.sampling_time_edit, 'String')) * 1.0e-6;
+sampling_rate = 1.0 / sampling_time;
 
 obs_params = struct('center_frequency', center_frequency, ...
                     'bandwidth', bandwidth, ...
                     'number_channels', 1, ...
                     'channel_bandwidth', bandwidth, ...
-                    'sampling_time', 1 / bandwidth, ...
+                    'sampling_time', sampling_time, ...
                     'observation_length', observation_length);
 setappdata(handles.main, 'observation_parameters', obs_params);
 
-% Collect channel RFI parameters
-chan_freqs = []; chan_snr = [];
-if get(handles.channel_rfi_checkbox, 'Value') == 1.0
-    eval(['chan_freqs = [' get(handles.channel_rfi_freqs_edit, 'String') '] * 1e6;']);
-    eval(['chan_snr   = [' get(handles.channel_rfi_snr_edit, 'String') '] * 1e6;']);
-    
-    if size(chan_freqs) ~= size(chan_snr)
-        msgbox(['Invalid Channel-RFI options. Number of items in "frequency channels"'...
-                'and channel RFI SNR should be the same'], 'Input Error', 'error');
-        return;
-    end
-    
-   if (size(chan_freqs(chan_freqs < center_frequency - bandwidth/2),2) > 0) || ...
-      (size(chan_freqs(chan_freqs > center_frequency + bandwidth/2),2) > 0)
-       msgbox('Invalid Channel-RFI options, frequency out of band', ...
-               'Input Error', 'error');
-       return;
-   end
-    
-    % Save RFI parameters to appdata
-    if size(chan_freqs,2) >= 1
-        x = struct('frequency',chan_freqs(1), 'chan_snr', chan_snr(1));
-        channel_rfi = [x];
-        for j=2:size(chan_freqs, 2)
-            channel_rfi(j) = struct('frequency', chan_freqs(j), 'chan_snr', chan_snr(j));
-        end
-    end
-
-    setappdata(handles.main, 'channel_rfi', channel_rfi);
-    
-end
-
-% Collect RFI spikes parameters
-if get(handles.rfi_spike_checkbox, 'Value') == 1.0
-    num_spikes = str2num(get(handles.rfi_spike_freq_edit, 'String'));
-    eval(['spike_snr = [' get(handles.rfi_spike_params_edit, 'String') '];']);
-    
-    if size(spike_snr, 2) ~= 2 && size(spike_snr) ~= []
-        msgbox('Invalid SNR spikes parameters.', 'Input Error', 'error');
-        return;
-    end
-    
-    if size(num_spikes,2) == []
-        msgbox('Invalid number of SNR spikes.', 'Input Error', 'error');
-        return;
-    end
-    
-    % Save RFI parameters to appdata
-    setappdata(handles.main, 'spike_rfi', struct('num',num_spikes,'snr',spike_snr));
-    
+% RFI parameters gathered from RFI popup form
+rfi = getappdata(handles.main, 'rfi');
+if isstruct(rfi)
+    chan_freqs = rfi.chan_freqs;
+    chan_snr   = rfi.chan_snr;
+    num_spikes = rfi.num_spikes;
+    spike_snr  = rfi.spike_snr;
+else
+    chan_freqs = [];
+    chan_snr   = [];
+    num_spikes = 0;
 end
 
 % Clear existing plots
@@ -593,7 +642,7 @@ transients = getappdata(handles.main, 'transients');
 for i=1:size(transients, 2)
     
     % Generate chirp
-    chirp = generate_chirp(voltage, obs_params, transients(i).dm);
+    chirp = generate_chirp(obs_params, transients(i).dm, transients(i).snr);
     
     if transients(i).period ~= -1  % Periodic transient
         if transients(i).period < 0
@@ -602,23 +651,37 @@ for i=1:size(transients, 2)
             return;
         end
         
-        period      = transients(i).period * 1e-3 * bandwidth;
-        first_pos   = int32(rand * period);
-        num_periods = floor(((observation_length * bandwidth) - size(chirp,2)) / period);
-        transients(i).timestamp = first_pos / bandwidth * 1e3;
+        period      = transients(i).period * 1e-3 * sampling_rate;
+        first_pos   = int32(rand * (period - size(chirp, 2)));
+        num_periods = ((observation_length * sampling_rate) - size(chirp,2)) / period;
+        transients(i).timestamp = first_pos / sampling_rate * 1e3;
 
-        for j=1:num_periods
+        % Insert full period in voltage stream
+        for j=1:floor(num_periods)
             start_pos = first_pos + period * (j-1);
             end_pos   = first_pos + period * (j-1) + size(chirp, 2) - 1;
-            voltage(start_pos:end_pos) = voltage(start_pos:end_pos) + ...
-                                         transients(i).snr * chirp;
+            voltage(start_pos:end_pos) = voltage(start_pos:end_pos) + chirp;
         end
+        
+        % Insert part of chirp in final period
+        if (num_periods - floor(num_periods)) * period > first_pos
+            start_pos = floor(num_periods) * period + first_pos;
+            if size(chirp, 2) <= observation_length * sampling_rate - start_pos
+                end_pos = start_pos + size(chirp, 2) - 1;
+                voltage(start_pos:end_pos) = voltage(start_pos:end_pos) + chirp;
+            else
+                voltage(start_pos:end) = voltage(start_pos:end) + ...
+                        chirp(1:observation_length * sampling_rate - start_pos);
+            end
+            
+        end
+        
     else     % Non-periodic transient
         if transients(i).timestamp ~= -1  % Timestamp set by user
-            ts = transients(i).timestamp * 1e-3 * bandwidth + 1;
-        else                              % Timestamp
-            ts = int32(rand * (size(voltage,2) + size(chirp, 2)) - size(chirp, 2));
-            transients(i).timestamp = ts / bandwidth * 1e3;
+            ts = transients(i).timestamp * 1e-3 * sampling_rate + 1;
+        else                              % Random timestamp
+            ts = int32(rand * (size(voltage,2) - size(chirp, 2)));
+            transients(i).timestamp = ts / sampling_rate * 1e3;
         end
         
         % Add single chirp to voltage stream
@@ -637,11 +700,11 @@ end
 
 % Generate required RFI spikes
 waitbar(0.8, h, 'Generating RFI');
-if get(handles.rfi_spike_checkbox, 'Value') == 1.0
+if num_spikes > 0
     snr = normrnd(spike_snr(1), spike_snr(2), 1, num_spikes);
-    width = abs(normrnd(10e-3 * bandwidth, 1e-3 * bandwidth, 1, num_spikes));
+    width = abs(normrnd(10e-3 * sampling_rate, 1e-3 * sampling_rate, 1, num_spikes));
     for i=1:num_spikes
-        t = int32(rand * (bandwidth * observation_length - width(i)));
+        t = int32(rand * (sampling_rate * observation_length - width(i)));
         voltage(t:t+width(i)-2) = snr(i) * voltage(t:t+width(i)-2); 
     end
 end
@@ -663,11 +726,18 @@ else
     display_transient(handles, int32(getappdata(handles.main, 'curr_transient')));
 end
 
+set(handles.panel_axes2, 'Visible', 'on');
+set(handles.plot1_button, 'Visible', 'on');
+
+if size(transients, 2) > 0
+    set(handles.plot2_button, 'Visible', 'on');
+end
+
 set(handles.channelisation_button, 'Enable', 'on');
 set(handles.change_signal_button, 'Visible', 'on');
+set(handles.generate_rfi_button, 'Visible', 'off');
 set(handles.add_transient_button, 'Enable', 'off');
 set(handles.remove_transient_button, 'Enable', 'off');
-set(handles.dedispersion_button, 'Enable', 'on');
 
 % Done
 close(h)
@@ -675,18 +745,15 @@ close(h)
 
 % --- Executes on button press in change_signal_button.
 function change_signal_button_Callback(hObject, eventdata, handles)
-% hObject    handle to change_signal_button (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 
 set(handles.add_transient_button, 'Enable', 'on');
 if size(getappdata(handles.main, 'transients')) ~= 0
     set(handles.remove_transient_button, 'Enable', 'on');
 end
 
-
 % Reset simulator
 reset_simulator(handles);
+set(handles.generate_rfi_button, 'Visible', 'on');
 generate_signal_button_Callback(hObject, eventdata, handles);
 
 % =========================== CHANNELISATION =============================
@@ -740,7 +807,63 @@ imagesc(abs(channelised_voltage));
 setappdata(handles.main, 'channelised_voltage', channelised_voltage);
 setappdata(handles.main, 'observation_parameters', params);
 
+% Update UI
+set(handles.dedispersion_button, 'Enable', 'on');
+set(handles.rfi_mitigation_button, 'Enable', 'on');
+set(handles.panel_axes2, 'Visible', 'on');
+set(handles.plot1_button, 'Visible', 'on');
+
 statusbar;
+
+% =========================== RFI MITIGATION ===========================
+
+% --- Executes on button press in huber_normalisation_checkbox.
+function huber_normalisation_checkbox_Callback(hObject, eventdata, handles)
+
+if get(handles.huber_normalisation_checkbox, 'Value') == 1.0
+    set(handles.huber_threshold_edit, 'Enable', 'on');
+else
+    set(handles.huber_threshold_edit, 'Enable', 'off');
+end
+
+
+% --- Executes on button press in apply_mitigation_button.
+function apply_mitigation_button_Callback(hObject, eventdata, handles)
+
+% Get data and convert to channelised power series
+power_series = abs(getappdata(handles.main, 'channelised_voltage')).^2;
+
+% If huber normalisation is checked, apply
+if get(handles.huber_normalisation_checkbox, 'Value') == 1.0
+    statusbar(handles.main, 'Applying Huber Filter ...');
+    thresh = str2double(get(handles.huber_threshold_edit, 'String'));
+    power_series = huber_normalisation(power_series, thresh);
+    statusbar(handles.main, '');
+end
+
+% Display plot
+axes(handles.axes3)
+imagesc(power_series);
+set(handles.panel_axes2, 'Visible', 'on');
+set(handles.panel_axes3, 'Visible', 'on');
+set(handles.plot1_button, 'Visible', 'on');
+set(handles.plot2_button, 'Visible', 'on');
+plot2_button_Callback(hObject, eventdata, handles)
+
+% Set channelised voltage to null and set power series instead
+setappdata(handles.main, 'channel_power', power_series);
+
+% --- Executes on button press in clear_rfi_button.
+function clear_rfi_button_Callback(hObject, eventdata, handles)
+
+setappdata(handles.main, 'channel_power', []);
+
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes3, 'Visible', 'off');
+set(handles.axes2, 'Visible', 'on');
+axes(handles.axes2);
+imagesc(abs(getappdata(handles.main, 'channelised_voltage')));
+
 
 % =========================== DEDISPERSION =============================
 
@@ -753,16 +876,36 @@ dm_step       = getappdata(handles.main, 'dm_step');
 num_dms       = getappdata(handles.main, 'num_dms');
 
 % Display the current dedispered_time_series
-if 0 < dm_index < num_dms
+if 0 > dm_index > num_dms
     return;
 end
 
+% Reset plots
+arrayfun(@cla,findall(0,'type','axes'))
+set(handles.axes2, 'Visible', 'off');
+set(handles.axes3, 'Visible', 'off');
+
+% If required, display dedispersed channelsif
+if get(handles.display_dedisp_channelised_checkbox, 'Value') == 1.0
+    % Calculate dedispersed channelised data
+    params       = getappdata(handles.main, 'observation_parameters');
+    power_series = abs(getappdata(handles.main, 'channelised_voltage').^2);
+    dedisped     = brute_force_dedisperser( power_series, params, double(start_dm + dm_index * dm_step));
+    
+    % Plot
+    set(handles.axes3, 'Visible', 'on');
+    axes(handles.axes3);
+    imagesc(dedisped);
+end
+
+% Plot dedispersed power series
 set(handles.axes2, 'Visible', 'on');
-set(handles.axes3, 'Visible', 'on');
-axes(handles.axes3);
-plot(reshape(sum(dedisped_data(dm_index,:,:), 2), 1, size(dedisped_data, 3)));
 axes(handles.axes2);
-imagesc(reshape(dedisped_data(dm_index,:,:), size(dedisped_data, 2), size(dedisped_data, 3) ));
+plot(dedisped_data(dm_index,:));
+
+set(handles.plot1_button, 'Visible', 'on');
+set(handles.plot2_button, 'Visible', 'off');
+set(handles.panel
 
 % Update directional UI controls
 if dm_index == 1 || num_dms <= 1
@@ -785,7 +928,13 @@ text = ['DM ' num2str(dm_index) ' of ' num2str(num_dms) ' (' ...
         num2str(start_dm + dm_index * dm_step) ')' ];
 set(handles.brute_curr_dm_text, 'String', text);
 
+% Update appdata
+setappdata(handles.brute_force_dedisp_panel, 'curr_dm_index', dm_index);
 
+% --- Executes on button press in display_dedisp_channelised_checkbox.
+function display_dedisp_channelised_checkbox_Callback(hObject, eventdata, handles)
+
+display_dedispersed_series(handles, getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index'));
 
 % --- Executes on selection change in dedisp_technique_popup.
 function dedisp_technique_popup_Callback(hObject, eventdata, handles)
@@ -802,12 +951,18 @@ end
 % --- Executes on button press in brute_dedisp_button.
 function brute_dedisp_button_Callback(hObject, eventdata, handles)
 
-% Brute-force dedispersion requires channelised data
-if size(getappdata(handles.main, 'channelised_voltage'), 2) == 0
-    msgbox('Brute-Force Dedispersion requires channelised data', ...
-           'Invalid input', 'error');
-    return;
+% Check if data is available
+if size(getappdata(handles.main, 'channel_power'), 2)  ~= 0
+    power_series = getappdata(handles.main, 'channel_power');
+else
+    if size(getappdata(handles.main, 'channelised_voltage'), 2) ~= 0
+        power_series = abs(getappdata(handles.main, 'channelised_voltage')).^2;
+    else
+        msgbox('You need to channelised and optionally RFI mitigate data first', 'No data available' ,'error');
+        return;
+    end
 end
+
 
 % Reset brute-force dedispersion UI
 set(handles.brute_dedisp_plotter_panel, 'Visible', 'off');
@@ -819,21 +974,23 @@ set(handles.axes3, 'Visible', 'off');
 start_dm = str2double(get(handles.brute_start_dm_edit, 'String'));
 dm_step  = str2double(get(handles.brute_dm_step_edit, 'String'));
 num_dms  = int32(str2double(get(handles.brute_num_dms_edit, 'String')));
-
-power_series = abs(getappdata(handles.main, 'channelised_voltage')).^2;
 params       = getappdata(handles.main, 'observation_parameters');
+
+% Calculate number of samples for largest DM value
+fch1 = (params.center_frequency + params.bandwidth / 2) * 1e-6;
+foff = params.bandwidth * 1e-6;
+delta_t = dispersion_delay( fch1 - foff, fch1, start_dm + dm_step * single(num_dms), params.sampling_time );
+arr_len = int32(size(power_series,2) - delta_t);
 
 % Perform brute-force dedispersion
 h = waitbar(0, 'Performing brute-force dedispersion');
-dedisped_data = zeros([num_dms size(power_series, 1) size(power_series, 2)]);
+dedisped_data = zeros(num_dms, arr_len);
 for i=1:num_dms
     waitbar(double(i)/double(num_dms), h,['Dedispersing ' num2str(i) ' of ' num2str(num_dms)]);
-    dedisped_data(i,:,:) = brute_force_dedisperser( power_series, params, double(start_dm + dm_step * (i-1)) );
+    dedisped = sum(brute_force_dedisperser( power_series, params, double(start_dm + dm_step * single(i-1.0)) ));
+    dedisped_data(i,:) = dedisped(1,1:arr_len);
 end
 close(h);
-
-% Display dedispersed time series
-display_dedispersed_series(handles, 1);
 
 % Save to appdata
 setappdata(handles.main, 'dedispersed_series', dedisped_data);
@@ -841,6 +998,9 @@ setappdata(handles.main, 'start_dm', start_dm);
 setappdata(handles.main, 'dm_step', dm_step);
 setappdata(handles.main, 'num_dms', num_dms);
 setappdata(handles.brute_force_dedisp_panel, 'curr_dm_index', 1);
+
+% Display dedispersed time series
+display_dedispersed_series(handles, 1);
 
 % Update UI
 set(handles.brute_dedisp_plotter_panel, 'Visible', 'on');
@@ -850,13 +1010,118 @@ if num_dms < 1
     set(handles.brute_right_button, 'Enable', 'off');    
 end
 
+% Update Global UI
+set(handles.post_processing_button, 'Enable', 'on');
+
+
 % --- Executes on button press in brute_left_button.
 function brute_left_button_Callback(hObject, eventdata, handles)
 
-display_dedispersed_series(handles, getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index') - 1);
+display_dedispersed_series(handles, ...
+    getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index') - 1);
 
 
 % --- Executes on button press in brute_right_button.
 function brute_right_button_Callback(hObject, eventdata, handles)
 
-display_dedispersed_series(handles, getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index') + 1)
+display_dedispersed_series(handles, ...
+    getappdata(handles.brute_force_dedisp_panel, 'curr_dm_index') + 1)
+
+
+% =========================== POST_PROCESSING =============================
+
+% --- Executes on selection change in post_technique_popup.
+function post_technique_popup_Callback(hObject, eventdata, handles)
+
+% Get selected option
+contents = cellstr(get(hObject, 'String'));
+option = contents{get(hObject, 'Value')};
+
+switch option;
+    case 'Threshold Detection'
+end
+
+% --- Executes on button press in median_filter_checkbox.
+function median_filter_checkbox_Callback(hObject, eventdata, handles)
+
+if get(handles.median_filter_checkbox, 'Value') == 1.0
+    set(handles.median_filter_nbins, 'Enable', 'on');
+else
+    set(handles.median_filter_nbins, 'Enable', 'off');
+end
+
+% --- Executes on button press in apply_threshold_button.
+function apply_threshold_button_Callback(hObject, eventdata, handles)
+
+statusbar(handles.main, 'Post-porcessing using detection threshold');
+
+% Get required data/parameters
+start_dm = str2double(get(handles.brute_start_dm_edit, 'String'));
+dm_step  = str2double(get(handles.brute_dm_step_edit, 'String'));
+num_dms  = int32(str2double(get(handles.brute_num_dms_edit, 'String')));
+params   = getappdata(handles.main, 'observation_parameters');
+
+% Make sure we have dedispersed data
+dedisped_data = getappdata(handles.main, 'dedispersed_series');
+thresh        = str2double(get(handles.detection_threshold, 'String'));
+
+% Apply median filter if required
+if get(handles.median_filter_checkbox, 'Value') == 1.0
+    bins = str2num(get(handles.median_filter_nbins, 'String'));
+    
+    % Apply median to each dedispersed time series
+    for i = 1 : size(dedisped_data, 1)
+        dedisped_data(i,:) = medfilt1(dedisped_data(i,:), bins);
+    end
+end
+
+% Create image
+save test_data.dat dedisped_data;
+
+% Calculate sum and stddev for all dedisperd power series
+mean   = mean2(dedisped_data);
+stddev = std2(dedisped_data);
+
+% Apply threshold
+[dm, time] = find(dedisped_data > mean + stddev * thresh);
+vals       = dedisped_data(dedisped_data > mean + stddev * thresh);
+vals       = (vals - mean) / stddev;
+dm         = start_dm + (dm - 1) .* dm_step;
+time       = time .* params.sampling_time;
+
+if get(handles.thresh_3d_checkbox, 'Value') == 1.0
+    % Display 3D scatter plot with results
+    statusbar(handles.main, 'Generating 3D plot');
+    arrayfun(@cla,findall(0,'type','axes'))
+    set(handles.axes3, 'Visible', 'off');
+    set(handles.axes2, 'Visible', 'on');
+    axes(handles.axes2);
+    scatter3(time, dm, vals, '+');
+    xlabel('Time (s)');
+    ylabel('DM');
+    zlabel('SNR')
+else
+    % Display Time vs DM plot
+    statusbar(handles.main, 'Generating 2D plots');
+    set(handles.axes2, 'Visible', 'on');
+    axes(handles.axes2);
+    scatter(time, dm, exp(log10((vals - min(vals) * 0.99))).^3);
+    title('Time vs DM plot');
+    xlabel('Time (s)');
+    ylabel('DM');
+    
+    % Display DM vs SNR plot
+    set(handles.axes3, 'Visible', 'on');
+    axes(handles.axes3);
+    scatter(dm, vals, '+');
+    title('SNR vs DM plot');
+    xlabel('DM');
+    ylabel('SNR')
+end
+
+statusbar(handles.main, '');
+
+% --- Executes on button press in thresh_3d_checkbox.
+function thresh_3d_checkbox_Callback(hObject, eventdata, handles)
+
+apply_threshold_button_Callback(hObject, eventdata, handles);

@@ -6,7 +6,7 @@
 
 #define NUM_THREADS 256
 
-int nsamp = 65536, ndms = 1, detrendLen = 1024;
+int nsamp = 65536, ndms = 1024, detrendLen = 32768;
 
 // --------------------------- Detrend and Normalisation kernel ----------------------------
 __global__ void detrend_normalise(float *input, int detrendLen)
@@ -19,7 +19,7 @@ __global__ void detrend_normalise(float *input, int detrendLen)
 		float sy = 0, sxy = 0, sxx = 0;
 		for (unsigned i = threadIdx.x; i < detrendLen; i += blockDim.x)
 		{
-			float x = - detrendLen / 2.0 + 0.5 + i;
+			float x = - detrendLen * 0.5 + 0.5 + i;
 			int index = blockIdx.y * gridDim.x * detrendLen + 
 						blockIdx.x * detrendLen + i;
 			float y = input[index];
@@ -96,7 +96,7 @@ __global__ void detrend_normalise(float *input, int detrendLen)
 
 	for (unsigned i = threadIdx.x; i < detrendLen ; i += blockDim.x)
 		input[blockIdx.y * gridDim.x * detrendLen + 
-			  blockIdx.x * detrendLen + i]        /= stddev;
+			  blockIdx.x * detrendLen + i] /= stddev;
 }
 
 // --------------------------- Main processing  ----------------------------
@@ -110,16 +110,16 @@ int main(int argc, char *argv[])
 	// Allocate and generate buffers
 	input = (float *) malloc(nsamp * ndms * sizeof(float));
 
-//	srand ( time(NULL) );
-//	for(i = 0; i < ndms; i++)
-//		for(j = 0; j < nsamp; j++)
-//			input[i * nsamp + j] = ((float)rand()/(float)RAND_MAX) + j * 0.001 + i * j * 0.001;
+	srand ( time(NULL) );
+	for(i = 0; i < ndms; i++)
+		for(j = 0; j < nsamp; j++)
+			input[i * nsamp + j] = ((float)rand() / (float)RAND_MAX) + j * 0.001 + i * j * 0.001;
 
 	printf("nsamp: %d, ndms: %d\n", nsamp, ndms);
 
-	FILE *fp = fopen("/home/lessju/Code/MDSM/release/pelican-mdsm/pipelines/output.dat", "rb");
-	fread(input, sizeof(float), nsamp, fp);
-	fclose(fp);
+//	FILE *fp = fopen("/home/lessju/Code/MDSM/release/pelican-mdsm/pipelines/output.dat", "rb");
+//	fread(input, sizeof(float), nsamp, fp);
+//	fclose(fp);
 	
 	// Initialise
 	cudaSetDevice(0);
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 	// Get output 
 	cudaMemcpy(input, d_input, ndms * nsamp * sizeof(float), cudaMemcpyDeviceToHost);
 
-	fp = fopen("testDetrend.dat", "wb");
+	FILE *fp = fopen("testDetrend.dat", "wb");
 	fwrite(input, sizeof(float), nsamp * ndms, fp);
 	fclose(fp);
 }

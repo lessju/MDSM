@@ -29,16 +29,12 @@ class MdsmModule : public AbstractModule
         SURVEY       *_survey;
         bool		 _createOutputBlob;
         float        *_input_buffer;
-        float        _bufferMean;
-        float        _bufferRMS;
         unsigned int _samples;
         unsigned int _gettime;
         unsigned int _counter;
         double       _timestamp, _blockRate;
         long         _iteration;
         bool         _invertChannels;
-        float       *_means[MDSM_STAGES]; // 3 
-        float       *_rmss[MDSM_STAGES]; 
 };
 
 // Declare this class as a pelican module.

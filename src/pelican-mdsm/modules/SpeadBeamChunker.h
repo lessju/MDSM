@@ -145,7 +145,6 @@ class SpeadBeamChunker : public AbstractChunker
 
     private:
 
-        unsigned _heapsPerChunk;
         unsigned _packetsPerHeap;
         unsigned _samplesPerSubband;
         unsigned _bitsPerSample;

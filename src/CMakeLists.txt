@@ -30,6 +30,10 @@ if(NOT GPU_VERSION_ARCHITECTURE)
     set(GPU_ARCHITECTURE "sm_13")
 endif(NOT GPU_VERSION_ARCHITECTURE)
 
+# === Compiler dependancies if compiler is GCC
+if(CMAKE_COMPILER_IS_GNUCXX)
+    set(CMAKE_CXX_FLAGS "-O3 -fexpensive-optimizations")
+endif()
 
 # === Find dependencies.
 if(NOT CUDA_SDK_ROOT_DIR)
@@ -57,6 +61,8 @@ find_package(Qt4 COMPONENTS QtCore QtNetwork QtXml REQUIRED)
 find_package(PelicanLofar REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(FFTW3 REQUIRED)
+find_package(GSL REQUIRED)
+find_package(Boost COMPONENTS random)
 find_package(PGPLOT REQUIRED)
 
 include_directories("${CUDA_SDK_ROOT_DIR}/common/inc")
@@ -66,11 +72,14 @@ include_directories(${PELICAN_INCLUDE_DIR})
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm-coherent")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm-multibeam")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/pelican-mdsm/modules")
 include_directories(${QT_QTXML_INCLUDE_DIR})
 include_directories(${QT_QTCORE_INCLUDE_DIR})
+include_directories(${QT_QTNETWORK_INCLUDE_DIR})
 include_directories(${QT_INCLUDE_DIR})
 include_directories(${PGPLOT_INCLUDE_DIRS})
+include_directories(${GSL_INCLUDE_DIRS} ${GSLCBLAS_INCLUDE_DIRS})
 
 # === Recurse into sub-directories defined in modules.cmake.
 include(modules.cmake)
@@ -80,6 +89,14 @@ target_link_libraries(standalone-mdsm
     ${QT_QTCORE_LIBRARY}
     ${PELICAN_LOFAR_LIBRARIES}
     ${PELICAN_LIBRARIES}
-    mdsm-cuda
-    mdsm
+    ${GSL_LIBRARIES} 
+    ${GSLCBLAS_LIBRARIES}
+    mdsm-multibeam-cuda
+    mdsm-multibeam
+)
+
+set_target_properties(standalone-mdsm PROPERTIES
+    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "-lgsl -lgslcblas"
 )

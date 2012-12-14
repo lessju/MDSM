@@ -9,7 +9,6 @@
 namespace TYPES {
 
 // Convenience shortcuts.
-// TODO these don't seem to be used anywhere!?
 typedef unsigned char        uchar;
 typedef unsigned short       ushort;
 typedef unsigned int         uint;
@@ -19,9 +18,6 @@ typedef unsigned long long   ulonglong;
 typedef long double          ldouble;
 
 // Fixed data sizes.
-// TODO: needed? these are defined in <boost/cstdint.hpp>
-// too (see ones used in the UDPPacket). Also perhaps the Qt versions qint8 etc.
-// might be more portable... ?
 typedef signed char         int8;
 typedef short               int16;
 typedef int                 int32;

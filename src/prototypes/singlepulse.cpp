@@ -204,7 +204,7 @@ int main()
         InitialCandidate *initialCands = (InitialCandidate *)
                 malloc(fftlen * sizeof(InitialCandidate));             // Store initial Candidate list
 
-		// Create FFTW plans (these calls are note thread safe, place in critical section)
+		// Create FFTW plans (these calls are not thread safe, place in critical section)
 		fftwf_plan chunkPlan, convPlan;
 		#pragma omp critical
 		{

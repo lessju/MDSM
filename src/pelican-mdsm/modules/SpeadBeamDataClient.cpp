@@ -1,5 +1,6 @@
 #include "SpeadBeamDataClient.h"
 #include "SpeadBeamChunker.h"
+#include "MultiBeamTimeSeriesDataSet.h"
 
 namespace pelican {
 
@@ -12,7 +13,7 @@ SpeadBeamDataClient::SpeadBeamDataClient(const ConfigNode& configNode,
         const DataTypes& types, const Config* config)
 : DirectStreamDataClient(configNode, types, config)
 {
-    addChunker("TimeSeriesDataSetC32", "SpeadBeamChunker");
+    addChunker("MultiBeamTimeSeriesDataSetC32", "SpeadBeamChunker");
 }
 
 

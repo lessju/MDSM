@@ -1,6 +1,5 @@
 ###############################################################################
 
-BIN = /home/lessju/sigproc/cuda_dedispersion
 CCC = g++
 
 ###############################################################################
@@ -10,7 +9,7 @@ CC = $(CCC) $(DFITS) $(DFFTW) -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 NVCC 		:= nvcc
 CUDA_PATH     	:= /usr/local/cuda
 CUDA_SDK_PATH 	:= /usr/local/cudaSDK/C
-PRESO   := /home/lessju/Code/presto
+PRESTO   := /home/lessju/Code/presto
 INC		:= -I. -I${CUDA_SDK_PATH}/common/inc -I${CUDA_PATH}/include
 LDFLAGS 	:= -L${CUDA_PATH}/lib -L${CUDA_PATH}/lib64 -L${CUDA_SDK_PATH}/lib \
 	          -L${CUDA_SDK_PATH}/common/lib -L/lib \
@@ -23,7 +22,15 @@ binner:
 	rm -f *.cu.o *.linkinfo
 
 detrend:
-	$(NVCC) -o detrend detrend.cu $(LDFLAGS) $(INC) -lfftw3
+	$(NVCC) -o detrend detrend.cu --gpu-architecture sm_20 $(LDFLAGS) $(INC)
+	rm -f *.cu.o *.linkinfo
+
+median_filter:
+	$(NVCC) -o median_filter median_filter.cu $(LDFLAGS) $(INC) --ptxas-options=-v --gpu-architecture=sm_20 --use_fast_math
+	rm -f *.cu.o *.linkinfo
+
+mean_stddev:
+	$(NVCC) -o mean_stddev mean_stddev.cu $(LDFLAGS) $(INC) --ptxas-options=-v --gpu-architecture=sm_20 --use_fast_math
 	rm -f *.cu.o *.linkinfo
 
 singlepulse:
@@ -39,10 +46,6 @@ fft:
 
 cpu_dedisp:
 	$(CCC) -o cpu cpu_dedisp.c
-
-tree:
-	$(NVCC) -o tree dm_tree.cu $(LDFLAGS) $(INC) -L/lib
-	rm -f *.cu.o *.linkinfo
 
 subband:
 	$(NVCC) -o subband subband_dedisp.cu --gpu-architecture sm_20 $(LDFLAGS) $(INC) -L/lib
@@ -65,15 +68,43 @@ test_atomic:
 	rm -f *.cu.o *.linkinfo
 
 coherent_dedisp:
-#	$(NVCC) -c coherent_dedisp.cu $(INC) --use_fast_math --gpu-architecture sm_13 -I/usr/local/pgplot/
 	$(NVCC) -c coherent_dedisp.cu $(INC) --use_fast_math --gpu-architecture sm_13 -I/usr/local/pgplot/  
 	gfortran -o coherent coherent_dedisp.o $(LDFLAGS) -L/lib -lcufft -L/usr/local/pgplot -lcpgplot -lpgplot -lgfortran -L/usr/X11R6/lib -lX11
 	rm -f *.cu.o *.linkinfo
 
+huber_filter:
+	g++ -o huber_filter huber_filter.cpp -O3 -fexpensive-optimizations -lboost_random -fopenmp
+	rm -f *.o
+
+quantiser:
+	g++ -o quantiser data_quantisation.cpp file_handler.cpp -O3 -fexpensive-optimizations -lboost_random -fopenmp
+	rm -f *.o
+
+bandpass:
+	$(CCC) -c file_handler.cpp
+	$(NVCC) -o bandpass bandpass.cu file_handler.o $(INC) $(LDFLAGS) --gpu-architecture sm_20 --use_fast_math -lgsl -lgslcblas --ptxas-options=-v
+	rm -f *.cu.o *.linkinfo
+
+periodicity:
+	$(CCC) -c file_handler.cpp
+	$(NVCC) -o periodicity periodicity_search.cu file_handler.o $(INC) $(LDFLAGS) --gpu-architecture sm_20 --use_fast_math --ptxas-options=-v -lcufft
+	rm -f *.cu.o *.linkinfo
+
+imager:
+	$(NVCC) -o imagere imager.cu $(INC) $(LDFLAGS) --gpu-architecture sm_20 --ptxas-options=-v -O3 -ptx
+	rm -f *.cu.o *.linkinfo
+
+power:
+	$(NVCC) -o power power.cu $(INC) $(LDFLAGS) --gpu-architecture sm_20 --ptxas-options=-v -O3
+	rm -f *.cu.o *.linkinfo
 
 fft_shift:
 	$(NVCC) -c fftShift.cu $(INC) --use_fast_math --gpu-architecture sm_13 -I/usr/local/pgplot/  
 	gfortran -o fftShift fftShift.o $(LDFLAGS) -L/lib -lcufft -L/usr/local/pgplot -lcpgplot -lpgplot -lgfortran -L/usr/X11R6/lib -lX11
 	rm -f *.cu.o *.linkinfo
+
+heap_test:
+	$(CCC) -o heap_test heap_memory_copy_sse.c -O2
+	rm -f *.o
 
 ################################################################################

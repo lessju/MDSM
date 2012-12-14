@@ -20,6 +20,7 @@ void MedicinaCoherentPipeline::init()
 // Run the pipeline
 void MedicinaCoherentPipeline::run(QHash<QString, DataBlob*>& remoteData)
 {
+    printf("Even more yeah\n");
     // Get pointer to the remote TimeStreamData data blob
 //    std::cout << "Asking for data blob" << std::endl;
     timeSeriesData = (TimeSeriesDataSetC32*) remoteData["TimeSeriesDataSetC32"];

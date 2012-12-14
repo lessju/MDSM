@@ -2,7 +2,6 @@ set(mdsm_modules_SRC
     MdsmModule.cpp
     CoherentMdsmModule.cpp
     DedispersedDataWriter.cpp
-    RawVoltageAdapter.cpp
     SigprocAdapter.cpp
     GuppiAdapter.cpp
     SpeadBeamChunker.cpp

@@ -16,8 +16,7 @@ using namespace std;
 namespace pelican {
 namespace lofar {
 
-
-//
+// Class constructor
 SpeadBeamAdapterTimeSeries::SpeadBeamAdapterTimeSeries(const ConfigNode& config)
 :AbstractStreamAdapter(config), _iteration(0)
 {
@@ -25,19 +24,16 @@ SpeadBeamAdapterTimeSeries::SpeadBeamAdapterTimeSeries(const ConfigNode& config)
         throw QString("SpeadBeamAdapterTimeSeries::SpeadBeamAdapterTimeSeries(): Invalid configuration");
 
     // Grab configuration for the adapter
-    _samplesPerSubband = config.getOption("samplesPerSubband", "value").toInt();
+    _spectraPerSubband = config.getOption("samplesPerSubband", "value").toInt();
     _subbandsPerHeap   = config.getOption("subbandsPerHeap", "value").toInt();
-    _numberOfBeams     = config.getOption("numberOfBeams", "value", "1").toInt();
+    _nBeams            = config.getOption("numberOfBeams", "value", "1").toInt();
     _bitsPerSample     = config.getOption("bitsPerSample", "value").toInt();
-    _samplesPerBlock   = config.getOption("samplesPerBlock", "value").toInt();
-    _heapsPerChunk     = config.getOption("heapsPerChunk", "value", "1").toInt();
     _nPolarisations    = config.getOption("numberOfPolarisations", "value", "1").toInt();
-    _numberOfBeams     = config.getOption("numberOfBeams", "value", "1").toInt();
     _samplingTime      = config.getOption("samplingTime", "value", "0").toFloat();
 
     // Resize temporary heap placeholder
-    _heapSize = _samplesPerSubband * _subbandsPerHeap * 
-                _numberOfBeams * _nPolarisations * _bitsPerSample / 8;
+    _heapSize = _spectraPerSubband * _subbandsPerHeap * 
+                _nBeams * _nPolarisations * _bitsPerSample / 8;
     _heapData.resize(_heapSize);
 }
 
@@ -49,50 +45,43 @@ void SpeadBeamAdapterTimeSeries::deserialise(QIODevice* in)
 
     // Loop over heaps
     char *heapData = &_heapData[0];
-    for(unsigned h = 0; h < _heapsPerChunk; ++h)
-    {
-        // Loop until entire heap is read from QIODevice
-        unsigned bytesRead = 0;
-        int tempBytesRead = 0;
-        while (bytesRead != _heapSize)
-        {
-            tempBytesRead = in -> read(heapData + bytesRead, _heapSize - bytesRead);
-            if (tempBytesRead <= 0)  in -> waitForReadyRead(-1);
-            else bytesRead += tempBytesRead;
-        }
 
-        // Interpret heap data
-        adaptHeap(h, heapData, _timeData);
+    // Loop until entire heap is read from QIODevice
+    unsigned bytesRead = 0;
+    int tempBytesRead = 0;
+    while (bytesRead != _heapSize)
+    {
+        tempBytesRead = in -> read(heapData + bytesRead, _heapSize - bytesRead);
+        if (tempBytesRead <= 0)  in -> waitForReadyRead(-1);
+        else bytesRead += tempBytesRead;
     }
 
+    // Interpret heap data
+    adaptHeap(heapData, _timeData);
+
     // Set timing
-    _timeData -> setLofarTimestamp(_samplingTime * _iteration * _samplesPerSubband);
-    _timeData -> setBlockRate(_samplingTime);
+    _timeData -> setTimestamp(_samplingTime * _iteration * _spectraPerSubband);
+    _timeData -> setSampleRate(_samplingTime);
 
     _iteration++;
 }
 
-void SpeadBeamAdapterTimeSeries::adaptHeap(unsigned heap, char* buffer,
-                                         TimeSeriesDataSetC32* data)
+void SpeadBeamAdapterTimeSeries::adaptHeap(char* buffer, MultiBeamTimeSeriesDataSetC32* data)
 {
-    // NOTE: Ignores polarisation for now, and assume 1 beam
+    // NOTE: Ignores polarisation for now
     switch(_bitsPerSample)
     {
         case 32:
         {
-            // NOTE: ASSUMES THAT _samplesPerBlock is 1
-	        TYPES::i16complex *complexBuffer = reinterpret_cast<TYPES::i16complex *>(buffer);
+	        i16complex *complexBuffer = reinterpret_cast<i16complex *>(buffer);
             Complex *times = data -> data();
-	        for(unsigned s = 0; s < _subbandsPerHeap; s++)
-		        for(unsigned t = 0; t < _samplesPerSubband; t++)
-		        {
-//                    unsigned index = heap * _samplesPerSubband + t;
-//		            Complex *times = data -> timeSeriesData(index / _samplesPerBlock, s, 0);
-//		            TYPES::i16complex value = complexBuffer[s * _samplesPerSubband + t];
-//		            times[index % _samplesPerBlock] = makeComplex(value);
-		            times[s * _samplesPerSubband + t] = 
-                            makeComplex(complexBuffer[s * _samplesPerSubband + t]);
-		        }
+            for(unsigned b = 0; b < _nBeams; b++)
+	            for(unsigned s = 0; s < _subbandsPerHeap; s++)
+		            for(unsigned t = 0; t < _spectraPerSubband; t++)
+		            {
+                        unsigned index = _spectraPerSubband * (b * _subbandsPerHeap + s) + t;
+		                times[index] = makeComplex(complexBuffer[index]);
+		            }
         }
         default:
             break;
@@ -115,18 +104,15 @@ void SpeadBeamAdapterTimeSeries::checkData()
     if (!_data) throw err("Cannot deserialise into an unallocated blob!.");
 
     // Check the chunk size matches the expected number of UDPPackets.
-    if (_chunkSize != _heapsPerChunk * _numberOfBeams * _samplesPerSubband * 
-                      _subbandsPerHeap * _bitsPerSample / 8)
+    if (_chunkSize != _nBeams * _spectraPerSubband * _subbandsPerHeap * _bitsPerSample / 8)
     {
         throw err("Chunk size '%1' != '%2.")
-                   .arg(_chunkSize).arg(_heapsPerChunk * _numberOfBeams * _samplesPerSubband * 
-                                        _subbandsPerHeap * _bitsPerSample / 8);
+                   .arg(_chunkSize).arg(_nBeams * _spectraPerSubband * _subbandsPerHeap * _bitsPerSample / 8);
     }
 
     // Resize the time stream data blob to match the adapter dimensions.
-    _timeData = (TimeSeriesDataSetC32*) _data;
-    _timeData -> resize(_heapsPerChunk * _samplesPerSubband / _samplesPerBlock, 
-                        _subbandsPerHeap, _nPolarisations, _samplesPerBlock);
+    _timeData = (MultiBeamTimeSeriesDataSetC32*) _data;
+    _timeData -> resize(_nBeams, _nPolarisations, _subbandsPerHeap, _spectraPerSubband);
 }
 
 inline QString SpeadBeamAdapterTimeSeries::err(const QString& message)
@@ -135,10 +121,10 @@ inline QString SpeadBeamAdapterTimeSeries::err(const QString& message)
 }
 
 inline SpeadBeamAdapterTimeSeries::Complex
-SpeadBeamAdapterTimeSeries::makeComplex(const TYPES::i16complex& z)
+SpeadBeamAdapterTimeSeries::makeComplex(const i16complex& z)
 {
     return Complex( (Real) z.real(), (Real) z.imag() );
 }
 
-} // namespace lofar
+}
 } // namespace pelican

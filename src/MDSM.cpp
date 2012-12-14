@@ -1,5 +1,5 @@
 // MDSM stuff
-#include "dedispersion_manager.h"
+#include "multibeam_dedispersion_manager.h"
 #include "file_handler.h"
 #include "survey.h"
 
@@ -9,11 +9,7 @@
 // C++ stuff
 #include <stdio.h>
 #include <stdlib.h>
-#include <vector>
-#include <DedispersedSeries.h>
-#include "DedispersedTimeSeries.h"
-
-#define USING_PELICAN_LOFAR 0
+#include <signal.h>
 
 // Process command-line parameters (when reading from file)
 SURVEY* file_process_arguments(int argc, char *argv[])
@@ -50,7 +46,11 @@ SURVEY* file_process_arguments(int argc, char *argv[])
     // Set file to be processed    
     survey -> fp = fopen(argv[file], "rb");
     header = read_header(survey -> fp);
-    survey -> nbits = header -> nbits;
+    if (header == NULL)
+        survey -> nbits = 32;
+    else
+        survey -> nbits = header -> nbits;
+//    printf("Header size: %d, %f\n", header -> total_bytes, header -> tsamp);
 
     // Load in additional parameters
     while(i < argc) {  
@@ -63,56 +63,24 @@ SURVEY* file_process_arguments(int argc, char *argv[])
     return survey;
 }
 
-// Process command-line parameters (when receiving data from lofar)
-SURVEY* lofar_process_arguments(int argc, char *argv[])
-{
-    SURVEY* survey;
-    int i = 1;
-
-    if (argc < 2){
-        fprintf(stderr, "Need at least observation file!\n");
-        exit(0);
-    }
-
-   // Load observation file and generate survey 
-    if (!strcmp(argv[i], "-obs"))
-           survey = processSurveyParameters(QString(argv[++i])); 
-    else {
-        fprintf(stderr, "First argument must be observation file! [-survey filepath]\n");
-        exit(0);
-    }
-
-    while(i < argc) {  
-       if (!strcmp(argv[i], "-nsamp"))
-           survey -> nsamp = atoi(argv[++i]);  
-       else if (!strcmp(argv[i], "-nsubs"))
-           survey -> nsubs = atoi(argv[++i]); 
-       else if (!strcmp(argv[i], "-survey")) // Survey file, process
-           survey = processSurveyParameters(QString(argv[++i])); 
-       else { printf("Invalid parameter\n"); exit(0); }
-       i++;
-    }
-
-    return survey;
-}
-
 // Load data from binary file
-unsigned long readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans, int maxshift, int counter)
+// This will split the bands into multiple beams (first beam highest band)
+unsigned long readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans, int nbeams)
 {
-    float *temp_buffer = (float *) malloc(nchans * sizeof(float));
+    int file_nchans = nchans * nbeams;
+    float *temp_buffer = (float *) malloc(file_nchans * sizeof(float));
     size_t tot_nsamp = 0;
 
-    int to_read = counter == 0 ? nsamp + maxshift : nsamp;
-    int shift = counter == 0 ? 0 : maxshift;
-
     // Corner turn while reading data
-    for(int i = 0; i < to_read; i++) {
-
-        if (read_block(fp, nbits, temp_buffer, nchans) != nchans)
+    for(int i = 0; i < nsamp; i++) 
+    {
+        if (read_block(fp, nbits, temp_buffer, file_nchans ) != (unsigned) file_nchans)
             return tot_nsamp;
 
-        for(int j = 0; j < nchans; j++)
-            buffer[j * (nsamp + maxshift) + shift + i] = temp_buffer[j];
+        for(int b = 0; b < nbeams; b++)
+            for(int j = 0; j < nchans; j++)
+                buffer[b * nchans * nsamp + j * nsamp + i] = 
+                       temp_buffer[b * nchans + j];
 
         tot_nsamp++;
     }
@@ -120,48 +88,36 @@ unsigned long readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int 
     free(temp_buffer);
 
     return tot_nsamp;
-
-//    return read_block(fp, nbits, buffer, (unsigned long) nsamp * nchans) / nchans;
 }
 
 // MDSM entry point
 int main(int argc, char *argv[])
 {
-    // Create mait QCoreApplication instance
+    // Create main QCoreApplication instance
     QCoreApplication app(argc, argv);
     SURVEY* survey = file_process_arguments(argc, argv);
 
-    // Initialise Dedispersion code
-    // NOTE: survey will be updated with MDSM parameters
-    float *input_buffer = NULL;
-    input_buffer = initialiseMDSM(survey);
+    // Initialise Dedispersion code and survey struct
+    initialiseMDSM(survey);
+
+    float *input_buffer;
 
     // Process current chunk
-    unsigned int counter = 0, data_read = 0, total = 0;
-    while (TRUE) {
+    unsigned int counter = 0, data_read = 0;
+    while (TRUE) 
+    {
+        // Get current buffer pointer
+        input_buffer = get_buffer_pointer();
 
-		// READING DATA FROM FILE
-		if (counter == 0) {   // First read, read in maxshift (TODO: need to be changed to handle maxshift internally
-
-			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp,
-									   survey -> nchans, survey -> maxshift, counter);
-			if (data_read < survey -> maxshift) {
-				fprintf(stderr, "Not enough samples in file to perform dediseprsion\n");
-				data_read = 0;
-			}
-			else
-				data_read -= survey -> maxshift;
-		}
-		else                 // Read in normally
-			data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, survey -> nsamp, 
-                                       survey -> nchans, survey -> maxshift, counter);
+		// Read data from file
+		data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, 
+                                   survey -> nsamp, survey -> nchans, survey -> nbeams);
 
         // Check if there is more processing to be done
 		unsigned int x;
-		next_chunk(data_read, x, survey -> tsamp * survey -> nsamp * counter, survey -> tsamp);
+        next_chunk_multibeam(data_read, x, survey -> tsamp * survey -> nsamp * counter, survey -> tsamp);
 		if (!start_processing(data_read))  break;
        
-        total += data_read;
         counter++;
     }
 

@@ -1,1 +1,14 @@
+# Directories #
+###############
 build
+
+# Compiled files #
+##################
+*.o
+*.pyc
+a.out
+
+# Temporary files #
+###################
+*~
+*.dat
