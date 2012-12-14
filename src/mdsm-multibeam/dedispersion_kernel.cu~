@@ -1,0 +1,165 @@
+#ifndef DEDISPERSE_KERNEL_H_
+#define DEDISPERSE_KERNEL_H_
+
+#include <cutil_inline.h>
+#include "cache_brute_force.h"
+
+// Stores temporary shift values
+__device__ __constant__ float dm_shifts[8192];
+
+ ---------------------- level_one_cache_with_accumulators_brute_force -------------------------------------
+__global__ void cache_dedispersion(float *outbuff, float *buff, const int nsamp, const int	nchans, 
+                                   const float mstartdm, const float mdmstep, const int maxshift)
+{
+	int   shift;	
+	float local_kernel_t[NUMREG];
+
+	int t  = blockIdx.x * NUMREG * blockDim.x  + threadIdx.x;
+	
+	// Initialise the time accumulators
+	for(int i = 0; i < NUMREG; i++) local_kernel_t[i] = 0.0f;
+
+	float shift_temp = mstartdm + ((blockIdx.y * blockDim.y + threadIdx.y) * mdmstep);
+	
+	// Loop over the frequency channels.
+    for(int c = 0; c < nchans; c++) 
+    {
+		// Calculate the initial shift for this given frequency
+		// channel (c) at the current despersion measure (dm) 
+		// ** dm is constant for this thread!!**
+		shift = (c * (nsamp + maxshift) + t) + __float2int_rz (dm_shifts[c] * shift_temp);
+		
+		for(int i = 0; i < NUMREG; i++) {
+			local_kernel_t[i] += buff[shift + (i * DIVINT) ];
+		}
+	}
+
+	// Write the accumulators to the output array. 
+	for(int i = 0; i < NUMREG; i++) {
+		outbuff[((blockIdx.y * DIVINDM) + threadIdx.y)* nsamp + (i * DIVINT) + (NUMREG * DIVINT * blockIdx.x) + threadIdx.x] = local_kernel_t[i];
+	}
+}
+
+// -------------------------- Optimised Dedispersion Loop -----------------------------------
+__global__ void brute_force_dedispersion(float *outbuff, float *buff, int nsamp, int nchans, float tsamp,
+                                         int chanfactor, float startdm, float dmstep, int maxshift, int inshift, int outshift)
+{
+    float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
+    int c, s;
+    float localvalue[4096];
+	
+
+    // Dedispersing over loop of samples (1 thread = 1+ samples)
+    for (s = threadIdx.x + blockIdx.x * blockDim.x; 
+         s < nsamp; 
+         s += blockDim.x * gridDim.x) {
+    
+
+        // Clear shared memory
+        localvalue[threadIdx.x] = 0;
+     
+        // Loop over all channels, calucate shift and sum for current sample
+        for(c = 0; c < nchans; c++) {
+            int shift = c * (nsamp + maxshift) + floor(dm_shifts[c * chanfactor] * shift_temp);
+            localvalue[threadIdx.x] += buff[inshift + shift + s];
+        }
+
+        // Store output
+        outbuff[outshift + blockIdx.y * nsamp + s] = localvalue[threadIdx.x];
+    }
+}
+
+// ============================= SAMPLE ACCUMULATORS ================================
+
+// ----------------------------- Channel Binnig Kernel --------------------------------
+__global__ void channel_binning_kernel(float *input, int nchans, int binsize)
+{
+    int b, c, channel;
+    float total;
+    float localvalue[4096];
+
+    channel = threadIdx.x + blockDim.x * blockIdx.x;
+    for(c = 0; c + channel < nchans; c += gridDim.x * blockDim.x) {
+
+        localvalue[threadIdx.x] = input[c + channel];
+    
+        __syncthreads();
+ 
+        if (threadIdx.x % binsize == 0) {       
+            total = 0;
+            for(b = 0; b < binsize; b++)       
+               total += localvalue[threadIdx.x + b];
+            input[c + channel] = total;
+        }
+
+       __syncthreads();
+    }
+}
+
+// --------------------------- Data binning kernel ----------------------------
+__global__ void binning_kernel(float *input, int nsamp, int nchans, int binsize, int inshift, int outshift)
+{
+    int b, c, channel, shift;
+    float localvalue[4096];
+
+    // Loop over all values (nsamp * nchans)
+    shift = threadIdx.x + blockIdx.y * (nchans / gridDim.y);
+    channel = shift + blockDim.x * gridDim.y * blockIdx.x;
+    for(c = 0; c + channel < nsamp * nchans; c += gridDim.x * blockDim.x * gridDim.y * binsize) {
+
+        // Load data from binsize samples into shared memory
+        localvalue[threadIdx.x] = 0;
+
+        for(b = 0; b < binsize; b++)
+            localvalue[threadIdx.x] += input[inshift + c + blockIdx.x * gridDim.y * 
+                                             blockDim.x * binsize + nchans * b + shift];
+ 
+        // Copy data to global memory
+        input[outshift + channel + c/binsize] = localvalue[threadIdx.x] / binsize;
+    }
+}
+
+// --------------------------- In-place data binning kernel ----------------------------
+__global__ void inplace_binning_kernel(float *input, int nsamp, int nchans, int binsize)
+{
+    int b, c, channel, shift;
+    float localvalue[4096];
+
+    // Loop over all values (nsamp * nchans)
+    shift = threadIdx.x + blockIdx.y * (nchans / gridDim.y);
+    channel = shift + blockIdx.x * gridDim.y * blockDim.x * binsize;
+    for(c = 0; c + channel < nsamp * nchans; c += gridDim.x * blockDim.x * gridDim.y * binsize) {
+
+        // Load data from binsize samples into shared memory
+        localvalue[shift] = 0;
+
+        for(b = 0; b < binsize; b++)
+            localvalue[shift] += input[c + blockIdx.x * gridDim.y * blockDim.x * 
+                                       binsize + nchans * b + shift];
+
+        // Copy data to global memory
+        input[c +  channel] = localvalue[shift] / binsize;
+    }
+}
+
+__global__ void inplace_memory_reorganisation(float *input, int nsamp, int nchans, int binsize)
+{
+    int c, channel, shift;
+    float localvalue[4096];
+
+    // Loop over all values (nsamp * nchans)
+    shift = threadIdx.x + blockIdx.y * (nchans / gridDim.y);
+    channel = shift + blockDim.x * gridDim.y * blockIdx.x;
+    for(c = 0; c + channel < nsamp * nchans; c += gridDim.x * blockDim.x * gridDim.y * binsize) {
+
+        // Load data from binsize samples into shared memory
+        localvalue[shift] = input[c + blockIdx.x * gridDim.y * blockDim.x * binsize + shift];
+ 
+        // Copy data to global memory
+        input[channel + c/binsize] = localvalue[shift];
+    }
+}
+
+// -----------------------------------------------------------------------------------
+
+#endif

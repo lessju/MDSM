@@ -1,0 +1,16 @@
+<!-- Based on Medicina parameters -->
+<observation> 
+    <dm lowDM="0" numDMs="1024" dmStep="0.1" />
+    <channels nchans="512" npols="1" ncoeffs="9"/>
+    <timing tsamp="0.0000512" />
+    <samples number="131072" bits="32"/>
+    <output filePrefix="test_multibeam" baseDirectory="." singleFileMode="1" />
+    <rfi applyRFIClipper="0" spectrumThreshold="6" channelThreshold="10"/>
+    <detection threshold="5" applyMedianFilter="0" />
+    <gpus ids="0,1" />
+
+    <beams>
+        <beam beamId="0" topFrequency="430" frequencyOffset="-0.01953125" />
+    </beams>
+
+</observation>

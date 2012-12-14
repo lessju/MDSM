@@ -1,0 +1,110 @@
+#include <QFileInfo>
+#include <QString>
+#include <QFile>
+
+#include <complex>
+#include <iostream>
+#include "stdlib.h"
+
+using namespace std;
+
+typedef std::complex<float> Complex;
+
+unsigned dataIndex, nSubbands, nBits, tsamp, timeSize, overlap, filesize;
+
+/// Extract the value for a given header keyword
+float valueForKeyword(QString line, QString keyword)
+{
+    int index = -1;
+    if ( (index = line.indexOf(keyword)) == -1)
+        return index;
+
+    QString card = line.mid(index, 80);
+    unsigned eqIndex = card.indexOf("=");
+    QString value = card.mid(eqIndex + 1, 80 - eqIndex);
+    return value.trimmed().toFloat();
+}
+
+/// Read file header and extract required parameters
+void readHeader(QFile *fp)
+{
+    // Read header
+    char buf[1024 * 8];
+    if ( fp -> readLine(buf, sizeof(buf)) > 0)
+    {
+        QString line(buf);
+        nSubbands       = (unsigned) valueForKeyword(line, QString("OBSNCHAN"));
+        nBits           = (unsigned) valueForKeyword(line, QString("NBITS"));
+        tsamp           = valueForKeyword(line, QString("TBIN"));
+        overlap          = valueForKeyword(line, QString("OVERLAP"));
+        timeSize        = (unsigned) valueForKeyword(line, QString("BLOCSIZE")) / nSubbands;
+        dataIndex       += line.lastIndexOf("END") + 80;
+
+        // If not set, get filesize
+        if (filesize == 0) {
+            QFileInfo f(*fp);
+            filesize = (unsigned) f.size();
+        }
+    }
+    else
+       throw QString("GuppiAdapter: File does not contain required header keywords.");
+}
+
+
+int main(void)
+{
+    // Open file
+    QFile *fp = new QFile(QString("/kepler/gpu1_guppi_55689_PSRB2021+51_C_0034.0002.raw"));
+    fp -> open(QIODevice::ReadOnly);
+
+    // Read first header
+    readHeader(fp);
+
+    // Create two output files (X and Y);
+    FILE *fpX = fopen("/home/lessju/Code/MDSM/src/prototypes/PSRDATA/PSRB2021+51_X.dat", "wb");
+    FILE *fpY = fopen("/home/lessju/Code/MDSM/src/prototypes/PSRDATA/PSRB2021+51_Y.dat", "wb");
+
+    float quantLookup[4] = { 3.3358750, 1.0, -1.0, -3.3358750 };
+
+    char *buffer = (char *) malloc(timeSize * nSubbands * sizeof(char));
+
+    int counter = 1;
+
+    do
+    {
+        std::cout << "Processing segment " << counter << ". " << nSubbands << " " << timeSize << " " << overlap << std::endl;
+        unsigned nSamples = timeSize - overlap;
+
+        // Read file
+        fp -> seek(dataIndex);
+        if ( fp -> read(buffer, timeSize * nSubbands * sizeof(char)) <= 0)
+        {
+            std::cerr << "Could not read data from file" << std::endl;
+            exit(-1);
+        }
+
+        for (unsigned t = 0; t < nSamples; t++)
+        {
+            for (unsigned c = 0; c < nSubbands; c++)
+            {
+                float xr = quantLookup[(buffer[c * timeSize + t] >> 0) & 3];
+                float xi = quantLookup[(buffer[c * timeSize + t] >> 2) & 3];
+              //  float yr = quantLookup[(buffer[c * timeSize + t] >> 4) & 3];
+              //  float yi = quantLookup[(buffer[c * timeSize + t] >> 6) & 3];
+
+                fwrite(&xr, sizeof(float), 1, fpX);
+                fwrite(&xi, sizeof(float), 1, fpX);
+              //  fwrite(&yr, sizeof(float), 1, fpY);
+              //  fwrite(&yi, sizeof(float), 1, fpY);
+            }
+        }
+        fflush(fpX);
+      //  fflush(fpY);
+
+        dataIndex += timeSize * nSubbands;
+        fp -> seek(dataIndex);
+        readHeader(fp);
+        counter++;
+    }
+    while (dataIndex + timeSize * nSubbands < filesize && counter < 50);
+}

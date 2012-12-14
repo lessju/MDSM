@@ -1,0 +1,85 @@
+% function [ clipped_data ] = lofar_rfi_clipper( data, params, coeffs, crRMS )
+
+% Initialise testing
+S = load('channeliser_data.mat');
+data = abs(S.channelised_voltage).^2;
+params = struct('center_frequency', 120, ...
+                'bandwidth', 2, ...
+                'number_channels', 256, ...
+                'channel_bandwidth', 2/256.0);
+coeff = 2;
+channelRejectionRMS = 8;
+
+% Genrate polynomial fit for bandpass
+bandpass = sum(data, 2) / size(1, 2);
+x_vals   = params.center_frequency - params.bandwidth / 2 + params.channel_bandwidth : ...
+           params.channel_bandwidth                       : ...
+           params.center_frequency + params.bandwidth / 2 ;
+x_vals = x_vals';
+
+p = polyfit(x_vals, bandpass, coeff);
+bandpassFit = polyval(p, x_vals);
+
+% Calculate channel rejection margin
+channel_margin = channelRejectionRMS * std(bandpassFit);
+
+% Subtract bandpass from spectra
+subtracted_data = bsxfun(@minus, data, bandpassFit);
+
+% Clip bright channels 
+subtracted_data( bsxfun(@minus, subtracted_data, median(subtracted_data)) > channel_margin/3 ) = 0;
+
+figure;
+imagesc(subtracted_data)
+
+%     # Calculate channel rejection margin (channel rejection RMS * bandpass RMS)
+%     channel_margin = channelRejectionRMS * np.sqrt(np.mean(bandpassFit) + np.std(bandpassFit))
+% 
+%     # Cast data as a numpy matrix
+%     data = np.matrix(data)
+% 
+%     # Subtract bandpass from spectra
+%     subtracted_data = data - bandpassFit
+% 
+%     # Clip bright channels (data - bandpassFit - median of each spectrum)
+%     subtracted_data[np.where(subtracted_data - np.median(subtracted_data, axis = 1) > channel_margin)] = 0
+% 
+%     # Calculate spectrum sums and spectrum sum squared
+%     spectrumSum   = np.sum(subtracted_data, axis = 1)
+%     spectrumSumSq = np.sum(np.multiply(subtracted_data, subtracted_data), axis = 1)
+% 
+%     # Scale by number of good channels in each spectrum and 
+%     # calculate RMS for each spectrum, and scale by nbins / goodChannels in case
+%     # number of good channels is substantially lower than the total number
+%     spectrumRMS = np.zeros(nsamp)
+%     for i in range(nsamp):
+%         goodChannels = np.count_nonzero(subtracted_data[i,:])
+%         spectrumSum[i]   /= goodChannels
+%         spectrumSumSq[i] /= goodChannels
+% 
+%         spectrumRMS[i] = np.sqrt(spectrumSumSq[i] - np.multiply(spectrumSum[i], spectrumSum[i]))
+%         spectrumRMS[i] *= np.sqrt((nchans * 1.0) / goodChannels)
+% 
+%     # Compute bandpass median
+%     bandpassMedian = np.median(bandpassFit)
+%     
+%     # Re-compute spectrum median and check whether it fits the model
+%     # If no, then something's not right and we attribute this to RFI    
+%     # If yes, we use the value to update the model
+% 
+%     # Calucate new spectra median (since some channels might have been chopped off)
+%     spectraMedian = np.median(subtracted_data, axis = 1)
+% 
+%     # Calculate spectrum RMS tolerance
+%     spectrumRMStolerance = spectrumRejectionRMS * (np.sqrt(np.mean(bandpassFit) + np.std(bandpassFit))) / sqrt(nchans);
+% 
+%     print spectraMedian, spectrumRMStolerance, (np.sqrt(np.mean(bandpassFit) + np.std(bandpassFit))) / sqrt(nchans)
+% 
+%     # if spectrum median is higher than accepted tolerance, clip it
+%     for i in range(nsamp):
+%         if fabs(spectraMedian[i]) > spectrumRMStolerance:
+%             subtracted_data[i,:] = np.zeros(nchans)
+
+
+
+
