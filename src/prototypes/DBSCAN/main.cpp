@@ -29,6 +29,8 @@ public:
         this -> id = id;
     }
 
+    unsigned numberOfPoints() { return indices.size(); }
+
     // Add point to current cluster
     void addPoint(unsigned pointIndex)
     {
@@ -88,9 +90,17 @@ public:
     vector<Cluster*> performClustering(vector<DataPoint> &dataPoints)
     {
         // Initliase clustering
-        char visited[dataPoints.size()];
+        char neighbors[dataPoints.size()]; // Store neighor points
+        char visited[dataPoints.size()];   // Store visited
         numClusters = 0;
         clusters.clear();
+        
+        // Get pointer to underlying data points array
+        DataPoint *points = reinterpret_cast<DataPoint *>(&dataPoints[0]);
+
+        // Set neighbors and visited to 0
+        memset(neighbors, 0, dataPoints.size() * sizeof(char));
+        memset(visited, 0, dataPoints.size() * sizeof(char));
 
         // Loop over all data point
         for(unsigned i = 0; i < dataPoints.size(); i++)
@@ -103,7 +113,83 @@ public:
             visited[i] = 1;
 
             // Get list of neghbours
-            vector<int> neighbors = getNeighbours(dataPoints, i);
+            unsigned found = getNeighbours(points, dataPoints.size(), i, neighbors, visited);
+
+            // if not enough points to create a cluster mark as noise
+            if (found < min_points)
+            {
+                dataPoints[i].cluster = -1;
+
+                // Not enough point in neighborhood, reset neighor list
+                memset(neighbors, 0, dataPoints.size());
+                continue;
+            }
+
+            Cluster *cluster = new Cluster(clusters.size() + 1, dataPoints);
+            clusters.push_back(cluster);
+
+            // Assign point and neighborhood to new cluster
+            dataPoints[i].cluster = cluster -> ClusterId();
+            cluster -> addPoint(i);
+
+            // Process all the found point
+            while (found != 0)
+            {
+                // Get index of next neighboring point
+                unsigned j = 0;
+                while (neighbors[j] == 0)
+                {
+                    j++;
+                    if (j >= dataPoints.size()) j = 0;
+                }
+
+                // Check if data point has already been processed
+                if (!visited[j])
+                {
+                    // Mark data point as visited
+                    visited[j] = 1;
+
+                    // Add point's neighborhood to current list
+                    found += getNeighbours(points, dataPoints.size(), j, neighbors, visited);
+                }
+
+                // If not already assigned to a cluster
+                if (dataPoints[j].cluster == 0)
+                {
+                    dataPoints[j].cluster = cluster -> ClusterId();
+                    cluster -> addPoint(j);
+                }
+
+                // Mark this neighbor as processed
+                neighbors[j] = 0;
+                found--;
+            }
+        }
+
+        this -> numClusters = clusters.size();
+
+        return clusters;
+    }
+
+    // Perform optimised clustering (FDBSCAN)
+    vector<Cluster*> performOptimisedClustering(vector<DataPoint> &dataPoints)
+    {
+        // Initliase clustering
+        numClusters = 0;
+        clusters.clear();
+
+        // Get pointer to underlying data points array
+        DataPoint *points = reinterpret_cast<DataPoint *>(&dataPoints[0]);
+
+        // Loop over all data points
+        for(unsigned i = 0; i < dataPoints.size(); i++)
+        {
+            // Check if data point has already been processed
+            if (dataPoints[i].cluster > 0)
+                continue;
+
+            // Get list of neghbours
+            vector<int> neighbors = getNeighboursVector(points, dataPoints.size(), i);
 
             // if not enough points to create a cluster mark as noise
             if (neighbors.size() < min_points)
@@ -112,39 +198,47 @@ public:
                 continue;
             }
 
+            // Create new cluster
             Cluster *cluster = new Cluster(clusters.size() + 1, dataPoints);
             clusters.push_back(cluster);
 
-            // Assign point to new cluster
+            // Assign point and neighborhood to new cluster
             dataPoints[i].cluster = cluster -> ClusterId();
             cluster -> addPoint(i);
 
-            // Loop over all neighbouring data points
-            for(unsigned j = 0; j < neighbors.size(); j++)
+            // Get representative seeds for this cluster
+            vector<int> candidates = selectCandidates(points, neighbors);
+
+            // Loop over all core point candidates
+            while (candidates.size() != 0)
             {
-                // Check if data point has already been processed
-                if (!visited[neighbors[j]])
+                // Get current candidate
+                unsigned candidate = candidates[0];
+
+                // Get neighborhood for current candidate
+                neighbors = getNeighboursVector(points, dataPoints.size(), candidate);
+
+                // Check if this is a core point
+                if (neighbors.size() >= min_points)
                 {
-                    // Mark data point as visited
-                    visited[neighbors[j]] = 1;
+                    // Select representative seeds
+                    vector<int> current_reps = selectCandidates(points, neighbors);
 
-                    // Get list of neighbours for current point
-                    vector<int> current_neighbors = getNeighbours(dataPoints, neighbors[j]);
+                    // Add valid representatives to global list
+                    for(unsigned j = 0; j < current_reps.size(); j++)
+                        if (dataPoints[current_reps[j]].cluster == 0)
+                            candidates.push_back(current_reps[j]);
+                }
 
-                    // Check if there are any neighbors
-                    if (current_neighbors.size() >= 1)
+                // Set the core point's neighbour list to the current cluster
+                for(unsigned j = 0; j < neighbors.size(); j++)
+                    if (dataPoints[neighbors[j]].cluster <= 0)
                     {
-                        for(unsigned k = 0; k < current_neighbors.size(); k++)
-                            neighbors.push_back(current_neighbors[k]);
+                        dataPoints[neighbors[j]].cluster = cluster -> ClusterId();
+                        cluster -> addPoint(neighbors[j]);
                     }
-                }
 
-                // If not already assigned to a cluster
-                if (dataPoints[neighbors[j]].cluster == 0)
-                {
-                    dataPoints[neighbors[j]].cluster = cluster -> ClusterId();;
-                    cluster -> addPoint(neighbors[j]);
-                }
+                candidates.erase(candidates.begin());
             }
         }
 
@@ -156,39 +250,41 @@ public:
 
 private:
 
-    // Candidate selection for FDBSCAN
-    vector<int> selectCandidates(const vector<DataPoint> &dataPoints, vector<int> &neighbours)
+    // Construct list of neighbours
+    unsigned getNeighbours(DataPoint* dataPoints, unsigned numberOfPoints, unsigned index, char *neighbors, char *visited)
     {
-        // Initialise limits
-        unsigned min_x = 0, max_x = 0, min_y = 0, max_y = 0, min_z = 0, max_z = 0;
+        unsigned count = 0;
 
-        // Loop over all neighborhood
-        for(unsigned i = 1; i < neighbours.size(); i++)
+        // Loop over all data points
+        for(unsigned i = 0; i < numberOfPoints; i++)
         {
-            min_x = (dataPoints[min_x].time < dataPoints[neighbours[i]].time) ? min_x : i;
-            max_x = (dataPoints[max_x].time > dataPoints[neighbours[i]].time) ? max_x : i;
-            min_y = (dataPoints[min_y].dm < dataPoints[neighbours[i]].dm) ? min_y : i;
-            max_y = (dataPoints[max_y].dm > dataPoints[neighbours[i]].dm) ? max_y : i;
-            min_z = (dataPoints[min_z].snr < dataPoints[neighbours[i]].snr) ? min_z : i;
-            max_z = (dataPoints[max_z].snr > dataPoints[neighbours[i]].snr) ? max_z : i;
+            // Avoid computing distance to same point
+            if (index != i)
+            {
+                // Compute distance to current point
+                float x = fabs(dataPoints[index].time - dataPoints[i].time);
+                float y = fabs(dataPoints[index].dm   - dataPoints[i].dm);
+                float z = fabs(dataPoints[index].snr  - dataPoints[i].snr);
+
+                // Check if distance is within legal bounds
+                if (x < min_time && y < min_dm && z < min_snr && neighbors[i] == 0 && visited[i] == 0)
+                {
+                    neighbors[i] = 1;
+                    count++;
+                }
+            }
         }
 
-        int arr[] = {neighbours[min_x], neighbours[max_x],
-                     neighbours[min_y], neighbours[max_y],
-                     neighbours[min_z], neighbours[max_z]};
-
-        vector<int> candidates(arr, arr + sizeof(arr) / sizeof(arr[0]) );
-
-        return candidates;
+        return count;
     }
 
-    // Construct list of neighbours
-    vector<int> getNeighbours(const vector<DataPoint> &dataPoints, unsigned index)
+    // Return neighbor list in vector form
+    vector<int> getNeighboursVector(DataPoint* dataPoints, unsigned numberOfPoints, unsigned index)
     {
         vector<int> neighbours;
 
         // Loop over all data points
-        for(unsigned i = 0; i < dataPoints.size(); i++)
+        for(unsigned i = 0; i < numberOfPoints; i++)
         {
             // Avoid computing distance to same point
             if (index != i)
@@ -207,12 +303,38 @@ private:
         return neighbours;
     }
 
+
+    // Candidate selection for FDBSCAN
+    vector<int> selectCandidates(DataPoint *dataPoints, const vector<int> &neighbours)
+    {
+        // Initialise limits
+        unsigned min_x = neighbours[0], max_x = neighbours[0], min_y = neighbours[0];
+        unsigned max_y = neighbours[0], min_z = neighbours[0], max_z = neighbours[0];
+
+        // Loop over all neighboring points and select representatives
+        for(unsigned i = 1; i < neighbours.size(); i++)
+        {
+            min_x = (dataPoints[min_x].time < dataPoints[neighbours[i]].time) ? min_x : neighbours[i];
+            max_x = (dataPoints[max_x].time > dataPoints[neighbours[i]].time) ? max_x : neighbours[i];
+            min_y = (dataPoints[min_y].dm   < dataPoints[neighbours[i]].dm)   ? min_y : neighbours[i];
+            max_y = (dataPoints[max_y].dm   > dataPoints[neighbours[i]].dm)   ? max_y : neighbours[i];
+            min_z = (dataPoints[min_z].snr  < dataPoints[neighbours[i]].snr)  ? min_z : neighbours[i];
+            max_z = (dataPoints[max_z].snr  > dataPoints[neighbours[i]].snr)  ? max_z : neighbours[i];
+        }
+
+        int arr[] = {min_x, max_x, min_y, max_y, min_z, max_z};
+
+        vector<int> candidates(arr, arr + sizeof(arr) / sizeof(arr[0]) );
+
+        return candidates;
+    }
+
     // List of clusters
     vector<Cluster*> clusters;
 
-    int      min_points;
-    float    min_dm, min_time, min_snr;
-    int      numClusters;
+    unsigned  min_points;
+    float     min_dm, min_time, min_snr;
+    int       numClusters;
 };
 
 int main()
@@ -225,7 +347,7 @@ int main()
     vector<DataPoint> dataPoints;
     double time, dm, snr;
     int counter = 0;
-    while (fscanf(fp, "%lf,%lf,%lf", &time, &dm, &snr) != EOF && counter < 4096*8)
+    while (fscanf(fp, "%lf,%lf,%lf", &time, &dm, &snr) != EOF && counter < 4096*256)
     {
         // Create data point
         DataPoint point = {time, dm, snr, 0, 0};
@@ -239,16 +361,20 @@ int main()
     myTimer.start();
 
     // Perofrm clustering
-    DBScan clustering(0.005, 5, 5, 20);
-    vector<Cluster*> clusters = clustering.performClustering(dataPoints);
+    DBScan clustering(0.008, 5, 5, 6);
+    vector<Cluster*> clusters = clustering.performOptimisedClustering(dataPoints);
+ //   vector<Cluster*> clusters = clustering.performClustering(dataPoints);
 
     // Examine clusters
+    int total = 0;
     for(unsigned i = 0; i < clusters.size(); i++)
     {
         clusters[i] -> computeTransientProbability(0, 0.1, 768);
+        std::cout << "Cluster " << i << " has " << clusters[i] -> numberOfPoints() << " points" << std::endl;
+        total += clusters[i] -> numberOfPoints();
     }
 
-    std::cout << "Found " << clustering.getNumberOfClusters() << " clusters in " <<  myTimer.elapsed() << "ms" << std::endl;
+    std::cout << "Found " << clustering.getNumberOfClusters() << " clusters in " <<  myTimer.elapsed() << "ms with a total of " << total << " points" << std::endl;
 
     // Output clustering results
     fp = fopen("cluster_output.dat", "w");

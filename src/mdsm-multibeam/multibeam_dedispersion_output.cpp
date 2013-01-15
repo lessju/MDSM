@@ -34,7 +34,12 @@ void create_files(FILE** fp, SURVEY* survey, double timestamp)
             strcat(pathName, "_beam_");
             strcat(pathName, beam_no);
             strcat(pathName, ".dat");
-            fp[i] = fopen(pathName, "w");
+            
+            if ((fp[i] = fopen(pathName, "w")) == NULL)
+            {
+                fprintf(stderr, "Invalid output file path: %s\n", pathName);
+                exit(-1);
+            }
         }
     else
         // Multiple-file mode
@@ -67,8 +72,69 @@ void create_files(FILE** fp, SURVEY* survey, double timestamp)
                 strcat(pathName, tempStr);
                 strcat(pathName, ".dat");
 
-                fp[i] = fopen(pathName, "w");
+                if ((fp[i] = fopen(pathName, "w")) == NULL)
+                {
+                    fprintf(stderr, "Invalid output file path: %s\n", pathName);
+                    exit(-1);
+                }
             }
+}
+
+// Trigger TBB dump to disk when when a valid detection is encountered
+void triggerTBB(SURVEY *survey, OUTPUT_PARAMS *params, float *input_buffer, double timestamp)
+{
+    // Keep looping until writer is available
+    while (true)
+    {
+        pthread_mutex_unlock(params -> writer_mutex);
+        if (!params -> writer_params -> data_available)
+        {
+            // Writer is idle, copy input data and start writing
+            memcpy(params -> writer_buffer, input_buffer, survey -> nbeams * survey -> nsamp * survey -> nchans * sizeof(float));
+
+            // Adjust file parameters
+            params -> writer_params -> create_new_file = true;
+
+            // Create file name
+            char pathName[256];
+            strcpy(pathName, survey -> basedir);
+            strcat(pathName, "/");
+            strcat(pathName, survey -> fileprefix);
+            strcat(pathName, "_TBB_");
+
+            // Format timestamp 
+            struct tm *tmp;
+            if (survey -> use_pc_time) {
+                time_t currTime = time(NULL);
+                tmp = localtime(&currTime);                    
+            }
+            else {
+                time_t currTime = (time_t) timestamp;
+                tmp = localtime(&currTime);
+            }       
+
+            char tempStr[30];
+            strftime(tempStr, sizeof(tempStr), "%F_%T", tmp);
+            strcat(pathName, tempStr);
+            sprintf(tempStr, "_%d", survey -> output_bits);
+            strcat(pathName, tempStr);
+            strcat(pathName, "bits.dat");
+
+            // Set filename
+            memcpy(&(params -> writer_params -> filename), &pathName, 256 * sizeof(char));
+
+            // Notify data writer
+            params -> writer_params -> data_available = 1;
+
+            // Ready, unlock mutex and return
+            pthread_mutex_unlock(params -> writer_mutex);
+
+            break;
+        }
+    
+        // Wait for a while
+        usleep(10);
+    }
 }
 
 // ========================== DETECTION FUNCTIONS ============================
@@ -156,17 +222,16 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         }   
     }
 
-    printf("Found %ld data points\n", dataPoints.size());
-
-    // We have now created a list of data point which exceed the threshold
+    // We have now created a list of data points which exceed the threshold
     // Initialise clustering with computed values
-    DBScan clustering(0.01, 50, 50, 50);
+    DBScan clustering(survey -> dbscan_time_range * survey -> blockRate, survey -> dbscan_dm_range, 
+                      survey -> dbscan_snr_range, survey -> dbscan_min_points);
 
     // Cluster data points
-    vector<Cluster*> clusters = clustering.performClustering(dataPoints);
+    vector<Cluster*> clusters = clustering.performOptimisedClustering(dataPoints);
     unsigned clustersFound = clusters.size();
 
-    printf("Clusters Found: %d\n", clustersFound);
+    printf("%d. Found %ld data points with %d clusters\n", (int) (time(NULL) - start_time), dataPoints.size(), clustersFound);
 
     // For now, just output clusters to file
     for(unsigned i = 0; i < clusters.size(); i++)
@@ -179,6 +244,10 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         }
     }
     fflush(output);
+
+    // Erase all cluster data
+    clusters.clear();
+    dataPoints.clear();
 
     return clustersFound;
 }
@@ -208,7 +277,8 @@ void* process_output(void* output_params)
     if (survey -> single_file_mode) 
         create_files(fp, survey, pptimestamp);
 
-    unsigned numClusters = 0;
+    unsigned numClusters[params -> nthreads];
+    memset(numClusters, 0, params -> nthreads * sizeof(unsigned));
 
     // Processing loop
     while (1) 
@@ -226,19 +296,32 @@ void* process_output(void* output_params)
                 create_files(fp, survey, pptimestamp);
 
             // Get input buffer pointer for current dedispersed output if TBB is enabled
-            float *input_buffer = (params -> input_buffer)[(loop_counter - 2)% MDSM_STAGES];
+            float *input_buffer = (params -> input_buffer)[(loop_counter - 2) % MDSM_STAGES];
 
             beg_read = time(NULL);
 
             // Processed dedispersed time series (each beam processed by one OpenMP thread)
             #pragma omp parallel \
-                shared (fp, params, survey, ppnsamp, pptimestamp, ppblockRate, start)
+                shared (fp, params, survey, ppnsamp, pptimestamp, ppblockRate, start, numClusters)
             {
                 unsigned threadId = omp_get_thread_num();
-                numClusters += process_brute_clustering(fp[threadId], (params -> output_buffer)[threadId], survey, 
-                                                        numClusters, ppnsamp, pptimestamp, ppblockRate, start);
-//                process_brute(fp[threadId], (params -> output_buffer)[threadId], survey, ppnsamp, pptimestamp, 
-//                                                      ppblockRate, start);
+
+                // Apply clustering if required            
+                if (survey -> apply_clustering)
+                {
+                    // Threshold and cluster points
+                    unsigned found = process_brute_clustering(fp[threadId], (params -> output_buffer)[threadId], survey, 
+                                                              numClusters[threadId], ppnsamp, pptimestamp, ppblockRate, start);
+                    numClusters[threadId] += found;
+
+                    // If the TBB is enabled and there are valid detection, dump the unprocessed data to disk
+                    if (found > 0 && survey -> tbb_enabled)
+                        triggerTBB(survey, params, input_buffer, pptimestamp);   
+                }
+                else
+                    // Just cluster points and dump them to disk
+                    process_brute(fp[threadId], (params -> output_buffer)[threadId], survey, ppnsamp, pptimestamp, 
+                                                ppblockRate, start);
             }
             
             written_samples += ppnsamp;

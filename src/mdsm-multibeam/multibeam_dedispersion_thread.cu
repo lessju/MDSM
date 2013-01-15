@@ -141,9 +141,7 @@ bool polynomialfit(int obs, int degree, double *dx, double *dy, double *store) /
     ws = gsl_multifit_linear_alloc(obs, degree);
     gsl_multifit_linear(X, y, c, cov, &chisq, ws);
 
-    printf("Bandpass fit chisq: %lf\n", chisq);
- 
-    /* store result ... */
+    // Store result
     for(i=0; i < degree; i++)
         store[i] = gsl_vector_get(c, i);
  

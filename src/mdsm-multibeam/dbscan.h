@@ -30,6 +30,9 @@ class Cluster
         // is due to an astrophysical transient
         float computeTransientProbability(float minDm, float dmStep, int numDMs);
 
+        // Return number of points in cluster    
+        unsigned numberOfPoints() { return indices.size(); }
+
         // Get cluster Id
         unsigned ClusterId() { return id; }
 
@@ -57,20 +60,29 @@ class DBScan
         // Class constructor
         DBScan(float minTime, float minDm, float minSnr, unsigned minPoints);
 
+        // Class destructor
+        ~DBScan();
+
         // Get number of clusters
         int getNumberOfClusters() { return this -> numClusters; }
 
         // Perform clustering
         vector<Cluster*> performClustering(vector<DataPoint> &dataPoints);
 
+        // Perform optimised clustering (FDBSCAN)
+        vector<Cluster*> performOptimisedClustering(vector<DataPoint> &dataPoints);
+
 
     private:
 
         // Candidate selection for FDBSCAN
-        vector<int> selectCandidates(const vector<DataPoint> &dataPoints, vector<int> &neighbours);
+        vector<int> selectCandidates(DataPoint *dataPoints, const vector<int> &neighbours);
 
         // Construct list of neighbours
-        vector<int> getNeighbours(const vector<DataPoint> &dataPoints, unsigned index);
+        unsigned getNeighbours(DataPoint* dataPoints, unsigned numberOfPoints, unsigned index, char *neighbors, char *visited);
+
+        // Return neighbor list in vector form
+        vector<int> getNeighboursVector(DataPoint* dataPoints, unsigned numberOfPoints, unsigned index);
 
         // List of clusters
         vector<Cluster*> clusters;

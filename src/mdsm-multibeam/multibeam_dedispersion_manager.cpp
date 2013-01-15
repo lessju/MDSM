@@ -131,6 +131,13 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> single_file_mode = 0;
     survey -> dump_to_disk = 0;
     survey -> tbb_enabled = 0;
+    survey -> apply_clustering = 0;
+    survey -> dbscan_min_points = 1;
+    survey -> dbscan_time_range = 1;
+    survey -> dbscan_dm_range = 1;
+    survey -> dbscan_snr_range = 1;
+    survey -> output_bits = 32;
+    survey -> output_compression = 1;
 
     // Start parsing observation file and generate survey parameters
     n = root.firstChild();
@@ -155,7 +162,6 @@ SURVEY* processSurveyParameters(QString filepath)
 			   survey -> nsamp = e.attribute("number").toUInt();
 			   survey -> nbits = e.attribute("bits").toUInt();
                survey -> voltage = e.attribute("voltage").toUInt();
-               survey -> dump_to_disk = e.attribute("writeToFile").toUInt();
             }
             else if (QString::compare(e.tagName(), QString("rfi"), Qt::CaseInsensitive) == 0) {
 			   survey -> apply_rfi_clipper = e.attribute("applyRFIClipper").toUInt();
@@ -167,8 +173,19 @@ SURVEY* processSurveyParameters(QString filepath)
 			   survey -> detection_threshold = e.attribute("threshold").toFloat();
                survey -> apply_median_filter = e.attribute("applyMedianFilter").toUInt();
                survey -> apply_detrending = e.attribute("applyDetrending").toUInt();
+               survey -> tbb_enabled = e.attribute("enableTBB").toUInt();
             }
-            else if (QString::compare(e.tagName(), QString("output"), Qt::CaseInsensitive) == 0) {
+            else if (QString::compare(e.tagName(), QString("clustering"), Qt::CaseInsensitive) == 0) {
+			   survey -> apply_clustering  = e.attribute("applyClustering").toUInt();
+               survey -> dbscan_min_points = e.attribute("minPoints").toUInt();
+               survey -> dbscan_time_range = e.attribute("timeRange").toFloat();   
+               survey -> dbscan_dm_range   = e.attribute("dmRange").toFloat();   
+               survey -> dbscan_snr_range  = e.attribute("snrRange").toFloat();   
+            }
+            else if (QString::compare(e.tagName(), QString("writer"), Qt::CaseInsensitive) == 0) {
+                survey -> dump_to_disk = e.attribute("writeToFile").toUInt();
+                survey -> output_bits = e.attribute("outputBits").toUInt();
+                survey -> output_compression = e.attribute("compression").toUInt();
                 char *temp = e.attribute("filePrefix", "output").toUtf8().data();
 			    strcpy(survey -> fileprefix, temp);
                 temp = e.attribute("baseDirectory", ".").toUtf8().data();
@@ -210,6 +227,11 @@ SURVEY* processSurveyParameters(QString filepath)
         }
         n = n.nextSibling();
     }
+
+    // Check if both dump_to_disk and tbb modes enabled, if
+    // so then disbale dump_to_disk
+    if (survey -> dump_to_disk && survey -> tbb_enabled)
+        survey -> dump_to_disk = 0;
 
     return survey;
 }
@@ -257,8 +279,8 @@ void initialiseMDSM(SURVEY* input_survey)
             beam -> dm_shifts[j] = dmdelay(beam -> fch1 + (beam -> foff * j), beam ->fch1);
 
         // Calculate maxshift
-        float high_dm    = survey -> lowdm + survey -> dmstep * (survey -> tdms - 1);
-        int maxshift     = beam -> dm_shifts[survey -> nchans - 1] * high_dm / survey -> tsamp;
+        float    high_dm   = survey -> lowdm + survey -> dmstep * (survey -> tdms - 1);
+        unsigned maxshift  = beam -> dm_shifts[survey -> nchans - 1] * high_dm / survey -> tsamp;
 
         greatest_maxshift = ( maxshift > greatest_maxshift) 
                             ? maxshift : greatest_maxshift;
@@ -326,6 +348,9 @@ void initialiseMDSM(SURVEY* input_survey)
     printf("Observation Params: nchans = %d, nsamp = %d, tsamp = %f\n", 
             survey -> nchans, survey -> nsamp, survey -> tsamp);
 
+    if (survey -> dump_to_disk) printf("Dump to disk mode enabled\n");
+    if (survey -> tbb_enabled) 	printf("TBB mode enabled\n");
+
     printf("Beam Params:\n");
     for(i = 0; i < survey -> nbeams; i++)
     {
@@ -363,6 +388,10 @@ void initialiseMDSM(SURVEY* input_survey)
     output_params.output_barrier = &output_barrier;
     output_params.start = start;
     output_params.survey = survey;
+    output_params.writer_mutex = &writer_mutex;
+    output_params.writer_buffer = writer_buffer;
+    output_params.writer_params = &writer_params;
+
 
     // Create output thread 
     if (pthread_create(&output_thread, &thread_attr, process_output, (void *) &output_params))
@@ -555,8 +584,10 @@ int start_processing(unsigned int data_read) {
                 char tempStr[30];
                 strftime(tempStr, sizeof(tempStr), "%F_%T", tmp);
                 strcat(pathName, tempStr);
-                strcat(pathName, "_dump");
-                strcat(pathName, ".dat");
+                strcat(pathName, "_dump_");
+                sprintf(tempStr, "%d", survey -> output_bits);
+                strcat(pathName, tempStr);
+                strcat(pathName, "bits.dat");
 
                 // Set filename
                 memcpy(&(writer_params.filename), &pathName, 256 * sizeof(char));

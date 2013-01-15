@@ -1,9 +1,6 @@
 // MDSM stuff
 #include "multibeam_dedispersion_writer.h"
-
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/math/distributions/normal.hpp>
+#include "cache_brute_force.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -14,85 +11,111 @@
 
 #include "omp.h"
 
-using boost::math::normal; // typedef provides default type is double.
+// Lookup table for log value used during the data encoding
+float log_lookup_table[LOG_LOOKUP_LENGTH];
 
-// Quantise floating point data to 8 bits
-void quantise_32to8_bits(FILE *fp, float *data, unsigned nsamp, unsigned nchans)
+// Maximum value permissible (higher value are clipped)
+float maximumValue = 0;
+
+// Quantise power data
+void quantise_power_data(FILE *fp, SURVEY *survey, float *data, unsigned nvalues)
 {
-    // Initialise parameters
-    normal s;
-    float thresh = 6;
-    float p = 2.0 / ( 1.0 * nsamp + 1.0), q = p;
-    float c = 1 - 2 * (thresh * pdf(s, thresh) - (thresh * thresh - 1) * cdf(s, -thresh));
-
-    // Set number of OpenMP threads
-    int num_threads = 8;
-	omp_set_num_threads(num_threads);
-
-    // Loop over all frequences
-    float temp1 = q / c;
-    float temp2 = 1 - q;
-
-    // Keep record of the mean and std of each channel to rescale output data
-    float means[nchans], stddevs[nchans], mins[nchans];
-
-    #pragma omp parallel for \
-        shared(nchans, nsamp, data, thresh, temp1, temp2, num_threads, means)
-    for(unsigned i = 0; i < nchans; i++)
+    // Check if first time that a buffer is being dumped to disk
+    if (maximumValue == 0)
     {
-        // Initialise mean and std for current channel
-        unsigned num = 128;
-        float m = 0, s2 = 0, s = 0;
-        for(unsigned k = 0; k < num; k++)
-        {
-            m += data[i * nsamp + k];
-            s2 += data[i * nsamp + k] * data[i * nsamp + k];
-        }
+        // Calculate maximum value
+        for(unsigned i = 0; i < nvalues; i++)
+            maximumValue = (data[i] > maximumValue) ? data[i] : maximumValue;
+        maximumValue *= 2; // Double the value to be able to cater for brighter input (might need improvement)
 
-        m  /= num;
-        s2 = s2 / num - m * m;
-        s  = sqrt(s2);
-
-        // Loop over all samples
-        float min = 999999999;
-        for(unsigned j = 0; j < nsamp; j++)
-        {
-            // New clipped value
-            float val = (data[i * nsamp + j] - m) / s;
-            val = (val > thresh) ? thresh : ((val < -thresh) ? -thresh : val);
-            data[i * nsamp + j] = val;
-            min = (min > val) ? val : min;
-
-            // Update running mean and std;
-            m  += p * s * val;
-            s2 = temp2 * s2 + temp1 * s2 * val * val;
-            s = sqrt(s2);
-        }
-
-        means[i]   = m;
-        stddevs[i] = s;
-        mins[i]    = min;
+        // Build lookup table
+        for(unsigned i = 0; i < LOG_LOOKUP_LENGTH; i++)
+            log_lookup_table[i] = log10(1 + i * survey -> output_compression / (float) LOG_LOOKUP_LENGTH );
     }
 
-    // Global minimum
-    float min = 9999999;
-    for(unsigned i = 0; i < nchans; i++)
-        min = (mins[i] < min) ? mins[i] : min;
-    
-    // Invert sign of minimum
-    min = -min;
+    // Define some initial values for fast processing
+    float Q = 1.0 / pow(2, survey -> output_bits);
+    float inverse_Q = 1.0 / Q;
+    float log_one_plus_mu = 1.0 / log10(1 + survey -> output_compression);
+    float inverse_maxValue = 1.0 / maximumValue;
+    unsigned bitrange = pow(2, survey -> output_bits);
 
-    // Data values are now in the range [min < v < thresh] 
-    unsigned char *quantised = (unsigned char *)  data;
-    float factor = 255 / (thresh + min);
-    for(unsigned i = 0; i < nchans * nsamp; i++)
-        quantised[i] = (data[i] + min) * factor;
+    // Start encoding data
+    // We want to interleave CPU processing and data buffering on disk
+    // so we divide the input buffer into N parts (assume power of 2)
+    unsigned char *encodedData = (unsigned char *) data;
+    for(unsigned p = 0; p < ENCODING_WRITE_OVERLAP; p++)
+    {
+        for(unsigned i = 0; i < nvalues / ENCODING_WRITE_OVERLAP; i++)
+        {
+            unsigned index = nvalues / ENCODING_WRITE_OVERLAP * p + i;
+            float datum = data[index] * inverse_maxValue * LOG_LOOKUP_LENGTH;
+            datum = log_lookup_table[(int) datum] * log_one_plus_mu;
+            encodedData[index] = (((int)(datum * inverse_Q) * Q + Q * 0.5) * bitrange);
+        }  
 
-    fwrite(means, sizeof(float), nchans, fp);  // Write means
-    fwrite(stddevs, sizeof(float), nchans, fp); // Write stddevs
-    fwrite(quantised, nchans * nsamp, sizeof(unsigned char), fp); // Write thresholded, quantized data
+        // Dump data to disk
+        fwrite(encodedData, nvalues / ENCODING_WRITE_OVERLAP, sizeof(unsigned char), fp);
+    }
 }
 
+// Quantise complex data
+void quantise_complex_data(FILE *fp, SURVEY *survey, short *data, unsigned nvalues)
+{
+    // Check if first time that a buffer is being dumped to disk
+    if (maximumValue == 0)
+    {
+        maximumValue = 32768;
+
+       // Create the lookup table and calculate its values
+        // We only need 32768 value to cover the entire range
+        // for signed short values (the negative values are
+        // just mirrored on the negative y-axis)
+        for(unsigned i = 0; i < maximumValue; i++) 
+            log_lookup_table[i] = log10(1 + i * survey -> output_compression / maximumValue);
+    }
+
+    // Define some initial values for fast processing
+    unsigned bitrange = pow(2, survey -> output_bits);
+    float Q = 1.0 / bitrange;
+    float inverse_Q = 1.0 / Q;
+    float log_one_plus_mu = 1.0 / log10(1 + survey -> output_compression);
+
+    // Start encoding data
+    // We want to interleave CPU processing and data buffering on disk
+    // so we divide the input buffer into N parts (assume power of 2)
+    unsigned char *encodedData = (unsigned char *) data;
+    for(unsigned p = 0; p < ENCODING_WRITE_OVERLAP; p++)
+    {
+        for(unsigned i = 0; i < nvalues / ENCODING_WRITE_OVERLAP; i++)
+        {
+            unsigned index = nvalues / ENCODING_WRITE_OVERLAP * p + i;
+
+            // Extract signs of real and imaginary parts
+            char real_sign = (data[index*2]   < 0) ? -1 : 1;
+            char imag_sign = (data[index*2+1] < 0) ? -1 : 1;
+
+            // Encode the value using the log lookup table
+            float real_datum = log_lookup_table[abs(data[index*2])]   * log_one_plus_mu;
+            float imag_datum = log_lookup_table[abs(data[index*2+1])] * log_one_plus_mu;
+
+            // Quantise values to 3 bits (+ sign bit)
+            unsigned char real_quant = ((char) (real_datum * inverse_Q) * Q + Q * 0.5) * bitrange;
+            unsigned char imag_quant = ((char) (imag_datum * inverse_Q) * Q + Q * 0.5) * bitrange;
+
+            // Combine values and sign bits to for 8-bit representation:
+            // [rsign rX rX rX isign iX iX iX]
+            unsigned char value = (real_sign   & 0x80)        |
+                                  ((real_quant & 0x07) << 4)  |
+                                  ((imag_sign  & 0x80) >> 4)  |
+                                  (imag_quant  & 0x07);
+            encodedData[i] =  value;
+        }
+
+        // Dump data to disk
+        fwrite(encodedData, nvalues / ENCODING_WRITE_OVERLAP, sizeof(unsigned char), fp);
+    }   
+}
 
 // Write request buffer to file
 void* write_to_disk(void* writer_params)
@@ -145,16 +168,16 @@ void* write_to_disk(void* writer_params)
         }
 
         // We have a valid file and data available. Write to disk
-        // TODO: super-optimise
         struct timeval tstart, end;
         long mtime, seconds, useconds;    
         gettimeofday(&tstart, NULL);
 
-        // Quantise data
-        if (1)
+        // Dump to file, quantising data if required
+        if (survey -> output_bits != 32)
             // Quantise data and dump to file
-            quantise_32to8_bits(fp, params -> writer_buffer, survey -> nsamp, survey -> nchans);
+            quantise_power_data(fp, survey,  params -> writer_buffer, survey -> nbeams * survey -> nsamp * survey -> nchans);
         else
+            // Dump directly to file
             fwrite(params -> writer_buffer, survey -> nbeams * survey -> nchans * survey -> nsamp, sizeof(float), fp);
 
         gettimeofday(&end, NULL);

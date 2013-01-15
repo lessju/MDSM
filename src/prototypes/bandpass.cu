@@ -14,10 +14,11 @@
 
 //char *filename = "/data/Data/SETI/B1839+56_8bit.fil";
 //char *filename = "/data/Data/SETI/samplePulsar.fil";
-char *filename = "/home/lessju/Kepler_Pulsar_RFI.dat";
-int nchans = 2048, nsamp = 16384, ncoeffs = 12;
-float channel_thresh = 2.5, spectrum_thresh = 0.5;
-unsigned channel_block = 16;
+//char *filename = "/home/lessju/Kepler_Pulsar_RFI.dat";
+char *filename = "/home/lessju/Medicina_Channel_RFI_and_Pulsar.dat";
+int nchans = 512, nsamp = 16384, ncoeffs = 12;
+float channel_thresh = 4, spectrum_thresh = 7;
+unsigned channel_block = 1024;
 
 // ======================== CUDA HELPER FUNCTIONS ==========================
 
@@ -205,9 +206,9 @@ __global__ void spectrum_clipper(float *input, double *bandpass, double *correct
                 input[c * nsamp + s] = 500;//bandpass[c];
 
         // Check for singe high-intensity pixels
-//        for(unsigned c = 0; c < nchans; c++)
-//            if (input[c*nsamp+s] > 2*spectrumThresh)
-//                input[c*nsamp+s] = 1e4;//bandpass[c];
+        for(unsigned c = 0; c < nchans; c++)
+            if (input[c*nsamp+s] > 3467 * 10)
+                input[c*nsamp+s] = bandpass[c];
     }
 }
 

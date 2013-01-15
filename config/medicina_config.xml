@@ -1,15 +1,28 @@
 	<!-- Based on Medicina parameters -->
 <observation> 
-    <dm lowDM="0" numDMs="512" dmStep="0.1" />
+
+    <dm lowDM="0" numDMs="1024" dmStep="0.1" />
+
     <channels nchans="512" npols="0" ncoeffs="12" />
+
     <timing tsamp="0.0001024" />
-    <samples number="262144" bits="32" writeToFile="0" voltage="0"/>
-    <output filePrefix="TestBeam" baseDirectory="." singleFileMode="1"
-            secondsPerFile="300" usePCTime="1" />
+
+    <samples number="131072" bits="32" voltage="0"/>
+    
     <rfi applyRFIClipper="1" channelBlock="1024" spectrumThreshold="7" channelThreshold="4"/>
-    <detection threshold="5" applyMedianFilter="0" applyDetrending="1" enableTBB="0"/>
-    <gpus ids="1" />
+
+    <detection threshold="5" applyMedianFilter="1" applyDetrending="1" enableTBB="0" />
+
+    <clustering applyClustering="1" minPoints="20" timeRange="50" dmRange="5" snrRange="2" />
+
+    <writer writeToFile="0" outputBits="8" compression="255" 
+            filePrefix="TestBeam" baseDirectory="." singleFileMode="1"
+            secondsPerFile="300" usePCTime="1" />
+
+    <gpus ids="0" />
+
     <beams>
         <beam beamId="0" topFrequency="413.8984375" frequencyOffset="-0.01953125" />
     </beams>
+
 </observation>

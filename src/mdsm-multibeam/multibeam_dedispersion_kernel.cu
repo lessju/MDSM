@@ -373,10 +373,6 @@ __global__ void spectrum_clipper(float *input, double *bandpass, float bandpass_
             // Spectrum is RFI, clear (replace with bandpass for now)
             for(unsigned c = 0; c < nchans; c++)
                 input[c * total + shift + s] = __double2float_rz(bandpass[c]);
-
-//        for(unsigned c = 0; c < nchans; c++)
-//            if (input[c*nsamp+s] > 100*spectrumThresh)
-//                input[c*nsamp+s] = bandpass[c];
     }
 }
 

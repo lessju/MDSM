@@ -58,9 +58,16 @@ typedef struct {
     bool  apply_median_filter;
     bool  apply_detrending;
 
+    // Clustering parameters
+    bool apply_clustering;
+    unsigned dbscan_min_points;
+    float dbscan_time_range, dbscan_dm_range, dbscan_snr_range;
+
     // Write parameters
     bool tbb_enabled;
     bool dump_to_disk;
+    unsigned output_bits;
+    unsigned output_compression;    
 
     // Number of GPUs which are used
     unsigned num_threads;
