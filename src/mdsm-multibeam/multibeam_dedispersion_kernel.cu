@@ -41,7 +41,7 @@ __global__ void cache_dedispersion(float *output, float *input, float *dm_shifts
 }
 
 // -------------------- 1D Median Filter -----------------------
-__global__ __device__ void median_filter(float *input, const int nsamp)
+__global__ void median_filter(float *input, const int nsamp)
 {
     // Declare shared memory array to hold local kernel samples
     // Should be (blockDim.x+width floats)

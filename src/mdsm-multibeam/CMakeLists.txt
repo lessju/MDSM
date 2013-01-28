@@ -12,6 +12,7 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 target_link_libraries(mdsm-multibeam-cuda
     ${CUDA_LIBRARIES}
+    ${OpenMP_CXX_FLAGS}
 )
 
 # C++ source files

@@ -7,7 +7,7 @@
 
     <timing tsamp="0.0001024" />
 
-    <samples number="131072" bits="32" voltage="0"/>
+    <samples number="262144" bits="32" voltage="0"/>
     
     <rfi applyRFIClipper="1" channelBlock="1024" spectrumThreshold="7" channelThreshold="4"/>
 
@@ -19,7 +19,7 @@
             filePrefix="TestBeam" baseDirectory="." singleFileMode="1"
             secondsPerFile="300" usePCTime="1" />
 
-    <gpus ids="0" />
+    <gpus ids="1" />
 
     <beams>
         <beam beamId="0" topFrequency="413.8984375" frequencyOffset="-0.01953125" />
