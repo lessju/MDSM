@@ -7,9 +7,10 @@
 #include "time.h"
 #include <math.h>
 
-#define BEAMFORMER_THREADS 64
+#define BEAMFORMER_THREADS 256
 #define BEAMS 16
-unsigned nchans = 1024, nants = 32, nsamp = 8192, nbeams = 16;
+#define ANTS 32
+unsigned nchans = 512, nants = 32, nsamp = 16384, nbeams = 16;
 
 // ======================== CUDA HELPER FUNCTIONS ==========================
 
@@ -41,7 +42,7 @@ inline void _cudaCheckError( const char *file, const int line )
         fprintf( stderr, "cudaCheckError() failed at %s:%i : %s\n",
                  file, line, cudaGetErrorString( err ) );
         exit( -1 );
-    }
+    }   
 #endif
 
     return; 
@@ -52,7 +53,7 @@ inline void _cudaCheckError( const char *file, const int line )
 
 // ==========================================================================
 
-__global__ void beamform_shared(char4 *input, float *output, unsigned nsamp,
+__global__ void beamform_shared(char4 *input, float *output, float4 *shifts, unsigned nsamp,
                                 unsigned nants, unsigned nchans, unsigned nbeams)
 {
     __shared__ char4 shared[BEAMFORMER_THREADS * 16];
@@ -66,7 +67,7 @@ __global__ void beamform_shared(char4 *input, float *output, unsigned nsamp,
         // Synchronise threads
         __syncthreads();
 
-        // Loop over channels
+        // Loop over channe
         for(unsigned channel = threadIdx.x;
                      channel < nchans;
                      channel += blockDim.x)
@@ -90,19 +91,22 @@ __global__ void beamform_shared(char4 *input, float *output, unsigned nsamp,
             			 antenna < nants / 4;
             			 antenna ++)
             {
-                char4 real = shared[threadIdx.x * 16 + (antenna + threadIdx.x) % 8];
-				char4 imag = shared[threadIdx.x * 16 + 8 + (antenna + threadIdx.x) % 8];
+//                char4 real = shared[threadIdx.x * 16 + (antenna + threadIdx.x) % 8];
+//				char4 imag = shared[threadIdx.x * 16 + 8 + (antenna + threadIdx.x) % 8];
+                char4 real = shared[threadIdx.x * 16 + antenna];
+                char4 imag = shared[threadIdx.x * 16 + antenna + 8];
 
                 // Loop over all beams
 				for(unsigned beam = 0; beam < nbeams; beam++)
 				{
                     // Add four antennas at a time (to reduce shared memory overhead and increase arithmetic intensity)
-                    float2 shift1 = {1, beam}, shift2 = {1, beam}, shift3 = {1, beam}, shift4 = {1, beam};
-                    float temp1 = (shift1.x * real.w) * (shift1.x * real.w) + (shift1.y * imag.w) * (shift1.y * imag.w);
-                    float temp2 = (shift2.x * real.x) * (shift2.x * real.x) + (shift2.y * imag.x) * (shift2.y * imag.x);
-                    float temp3 = (shift3.x * real.y) * (shift3.x * real.y) + (shift3.y * imag.y) * (shift3.y * imag.y);
-                    float temp4 = (shift4.x * real.z) * (shift4.x * real.z) + (shift4.y * imag.z) * (shift4.y * imag.z);
-					beams[blockDim.x * beam + threadIdx.x] += temp1 + temp2 + temp3 + temp4;
+                    float4 phase_shifts = shifts[beam * nchans * nants / 4 + antenna * nchans + channel];
+
+                    float temp1 = real.w * real.w + (phase_shifts.w * imag.w) * (phase_shifts.w * imag.w);
+                    float temp2 = real.x * real.x + (phase_shifts.x * imag.x) * (phase_shifts.x * imag.x);
+                    float temp3 = real.y * real.y + (phase_shifts.y * imag.y) * (phase_shifts.y * imag.y);
+                    float temp4 = real.z * real.z + (phase_shifts.z * imag.z) * (phase_shifts.z * imag.z);
+ 					beams[blockDim.x * beam + threadIdx.x] += temp1 + temp2 + temp3 + temp4;
 				}
             }
 
@@ -111,20 +115,87 @@ __global__ void beamform_shared(char4 *input, float *output, unsigned nsamp,
 
             // Save beam value to global memory
             for(unsigned beam = 0; beam < nbeams; beam++)
-                output[beam * nsamp * nchans + channel * nsamp + time] = beams[blockDim.x * beam + threadIdx.x];//beams[blockDim.x * beam + threadIdx.x];
-//                    output[blockIdx.x * blockDim.x * beam + threadIdx.x] = beams[beam];
+//                output[beam * nsamp * nchans + channel * nsamp + time] = beams[blockDim.x * beam + threadIdx.x];//beams[blockDim.x * beam + threadIdx.x];
+                    output[blockIdx.x * blockDim.x * beam + threadIdx.x] = beams[beam];
 
             // Synchronise threads
             __syncthreads();
         }
+    }	
+}
+
+
+// Kernel which paralellises over time instead of frequency within the blocks
+__global__ void beamform_time(char4 *input, float *output, float *shifts, unsigned nsamp,
+                                unsigned nants, unsigned nchans, unsigned nbeams)
+{
+    __shared__ char4   shared[BEAMFORMER_THREADS * 16];
+    __shared__ float   phase_shifts[ANTS * BEAMS];
+    
+
+    // Thread block will loop over time for a single channel
+    // Channel changes in the y direction
+    // Multiple blocks in the x direction
+
+    // We only need to load the phase shifts once
+    // Stored in beam/antenna order
+    for(unsigned i = threadIdx.x; i < ANTS * BEAMS; i+= blockDim.x)
+        phase_shifts[i] = shifts[blockIdx.y * nbeams * nants + i];
+
+    // Loop over time samples for current block
+    for(unsigned time = blockIdx.x * blockDim.x + threadIdx.x;
+                 time < nsamp;
+                 time += gridDim.x * blockDim.x)
+    {
+        // Synchronise threads
+        __syncthreads();
+
+        // Load data to shared memory
+        unsigned index = (time / blockDim.x) * blockDim.x * nchans * 16;
+        for(unsigned i = threadIdx.x; i < blockDim.x * 16; i += blockDim.x)
+            shared[i] = input[index + (i / 16) * nchans * 16 + i % 16];
+
+        // Loop over all antennas
+        for(unsigned antenna = 0; antenna < nants / 4; antenna++)
+        {
+            // Add four antennas at a time (to reduce shared memory overhead and increase arithmetic intensity)
+            unsigned antenna_shift = threadIdx.x * 16 + (antenna + threadIdx.x) % 8;
+            char4 real = shared[antenna_shift];
+            char4 imag = shared[antenna_shift + 8];
+
+            // Loop over all the beams
+            for(unsigned beam = 0; beam < nbeams; beam++)
+            {
+                float shift;
+
+                // Read shifts from shared memory and apply to current four antennas
+                shift = phase_shifts[beam * nants + antenna / 4];
+                float temp1 = real.w * real.w + (shift * imag.w) * (shift * imag.w);
+                shift = phase_shifts[beam * nants + antenna / 4 + 1];
+                float temp2 = real.x * real.x + (shift * imag.x) * (shift * imag.x);
+                shift = phase_shifts[beam * nants + antenna / 4 + 2];
+                float temp3 = real.y * real.y + (shift * imag.y) * (shift * imag.y);
+                shift = phase_shifts[beam * nants + antenna / 4 + 3];
+                float temp4 = real.z * real.z + (shift * imag.z) * (shift * imag.z);
+
+                // Add value to beam in global memory
+                output[beam * nsamp * nchans + blockIdx.y * nsamp + time] += temp1 + temp2 + temp3 + temp4;
+            }
+        }
+
+        // Synchronise threads
+        __syncthreads();
     }
 }
+
 
 // ==========================================================================
 int main(int agrc, char *argv[])
 {
 //    struct timeval start, end;
 //    long mtime, seconds, useconds;
+
+    cudaSetDevice(0);
 
 	cudaEvent_t event_start, event_stop;
 	float timestamp;
@@ -148,17 +219,22 @@ int main(int agrc, char *argv[])
     // whose required input data format is beam/channel/time, with time changing the faster,
     // and is in 32-bit single precision floating point
     float *d_output_buffer, *output_buffer;
+    float *d_shifts;
     CudaSafeCall(cudaMallocHost((void **) &output_buffer, nchans * nsamp * nbeams * sizeof(float)));
     CudaSafeCall(cudaMalloc((void **) &d_output_buffer, nchans * nsamp * nbeams * sizeof(float)));
+    CudaSafeCall(cudaMalloc((void **) &d_shifts, nchans * nbeams * nants * sizeof(float)));
     printf("Allocated output buffers\n");
 
     // Generate fake data
-    for(unsigned i = 0; i < nsamp; i++)
-        for(unsigned j = 0; j < nchans; j++)
-            for(unsigned k = 0; k < nants * 2; k++)
-                input_buffer[i * nchans * nants * 2 + j * nants * 2 + k] = j;
-//    memset(input_buffer, 1, nchans * nsamp * nants * sizeof(char2));
+//    for(unsigned i = 0; i < nsamp; i++)
+//        for(unsigned j = 0; j < nchans; j++)
+//            for(unsigned k = 0; k < nants * 2; k++)
+//                input_buffer[i * nchans * nants * 2 + j * nants * 2 + k] = j;
+    memset(input_buffer, 1, nchans * nsamp * nants * sizeof(char2));
     printf("Generated fake data\n");
+
+    // Generate shifts
+    cudaMemset((void *) d_shifts, 1, nchans * nbeams * nants * sizeof(float));
 
     // Copy input buffer to GPU
     cudaEventRecord(event_start, 0);
@@ -169,14 +245,23 @@ int main(int agrc, char *argv[])
 	printf("Copied data to GPU in: %lf\n", timestamp);
 
     // Run beamformer kernel
+//    cudaEventRecord(event_start, 0);
+//    beamform_shared<<< 1024, BEAMFORMER_THREADS >>>
+//            ((char4 *) d_input_buffer, d_output_buffer, d_shifts, nsamp, nants, nchans, nbeams);
+//    cudaEventRecord(event_stop, 0);
+//	cudaEventSynchronize(event_stop);
+//	cudaEventElapsedTime(&timestamp, event_start, event_stop);
+//    double kernel_time = timestamp;
+//	printf("Performed beamforming [shared] in : %lf\n", timestamp);
+
     cudaEventRecord(event_start, 0);
-    beamform_shared<<< 4096, BEAMFORMER_THREADS >>>
-            ((char4 *) d_input_buffer, d_output_buffer, nsamp, nants, nchans, nbeams);
+    beamform_time<<< dim3(nsamp / BEAMFORMER_THREADS, nchans), BEAMFORMER_THREADS >>>
+            ((char4 *) d_input_buffer, d_output_buffer, d_shifts, nsamp, nants, nchans, nbeams);
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
 	cudaEventElapsedTime(&timestamp, event_start, event_stop);
     double kernel_time = timestamp;
-	printf("Performed beamforming [shared] in : %lf\n", timestamp);
+	printf("Performed beamforming [time] in : %lf\n", timestamp);
 
     // Run beamformer kernel
     cudaEventRecord(event_start, 0);
@@ -186,17 +271,32 @@ int main(int agrc, char *argv[])
 	cudaEventElapsedTime(&timestamp, event_start, event_stop);
 	printf("Copied results back to CPU memory in : %lf\n", timestamp);
 
+    cudaEventRecord(event_start, 0);
+    CudaSafeCall(cudaMemcpy(input_buffer, d_input_buffer, nsamp * nchans * nants * sizeof(char2), cudaMemcpyDeviceToHost));
+    cudaEventRecord(event_stop, 0);
+	cudaEventSynchronize(event_stop);
+	cudaEventElapsedTime(&timestamp, event_start, event_stop);
+	printf("Copied results back to CPU memory in : %lf\n", timestamp);
+
     printf("Performance: %.2f Gflops\n", 32.0f * nchans * nsamp * nbeams * (nants * 0.25) * (1.0 / (kernel_time * 0.001)) * 1e-9);
 
-//)* nbeams * nchans * nsamp * (((float)nants) / 4.0) * (1.0 / (kernel_time * 0.001)) * 1.0e-9);
+    // Check to see if all output has been successful
+//    for(unsigned i = 0; i < nbeams; i++)
+//        for(unsigned j = 0; j < nchans; j++)
+//            for(unsigned k = 0; k < nsamp; k++)
+//                if ((output_buffer[i * nchans * nsamp + j * nsamp + k] - (j*j + j*i)*nants * 2) > 0.001)
+//                {
+//                    printf("!! %d.%d.%d = %f != %f\n", i, j, k, output_buffer[i * nchans * nsamp + j * nsamp + k],(j*j + j*j)*nants * 2);
+//                    exit(0);
+//                }
 
     // Check to see if all output has been successful
-    for(unsigned i = 0; i < nbeams; i++)
+    for(unsigned i = 0; i < nsamp; i++)
         for(unsigned j = 0; j < nchans; j++)
-            for(unsigned k = 0; k < nsamp; k++)
-                if ((output_buffer[i * nchans * nsamp + j * nsamp + k] - (j*j + j*i)*nants * 2) > 0.001)
+            for(unsigned k = 0; k < nants * 2; k++)
+                if (input_buffer[i * nchans * nants * 2 + nchans * nants * 2 + k]!= 0)
                 {
-                    printf("!! %d.%d.%d = %f != %f\n", i, j, k, output_buffer[i * nchans * nsamp + j * nsamp + k],(j*j + j*j)*nants * 2);
+                    printf("!! %d.%d.%d = %d != %f\n", i, j, k, (int) input_buffer[i * nchans * nants * 2 + nchans * nants * 2 + k], 0.0f);
                     exit(0);
                 }
 }

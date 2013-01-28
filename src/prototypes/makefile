@@ -85,6 +85,10 @@ bandpass:
 	$(NVCC) -o bandpass bandpass.cu file_handler.o $(INC) $(LDFLAGS) --gpu-architecture sm_20 --use_fast_math -lgsl -lgslcblas --ptxas-options=-v
 	rm -f *.cu.o *.linkinfo
 
+beamformer:
+	$(NVCC) -o beamformer beamformer.cu $(INC) $(LDFLAGS) --gpu-architecture sm_20 --use_fast_math --ptxas-options=-v
+	rm -f *.cu.o *.linkinfo
+
 periodicity:
 	$(CCC) -c file_handler.cpp
 	$(NVCC) -o periodicity periodicity_search.cu file_handler.o $(INC) $(LDFLAGS) --gpu-architecture sm_20 --use_fast_math --ptxas-options=-v -lcufft
