@@ -60,7 +60,7 @@ brute_dedisp:
 	rm -f *.cu.o *.linkinfo
 	
 brute_dedisp_imp:
-	$(NVCC) -o brute_dedisp_imp brute_dedisp_imp.cu $(LDFLAGS) $(INC) -L/lib
+	$(NVCC) -o brute_dedisp_imp brute_dedisp_imp.cu $(LDFLAGS) $(INC) -L/lib --use_fast_math --gpu-architecture=sm_20
 	rm -f *.cu.o *.linkinfo
 
 test_atomic:
@@ -86,7 +86,7 @@ bandpass:
 	rm -f *.cu.o *.linkinfo
 
 beamformer:
-	$(NVCC) -o beamformer beamformer.cu $(INC) $(LDFLAGS) --gpu-architecture sm_20 --use_fast_math --ptxas-options=-v
+	$(NVCC) -o beamformer beamformer.cu $(INC) $(LDFLAGS) --gpu-architecture sm_20 --use_fast_math --ptxas-options=-v 
 	rm -f *.cu.o *.linkinfo
 
 periodicity:

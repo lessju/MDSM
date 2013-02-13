@@ -56,5 +56,3 @@ def process_logfile(outfile, infile=None , data=None):
 
 if __name__ == '__main__':
     res = process_logfile(str(argv[1]), str(argv[2]))
-
-

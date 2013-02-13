@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>medicina.jpg</file>
+    </qresource>
+</RCC>
