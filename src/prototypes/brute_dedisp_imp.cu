@@ -12,23 +12,21 @@ __constant__ float dm_shifts[4096];
 __global__ void dedisperse_loop(float *outbuff, float *buff, int nsamp, int nchans, float tsamp,
                                 float startdm, float dmstep, int maxshift)
 {
-    extern __shared__ float shared[];
-
     int c, s = threadIdx.x + blockIdx.x * blockDim.x;
     float shift_temp = (startdm + blockIdx.y * dmstep) / tsamp;
     
     for (s = threadIdx.x + blockIdx.x * blockDim.x; 
          s < nsamp; 
-         s += blockDim.x * gridDim.x) {
-
-        shared[threadIdx.x] = 0;
+         s += blockDim.x * gridDim.x) 
+    {
+        float value = 0;
      
         for(c = 0; c < nchans; c++) {
-            int shift = c * (nsamp + maxshift) + floor(dm_shifts[c] * shift_temp);
-            shared[threadIdx.x] += buff[s + shift];
+            int shift = c * (nsamp + maxshift) + floorf(dm_shifts[c] * shift_temp);
+            value += buff[s + shift];
         }
 
-        outbuff[blockIdx.y * nsamp + s] = shared[threadIdx.x];
+        outbuff[blockIdx.y * nsamp + s] = value;
     }
 }
 
@@ -134,7 +132,7 @@ int main(int argc, char *argv[])
 
     dim3 gridDim(nsamp / blocksize, tdms);  
     cudaEventRecord(event_start, 0);
-    dedisperse_loop<<<gridDim, blocksize, 512>>>(d_output, d_input, nsamp, nchans, tsamp, startdm, dmstep, maxshift);
+    dedisperse_loop<<<gridDim, blocksize>>>(d_output, d_input, nsamp, nchans, tsamp, startdm, dmstep, maxshift);
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);
     cudaEventElapsedTime(&timestamp, event_start, event_stop);

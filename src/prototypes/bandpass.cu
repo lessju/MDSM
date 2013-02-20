@@ -15,7 +15,9 @@
 //char *filename = "/data/Data/SETI/B1839+56_8bit.fil";
 //char *filename = "/data/Data/SETI/samplePulsar.fil";
 //char *filename = "/home/lessju/Kepler_Pulsar_RFI.dat";
-char *filename = "/home/lessju/Medicina_Channel_RFI_and_Pulsar.dat";
+//char *filename = "/home/lessju/Medicina_Channel_RFI_and_Pulsar.dat";
+char *filename = "/home/lessju/Medicina_Time_RFI.dat";
+//char *filename = "/home/lessju/Medicina_Channel_RFI_and_Pulse.dat";
 int nchans = 512, nsamp = 16384, ncoeffs = 12;
 float channel_thresh = 4, spectrum_thresh = 7;
 unsigned channel_block = 1024;
