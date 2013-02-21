@@ -1,17 +1,17 @@
-	<!-- Based on Medicina parameters -->
+<!-- Based on Medicina parameters -->
 <observation> 
 
-    <dm lowDM="0" numDMs="2048" dmStep="0.1" />
+    <dm lowDM="0" numDMs="512" dmStep="0.1" />
 
-    <channels nchans="512" npols="0" ncoeffs="12" />
+    <channels nchans="1024" npols="1" ncoeffs="12" />
 
     <timing tsamp="0.0001024" />
 
     <samples number="131072" bits="32" voltage="0"/>
     
-    <rfi applyRFIClipper="1" channelBlock="1024" spectrumThreshold="7" channelThreshold="4"/>
+    <rfi applyRFIClipper="0" channelBlock="1024" spectrumThreshold="7" channelThreshold="4"/>
 
-    <detection threshold="5" applyMedianFilter="1" applyDetrending="1" enableTBB="0" />
+    <detection threshold="5" applyMedianFilter="0" applyDetrending="0" enableTBB="0" />
 
     <clustering applyClustering="1" minPoints="20" timeRange="50" dmRange="5" snrRange="2" />
 

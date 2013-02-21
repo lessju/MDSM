@@ -56,9 +56,7 @@ endif(CMAKE_BUILD_TYPE MATCHES RELEASE|[Rr]elease)
 
 include(compilerDefaults)
 
-#find_package(Pelican REQUIRED)
 find_package(Qt4 COMPONENTS QtCore QtNetwork QtXml REQUIRED)
-#find_package(PelicanLofar REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(FFTW3 REQUIRED)
 find_package(GSL REQUIRED)
@@ -67,13 +65,12 @@ find_package(PGPLOT REQUIRED)
 
 include_directories("${CUDA_SDK_ROOT_DIR}/common/inc")
 include_directories(${CUDA_INCLUDE_DIRS})
-#include_directories(${PELICAN_LOFAR_INCLUDE_DIR})
-#include_directories(${PELICAN_INCLUDE_DIR})
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm-coherent")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/medicina-transient-pipeline")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/medicina-correlator-pipeline")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm-multibeam")
-#include_directories("${CMAKE_CURRENT_SOURCE_DIR}/pelican-mdsm/modules")
 include_directories(${QT_QTXML_INCLUDE_DIR})
 include_directories(${QT_QTCORE_INCLUDE_DIR})
 include_directories(${QT_QTNETWORK_INCLUDE_DIR})
@@ -87,8 +84,6 @@ include(modules.cmake)
 add_executable(standalone-mdsm MDSM.cpp)
 target_link_libraries(standalone-mdsm
     ${QT_QTCORE_LIBRARY}
-#    ${PELICAN_LOFAR_LIBRARIES}
-#    ${PELICAN_LIBRARIES}
     ${GSL_LIBRARIES} 
     ${GSLCBLAS_LIBRARIES}
     mdsm-multibeam-cuda

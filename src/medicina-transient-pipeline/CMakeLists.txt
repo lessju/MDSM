@@ -11,8 +11,8 @@ target_link_libraries(standaloneMdsmLib
     ${QT_QTNETWORK_LIBRARY}
 )
 
-add_executable(medicinaPipeline pipeline.cpp)
-target_link_libraries(medicinaPipeline
+add_executable(medicinaTransientPipeline pipeline.cpp)
+target_link_libraries(medicinaTransientPipeline
     ${QT_QTCORE_LIBRARY}
     ${QT_QTNETWORK_LIBRARY}
     standaloneMdsmLib
@@ -20,14 +20,7 @@ target_link_libraries(medicinaPipeline
     mdsm-multibeam
 )
 
-set_target_properties(medicinaPipeline PROPERTIES
+set_target_properties(medicinaTransientPipeline PROPERTIES
     COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}"
 )
-
-#add_executable(dataEmulator DataEmulator.cpp)
-#target_link_libraries(dataEmulator
-#    ${QT_QTCORE_LIBRARY}
-#    ${QT_QTNETWORK_LIBRARY}
-#    mdsm
-#)
