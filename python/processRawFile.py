@@ -30,24 +30,24 @@ def read_data():
         print nbits + " bits not supported"
         exit()
 
-#    if integs > 1:
-#        i = 0
-#        vector = np.array([])
-#        while i < nsamp:
-#            data = f.read(integs * nchans * nbits / 8)
-#            data = struct.unpack(integs * nchans * mode, data)
-#            data = np.reshape(data, (integs, nchans))
-#            data = np.sum(data, axis=0) / integs
-#            vector = np.append(vector, data)
-#            if i % 100 == 99:
-#                print i
-#            i += 1
-#        return np.reshape(vector, (nsamp, nchans))
+    if integs > 1:
+        i = 0
+        vector = np.array([])
+        while i < nsamp:
+            data = f.read(integs * nchans * nbits / 8)
+            data = struct.unpack(integs * nchans * mode, data)
+            data = np.reshape(data, (integs, nchans))
+            data = np.sum(data, axis=0) / integs
+            vector = np.append(vector, data)
+            if i % 100 == 99:
+                print i
+            i += 1
+        return np.reshape(vector, (nsamp, nchans))
 
-#    else:
-    f.seek(1024 * nchans * nbits / 8)  # HACK
-    data = f.read(nsamp * nchans * nbits / 8)
-    data = struct.unpack(nsamp * nchans * mode, data)
+    else:
+       # f.seek(nchans * nbits / 8)
+        data = f.read(nsamp * nchans * nbits / 8)
+        data = struct.unpack(nsamp * nchans * mode, data)
     return np.reshape(data, (nsamp, nchans))
 
 def plot_bandpass(data, ax):

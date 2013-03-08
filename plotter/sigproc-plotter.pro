@@ -6,7 +6,7 @@ TEMPLATE = app
 TARGET = 
 DEPENDPATH += .
 INCLUDEPATH += . /usr/include/qwt-qt4
-LIBS += -lqwt-qt4 -lQtSvg
+LIBS += -lqwt-qt4 -lQtSvg -lgsl -lgslcblas
 
 CONFIG += qt debug
 
@@ -18,3 +18,6 @@ FORMS += plotWidget.ui \
 SOURCES += file_handler.cpp mainWindow.cpp plotter.cpp \
     openDialogWindow.cpp
 RESOURCES += plotterResources.qrc
+
+QMAKE_CXXFLAGS += -fopenmp
+QMAKE_LFLAGS *= -fopenmp

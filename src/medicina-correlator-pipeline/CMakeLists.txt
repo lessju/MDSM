@@ -11,8 +11,8 @@ target_link_libraries(standaloneCorrelatorLib
     ${QT_QTNETWORK_LIBRARY}
 )
 
-add_executable(medicinaCorrelatorPipeline pipeline.cpp)
-target_link_libraries(medicinaCorrelatorPipeline
+add_executable(medicinaCorrelator pipeline.cpp)
+target_link_libraries(medicinaCorrelator
     ${QT_QTCORE_LIBRARY}
     ${QT_QTNETWORK_LIBRARY}
     standaloneCorrelatorLib
@@ -20,7 +20,7 @@ target_link_libraries(medicinaCorrelatorPipeline
     mdsm-multibeam
 )
 
-set_target_properties(medicinaCorrelatorPipeline PROPERTIES
+set_target_properties(medicinaCorrelator PROPERTIES
     COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}"
 )

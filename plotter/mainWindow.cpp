@@ -11,11 +11,16 @@
 
 #include "math.h"
 
+#include <gsl/gsl_multifit.h>
+#include "omp.h"
+
 #include <iostream>
 
 unsigned mu = 255;
 
-// Destructor
+using namespace std;
+
+// Constructor
 MainWindow::MainWindow() 
 {
     // Set central widget
@@ -45,6 +50,10 @@ MainWindow::MainWindow()
     saveAct->setStatusTip(tr("Save current buffer to file"));
     connect(saveAct, SIGNAL(triggered()), this, SLOT(saveBuffer()));
 
+    exportAct = new QAction(tr("&Export Plot"), this);
+    exportAct->setStatusTip(tr("Export current plot to disk"));
+    connect(exportAct, SIGNAL(triggered()), this, SLOT(exportPlot()));
+
     exitAct = new QAction(tr("&Quit"), this);
     exitAct->setShortcuts(QKeySequence::Quit);
     exitAct->setStatusTip(tr("Quit"));
@@ -55,23 +64,36 @@ MainWindow::MainWindow()
     fileMenu->addAction(openAct);
     fileMenu->addAction(liveAct);
     fileMenu->addAction(saveAct);
+    fileMenu->addAction(exportAct);
     fileMenu->addSeparator();
     fileMenu->addAction(exitAct);
     
     // Connect UI controls signals
-    connect(plotWidget -> plotButton, SIGNAL(clicked()), this, SLOT(plot()));   
     connect(plotWidget -> channelSpin, SIGNAL(valueChanged(int)), this, SLOT(plotChannel(int)));
     connect(plotWidget -> timeSlider, SIGNAL(sliderMoved(int)), this, SLOT(sliderMoved(int)));
     connect(plotWidget -> tabWidget, SIGNAL(currentChanged(int)), this, SLOT(plot()));
     connect(plotWidget -> integrationBox, SIGNAL(valueChanged(int)), SLOT(plot()));
     connect(plotWidget -> sampleSpin, SIGNAL(valueChanged(int)), SLOT(sampleSpin(int)));
     connect(plotWidget -> beamNumber, SIGNAL(valueChanged(int)), SLOT(beamNumberChanged(int)));
+    connect(plotWidget -> dmSpinBox, SIGNAL(valueChanged(double)), SLOT(dmChanged(double)));
+    connect(plotWidget -> plotButton, SIGNAL(clicked()), SLOT(applyFolding()));
+    connect(plotWidget -> foldingSpinBox, SIGNAL(valueChanged(int)), SLOT(foldNumberChanged(int)));
+    connect(plotWidget -> channelRfiBox, SIGNAL(clicked()), SLOT(applyRFI()));
+    connect(plotWidget -> spectrumRfiBox, SIGNAL(clicked()), SLOT(applyRFI()));
+    connect(plotWidget -> spectrumThresholdBox, SIGNAL(valueChanged(double)), SLOT(applyRFI()));
+    connect(plotWidget -> channelThresholdBox, SIGNAL(valueChanged(double)), SLOT(applyRFI()));
+    connect(plotWidget -> channelBlockBox, SIGNAL(valueChanged(int)), SLOT(applyRFI()));
+    connect(plotWidget -> fitDegreesBox, SIGNAL(valueChanged(int)), SLOT(applyRFI()));
+    connect(plotWidget->channelMaskEdit, SIGNAL(returnPressed()), SLOT(applyRFI()));
 
     // Initialiase channel plot
     plotWidget -> chanPlot -> setTitle("Channel Intensity plot");
 
     // Initialiase bandpass plot
     plotWidget -> bandPlot -> setTitle("Bandpass plot");
+
+    // Initialise timeseries plot
+    plotWidget -> timePlot -> setTitle("Time series plot");
 
     // Initialiase spectogram plot
     spect = new QwtPlotSpectrogram();
@@ -96,22 +118,31 @@ MainWindow::MainWindow()
 }
 
 // Destructor
-MainWindow::~MainWindow() { }
+MainWindow::~MainWindow()
+{
+    free(_buffer);
+    free(_x);
+    free(_y);
+    free(_xB);
+    free(_yB);
+    free(_delays);
+    free(_bandpassFit);
+}
 
 // Initialise plotter
 void MainWindow::initialisePlotter()
 {
     // Allocate memory buffers
-    _temp   = (float *) malloc(_nSamples * _nChannels * sizeof(float));
     _buffer = (float *) malloc(_nSamples * _nChannels * sizeof(float));
     _x      = (double *) malloc(_nSamples * sizeof(double));
     _y      = (double *) malloc(_nSamples * sizeof(double));
     _xB     = (double *) malloc(_nChannels * sizeof(double));
     _yB     = (double *) malloc(_nChannels * sizeof(double));
+    _delays = (int *) malloc(_nChannels * sizeof(int));
 
     // Initialise UI
     plotWidget -> verticalGroupBox -> setEnabled(true);
-    plotWidget -> channelSpin->setEnabled(true);
+    plotWidget -> channelSpin-> setEnabled(true);
     plotWidget -> sampleSpin -> setMaximum(_totalSamples);
 
     // Initialise Plots
@@ -132,9 +163,23 @@ void MainWindow::initialisePlotter()
     zoomer->setTrackerPen(c);
 
     // Update UI
-    plotWidget->groupBox->setEnabled(true);
-    plotWidget->groupBox_2->setEnabled(true);
-    plotWidget->plotButton->setEnabled(true);
+    plotWidget -> groupBox   -> setEnabled(true);
+    plotWidget -> groupBox_2 -> setEnabled(true);
+    plotWidget -> groupBox_3 -> setEnabled(true);
+    plotWidget -> groupBox_4 -> setEnabled(true);
+    plotWidget -> channelBlockBox->setEnabled(false);
+    plotWidget -> spectrumThresholdBox->setEnabled(false);
+    plotWidget -> channelThresholdBox->setEnabled(false);
+
+    // Initialise delays array
+    memset(_delays, 0, _nChannels * sizeof(int));
+
+    // Initialise folding options
+    _folded = false;
+
+    // Initialise RFI options
+    _clipChannel = _clipSpectrum = false;
+    _bandpassFit = (double *) malloc(_nChannels * sizeof(double));
 
     // Preliminary plot
     plot(true);
@@ -180,39 +225,105 @@ void MainWindow::liveFiles()
         }
 
         // Process all files
-        for(unsigned i = 0; i < dialog.filenames.length(); i++)
+        for(int i = 0; i < dialog.filenames.length(); i++)
         {
             // Open and read all the file
             fp = fopen(dialog.filenames[i].toAscii(), "rb");
             unsigned total_read = read_block(fp, dialog.nBits, temp, filesize / (dialog.nBits / 8));
 
+            std::cout << "Processing file " << dialog.filenames[i].toAscii().data() << std::endl;
+
+            // Set number of omp threads
+            omp_set_num_threads(dialog.nBeams);
+            //printf("Number of cores for openmp: %d\n", sysconf( _SC_NPROCESSORS_ONLN ) / 2);
+
             // If the data is Mu-Law encoded, then we have to decode it first
             if (dialog.muLawEncoded && dialog.nBits == 8)
             {
-                float log_one_plus_mu = log10(1 + mu);
-                float invserse_mu = 1.0 / mu;
-                float quant_interval = 1.0 / 255.0;
+                // Total power with each value packed in 8 bits
+                if (dialog.hasTotalPower)
+                {
+                    float log_one_plus_mu = log10(1 + mu);
+                    float invserse_mu = 1.0 / mu;
+                    float quant_interval = 1.0 / 255.0;
 
-                // Start decoding data
+                    // Start decoding data
+                    #pragma omp parallel \
+                        shared(total_read, temp, quant_interval, log_one_plus_mu, invserse_mu )
+                    {
+                        unsigned threadId = omp_get_thread_num();
+                        unsigned numThreads = omp_get_num_threads();
+
+                        for(unsigned i = 0; i < total_read / numThreads; i++)
+                        {
+                            unsigned index = (total_read / numThreads) * threadId + i;
+                            float datum = temp[index] * quant_interval;
+                            temp[index] = (powf(10.0, log_one_plus_mu * datum) - 1) * invserse_mu;
+                        }
+                    }
+                }
+                // Complex voltages with each value packed in 8 bits (4 bits per component)
+                else
+                {
+                    float log_one_plus_mu = log10(1 + mu);
+                    float invserse_mu = 1.0 / mu;
+                    float quant_interval = 1.0 / 8.0;
+
+                    // Start decoding data
+                    #pragma omp parallel \
+                        shared(total_read, temp, quant_interval, log_one_plus_mu, invserse_mu )
+                    {
+                        unsigned threadId = omp_get_thread_num();
+                        unsigned numThreads = omp_get_num_threads();
+
+                        // Start decoding data
+                        for(unsigned i = 0; i < total_read / numThreads; i++)
+                        {
+                            // Each char contains 2 values: real and complex
+                            // containg 4 bits, one for sign and the others for the value
+                            unsigned char value = temp[(total_read / numThreads) * threadId + i];
+
+                            char real_sign  = ((value & 0x80) == 0) ? 1 : -1;
+                            char imag_sign  = ((value & 0x08) == 0) ? 1 : -1;
+                            char real_value = (value & 0x70) >> 4;
+                            char imag_value = value & 0x07;
+
+                            float real_datum = real_value * quant_interval;
+                            float imag_datum = imag_value * quant_interval;
+                            float x = (powf(10.0, (float) log_one_plus_mu * real_datum) - 1) * invserse_mu * real_sign;
+                            float y = (powf(10.0, (float) log_one_plus_mu * imag_datum) - 1) * invserse_mu * imag_sign;
+                            temp[(total_read / numThreads) * threadId + i] = x * x + y * y ;
+                        }
+                    }
+                }
+            }
+            // If data contains voltage power, convert to total power
+            else if (!dialog.hasTotalPower)
+            {
+                short *shortBuffer = (short *) temp;
                 for(unsigned i = 0; i < total_read; i++)
                 {
-                    float datum = temp[i] * quant_interval;
-                    temp[i] = (powf(10.0, log_one_plus_mu * datum) - 1) * invserse_mu;
+                    short x = shortBuffer[i * 2];
+                    short y = shortBuffer[i * 2 + 1];
+                    temp[i] = x * x + y * y;
                 }
             }
             fclose(fp);
 
             unsigned nsamp = total_read / ((float) dialog.nBeams * dialog.nChannels);
             unsigned nchans = dialog.nChannels;
-            unsigned nbeams = dialog.nBeams;
 
             // Loop over all beams and write data to files
-            for(unsigned j = 0; j < nbeams; j++)
+            #pragma omp parallel
+            {
+                unsigned j = omp_get_thread_num();
+
                 // Current processing beam j, loop over all samples
                 for(unsigned k = 0; k < nsamp; k++)
                     // Loop over all channels
                     for(unsigned l = 0; l < nchans; l++)
                         fwrite((void *) &temp[j * nsamp * nchans + l * nsamp + k], sizeof(float), 1, beam_file[j]);
+            }
         }
 
         // We have processed all the files! Select which beam to display
@@ -222,7 +333,7 @@ void MainWindow::liveFiles()
         plotWidget -> beamNumber -> setMaximum(dialog.nBeams);
 
         // Get valid filename and read header
-        filename = QString("/tmp/%1.dat").arg(plotWidget->beamNumber->value() - 1);
+        filename = QString("/tmp/0.dat");
         file = fopen(filename.toUtf8().data(), "rb");
         _headerSize = 0;
 
@@ -256,6 +367,193 @@ void MainWindow::liveFiles()
         msgBox.setText("Invalid selection please choose files which were dumped by MDSM");
         msgBox.exec();
     }
+}
+
+// Apply folding if required
+void MainWindow::applyFolding()
+{
+    // Apply folding to data series
+    if (!_folded)
+    {       
+        int numFolds     = plotWidget->foldingSpinBox->value();
+        _profileLength   = round((plotWidget->periodSpinBox->value() * 1e-3) / _timestep);
+
+        // Check if we have enough values in file (from current position)
+        // to generate required profile
+        if (_profileLength * numFolds > _totalSamples - _currentSample || plotWidget->periodSpinBox->value() < 0.001)
+        {
+            QMessageBox msgBox;
+            msgBox.setText(QString("Not enough data to generate profile with current settings."));
+            msgBox.exec();
+            _profileLength = 0;
+            return;
+        }
+
+        // Set as folded
+        _folded = true;
+
+        // Update UI
+        (plotWidget -> beamNumber)->setEnabled(false);
+        (plotWidget -> dmSpinBox)->setEnabled(false);
+        (plotWidget -> periodSpinBox)->setEnabled(false);
+        (plotWidget -> groupBox_4) -> setEnabled(false);
+        _clipChannel = _clipSpectrum = false;
+        plotWidget->plotButton->setText("Toggle Plot Type (Data)");
+
+        // Initialise profile file
+        QFile::remove(QString("/tmp/profile.dat"));
+        profileFilename = QString("/tmp/profile.dat");
+        profileFile = fopen(profileFilename.toAscii(), "wb");
+
+        // Allocate temporary memory space
+        unsigned maxshift = _delays[_nChannels - 1];
+        float *temp    = (float *) malloc((_profileLength + maxshift) * _nChannels * sizeof(float));
+        float *profile = (float *) malloc(_profileLength * _nChannels * sizeof(float));
+        memset(temp, 0, (_profileLength + maxshift) * _nChannels * sizeof(float));
+        memset(profile, 0, _profileLength * _nChannels * sizeof(float));
+
+        // Load data to generate profile
+        for(unsigned p = 0; p < numFolds; p++)
+        {
+            // Seek file to start of current profile
+            fseek(file, _headerSize + (unsigned long) (_currentSample + p * _profileLength) * _nChannels * _nBits / 8 , SEEK_SET);
+
+            // Read current block
+            read_block(file, _nBits, temp, (_profileLength + maxshift) * _nChannels);
+
+            // Create data buffer whilst integrating and dedispersing
+            for(unsigned i = 0; i < _profileLength; i++)
+                for(unsigned j = 0; j < _nChannels; j++)
+                        profile[i * _nChannels + j] += temp[i * _nChannels + _delays[j] * _nChannels + j];
+        }
+
+        // Write profile to file
+        fwrite(profile, sizeof(float), _profileLength * _nChannels, profileFile);
+        fclose(profileFile);
+
+        // Finished generating file, set profile file as current one
+        _origTotalSamples = _totalSamples;
+        _origCurrentSample = _currentSample;
+        _currentSample = 0;
+        plot(true);
+
+        // Clear temporary memory
+        free(profile);
+        free(temp);
+
+    }
+    // Don't apply folding to data series, reset plotter
+    else
+    {
+        // Update UI
+        (plotWidget -> beamNumber)->setEnabled(true);
+        (plotWidget -> dmSpinBox)->setEnabled(true);
+        (plotWidget -> periodSpinBox)->setEnabled(true);
+        plotWidget->groupBox_4->setEnabled(true);
+        _clipChannel = plotWidget->channelRfiBox->isChecked();
+        _clipChannel = plotWidget->spectrumRfiBox->isChecked();
+        plotWidget->plotButton->setText("Toggle Plot Type (Folded Profile)");
+
+        _folded = false;
+
+        plot(true);
+    }
+}
+
+// Apply RFI clipping if required
+void MainWindow::applyRFI()
+{
+    // Set global variables
+    _clipChannel  = plotWidget -> channelRfiBox  -> isChecked();
+    _clipSpectrum = plotWidget -> spectrumRfiBox -> isChecked();
+    _channelBlock = plotWidget -> channelBlockBox -> value();
+    _degrees      = plotWidget -> fitDegreesBox->value();
+
+    // Check if we need to clip any channels
+    QString mask = plotWidget->channelMaskEdit->text();
+    QStringList maskList = mask.split(",", QString::SkipEmptyParts);
+    _channelMask.clear();
+
+    // For each comma-separated item, check if we have a range
+    // specified as well
+    for(int i = 0; i < maskList.count(); i++)
+        if (maskList[i].contains(QString("-")))
+        {
+            // We are dealing with a range, process accordingly
+            QStringList range = maskList[i].split("-", QString::SkipEmptyParts);
+            unsigned from = range[0].toUInt(), to = range[1].toUInt();
+            _channelMask.append(QPair<int, int>(from, to));
+        }
+        else
+            _channelMask.append(QPair<int, int>(-1, maskList[i].toUInt()));
+
+    // Update mask
+    plot(false);
+}
+
+// Number of fold changed
+void MainWindow::foldNumberChanged(int)
+{
+    // Nothing to do if we are not in folding mode
+//    if (!_folded)
+//        return;
+//
+//    // Recreate new pulse profile with updated number of folds
+//    int numFolds     = plotWidget->foldingSpinBox->value();
+//    _profileLength   = round((plotWidget->periodSpinBox->value() * 1e-3) / _timestep);
+//
+//    // Check if we have enough values in file (from current position)
+//    // to generate required profile
+//    if (_profileLength * numFolds > _origTotalSamples - _origCurrentSample || plotWidget->periodSpinBox->value() < 0.001)
+//    {
+//        QMessageBox msgBox;
+//        msgBox.setText(QString("Not enough data to generate profile with current settings."));
+//        msgBox.exec();
+//        _profileLength = 0;
+//        return;
+//    }
+//
+//    // Initialise profile file
+//    QFile::remove(QString("/tmp/profile.dat"));
+//    profileFilename = QString("/tmp/profile.dat");
+//    profileFile = fopen(profileFilename.toAscii(), "wb");
+//
+//    // Allocate temporary memory space
+//    unsigned maxshift = _delays[_nChannels - 1];
+//    float *temp    = (float *) malloc((_profileLength + maxshift) * _nChannels * sizeof(float));
+//    float *profile = (float *) malloc(_profileLength * _nChannels * sizeof(float));
+//    memset(temp, 0, (_profileLength + maxshift) * _nChannels * sizeof(float));
+//    memset(profile, 0, _profileLength * _nChannels * sizeof(float));
+//
+//    // Initialise original file
+//    FILE *orig_file = fopen(filename.toUtf8().data(), "rb");
+//
+//    // Load data to generate profile
+//    for(unsigned p = 0; p < numFolds; p++)
+//    {
+//        // Seek file to start of current profile
+//        fseek(file, _headerSize + (unsigned long) (_origCurrentSample + p * _profileLength) * _nChannels * _nBits / 8 , SEEK_SET);
+//
+//        // Read current block
+//        read_block(orig_file, _nBits, temp, (_profileLength + maxshift) * _nChannels);
+//
+//        // Create data buffer whilst integrating and dedispersing
+//        for(unsigned i = 0; i < _profileLength; i++)
+//            for(unsigned j = 0; j < _nChannels; j++)
+//                    profile[i * _nChannels + j] += temp[i * _nChannels + _delays[j] * _nChannels + j];
+//    }
+//
+//    // Write profile to file
+//    fwrite(profile, sizeof(float), _profileLength * _nChannels, profileFile);
+//    fclose(profileFile);
+//    fclose(orig_file);
+//
+//    // Finished generating file, set profile file as current one
+//    plot(true);
+//
+//    // Clear temporary memory
+//    free(profile);
+//    free(temp);
 }
 
 // Open a data file to plot
@@ -300,6 +598,8 @@ void MainWindow::openFile()
             _totalSamples = _filesize / (_nChannels * (_nBits / 8));
             _currentSample = 0;
             fseek(file, 0L, SEEK_SET);
+
+            _folded = false;
 
             // Initiliase plotter
             initialisePlotter();
@@ -355,6 +655,48 @@ void MainWindow::quit()
     close();
 }
 
+// Export plot to disk
+void MainWindow::exportPlot()
+{
+    // Create QPixmap
+    QPixmap pixmap(600, 600);
+    pixmap.fill(Qt::white);
+
+    // Create filter
+    QwtPlotPrintFilter filter;
+    int options = QwtPlotPrintFilter::PrintAll;
+    options &= ~QwtPlotPrintFilter::PrintBackground;
+    options |= QwtPlotPrintFilter::PrintFrameWithScales;
+    filter.setOptions(options);
+
+    // Print current plot to pixmap
+    if (plotWidget -> tabWidget -> currentIndex() == 2)
+        plotWidget -> bandPlot -> print(pixmap, filter);
+    else if (plotWidget -> tabWidget -> currentIndex() == 1)
+        plotWidget -> chanPlot -> print(pixmap, filter);
+    else if (plotWidget -> tabWidget -> currentIndex() == 0)
+        plotWidget -> specPlot -> print(pixmap, filter);
+    else
+        plotWidget -> timePlot -> print(pixmap, filter);
+
+    // Show save file dialog
+    QFileDialog dialog(this);
+    dialog.setFileMode(QFileDialog::AnyFile);
+
+    if (dialog.exec())
+    {
+        QStringList filenames = dialog.selectedFiles();
+        if (filenames.length() == 0)
+            return;
+
+        QString filename = filenames[0];
+
+        QFile file(filename);
+        file.open(QIODevice::WriteOnly);
+        pixmap.save(&file, "PNG");
+    }
+}
+
 // Beam number changed, change file
 void MainWindow::beamNumberChanged(int i)
 {
@@ -363,9 +705,33 @@ void MainWindow::beamNumberChanged(int i)
     _headerSize = 0;
     _currentSample = 0;
 
-    plot(true);
+    // Open file, read header and update internal parameters
+     file = fopen(filename.toUtf8().data(), "rb");
+     header = read_header(file);
+     _headerSize = (header == NULL) ? 0 : header -> total_bytes;
+
+     fseek(file, 0L, SEEK_END);
+     _filesize = ftell(file) - _headerSize;
+     _totalSamples = _filesize / (_nChannels * (_nBits / 8));
+     fseek(file, 0L, SEEK_SET);
+
+    plot(false);
 }
 
+// DM changed
+void MainWindow::dmChanged(double dm)
+{
+    // Generate new delays array
+    for(unsigned i = 0; i < _nChannels; i++)
+    {
+        float F2 = _topFrequency;
+        float F1 = _topFrequency - i * (_bandwidth / _nChannels);
+        _delays[i] = (4148.741601 * ((1.0 / F1 / F1) - (1.0 / F2 / F2))) * dm / _timestep;
+    }
+
+    // Update plots
+    plot(false);
+}
 
 // Slider has moved, adjust plots to reflect
 // time in file
@@ -395,47 +761,205 @@ void MainWindow::sampleSpin(int i)
     plot(false);
 }
 
-
 // Perform requried calculation for plotting
 void MainWindow::createDataBuffer(unsigned integrate)
 {
     // Reset buffers
-    memset(_temp, 0, _nSamples * _nChannels * sizeof(float));
-    memset(_buffer, 0, _nSamples * _nChannels * sizeof(float));
-
-    // Check if we have enough memory space
-    if (integrate > _nSamples)
+    if (_folded)
     {
-        fprintf(stderr, "Integration limit is %d\n", _nSamples);
-        exit(0);
+        float *temp   = (float *) malloc(_nSamples * _nChannels * integrate * sizeof(float));
+
+        memset(temp, 0, _nSamples * _nChannels * sizeof(float));
+        memset(_buffer, 0, _nSamples * _nChannels * sizeof(float));
+
+        // Load file to buffer
+        read_block(file, _nBits, temp, _nSamples * integrate * _nChannels);
+
+        // Create data buffer whilst integrating and dedispersing
+        for(unsigned i = 0; i < _nSamples; i++)
+            for(unsigned j = 0; j < _nChannels; j++)
+                for(unsigned k = 0; k < integrate; k++)
+                    _buffer[i * _nChannels + j] += temp[i * integrate * _nChannels + k * _nChannels + j] / integrate;;
+
+        free(temp);
     }
-
-    // Read data from file whilst integrating
-    for(unsigned i = 0; i < _nSamples; i++)
+    else
     {
-        read_block(file, _nBits, _temp, integrate * _nChannels);
+        unsigned maxshift = _delays[_nChannels - 1];
+        float *temp   = (float *) malloc((_nSamples + maxshift) * integrate * _nChannels * sizeof(float));
 
-        // If the data is Mu-Law encoded, then we have to decode it first
-        if (_muLawEncoded && _nBits == 8)
+        memset(temp, 0, _nSamples * _nChannels * sizeof(float));
+        memset(_buffer, 0, _nSamples * _nChannels * sizeof(float));
+
+        // Load file to buffer
+        read_block(file, _nBits, temp, (_nSamples + maxshift) * integrate * _nChannels);
+
+        // Create data buffer whilst integrating and dedispersing
+        for(unsigned i = 0; i < _nSamples; i++)
+            for(unsigned j = 0; j < _nChannels; j++)
+                for(unsigned k = 0; k < integrate; k++)
+                    _buffer[i * _nChannels + j] += temp[i * integrate * _nChannels + k * _nChannels + _delays[j] * _nChannels + j] / integrate;
+
+        // Data buffer created, check if we need to perform any clipping (only performed on non-folded data)
+        if (_clipChannel || _clipSpectrum)
         {
-            float log_one_plus_mu = log10(1 + mu);
-            float invserse_mu = 1.0 / mu;
-            float quant_interval = 1.0 / 255.0;
+            // Create bandpass for fitting
+            memset(_xB, 0, _nChannels * sizeof(double));
+            memset(_yB, 0, _nChannels * sizeof(double));
+            memset(_bandpassFit, 0, _nChannels * sizeof(double));
+            for(unsigned i = 0; i < _nChannels; i++)
+                _xB[i] = i / (1.0 * _nChannels);
 
-            // Start decoding data
-            for(unsigned i = 0; i < integrate * _nChannels; i++)
+            for(unsigned j = 0; j < _nSamples; j++)
+                for(unsigned i = 0; i < _nChannels; i++)
+                    _yB[i] += _buffer[j * _nChannels + i] / _nChannels;
+
+            // Now that we have a bandpass, check if we need to mask any channels
+            for(int i = 0; i < _channelMask.size(); i++)
             {
-                float datum = _temp[i] * quant_interval;
-                _temp[i] = (powf(10.0, log_one_plus_mu * datum) - 1) * invserse_mu;
+                // Check if current mask refers to a range
+                if (_channelMask[i].first == -1)
+                {
+                    int index = _channelMask[i].second;
+                    if (index == 0)
+                        _yB[0] = (_yB[1] + _yB[2]) / 2.0;
+                    else if (index == _nChannels - 1)
+                        _yB[_nChannels - 1] = (_yB[_nChannels - 2] + _yB[_nChannels - 3]) / 2.0;
+                    else
+                        _yB[index] = (_yB[index-1] + _yB[index+1]) / 2.0;
+                }
+                else
+                {
+                    // Dealing with a frequency range, need to interpolate from range borders
+                    float value = (_yB[_channelMask[i].first - 1], _yB[_channelMask[i].first + 1]) / 2.0;
+                    for(int j = _channelMask[i].first; j <= _channelMask[i].second; j++)
+                        _yB[j] = value;
+                }
             }
+
+            // Fit bandpass
+            gsl_multifit_linear_workspace *ws;
+            gsl_matrix *cov, *X;
+            gsl_vector *y, *c;
+            double chisq;
+
+            X = gsl_matrix_alloc(_nChannels, _degrees);
+            y = gsl_vector_alloc(_nChannels);
+            c = gsl_vector_alloc(_degrees);
+            cov = gsl_matrix_alloc(_degrees, _degrees);
+
+            for(unsigned i = 0; i < _nChannels; i++)
+            {
+                gsl_matrix_set(X, i, 0, 1.0);
+                for(unsigned j = 0; j < _degrees; j++)
+                    gsl_matrix_set(X, i, j, pow(_xB[i], j));
+                 gsl_vector_set(y, i, _yB[i]);
+            }
+
+            ws = gsl_multifit_linear_alloc(_nChannels, _degrees);
+            gsl_multifit_linear(X, y, c, cov, &chisq, ws);
+
+            // Store coefficients
+            double coeffs[_nChannels];
+            for(unsigned i = 0; i < _degrees; i++)
+                coeffs[i] = gsl_vector_get(c, i);
+
+            // Generate fitted bandpass
+            for(unsigned i = 0; i < _nChannels; i++)
+                for(unsigned j = 0; j < _degrees; j++)
+                    _bandpassFit[i] += coeffs[j] * pow(_xB[i], j);
+
+            // Calculate MSE between fit and banpass
+            float mse = 0;
+            for(unsigned i = 0; i < _nChannels; i++)
+                mse += pow(_yB[i] - _bandpassFit[i], 2);
+            mse /= _nChannels;
+            mse = sqrt(mse);
+
+            // Calculate bandpass mean and std
+            float bandpass_mean = 0, bandpass_std = 0;
+            for(unsigned i = 0; i < _nChannels; i++)
+                 bandpass_mean += _yB[i];
+            bandpass_mean /= _nChannels;
+
+            for(unsigned i = 0; i < _nChannels; i++)
+                bandpass_std += (_yB[i] - bandpass_mean) * (_yB[i] - bandpass_mean);
+            bandpass_std = sqrt(bandpass_std / _nChannels);
+
+            // Perform channel clipping if required
+            if (_clipChannel)
+            {
+                float thresh = plotWidget->channelThresholdBox->value() * mse;
+
+                if (_channelBlock == 1)
+                {
+                    for(unsigned i = 0; i < _nSamples; i++)
+                        for(unsigned j = 0; j < _nChannels; j++)
+                            if (_buffer[i * _nChannels + j] > thresh)
+                                _buffer[i * _nChannels + j] = _bandpassFit[i];
+                }
+                else
+                {
+                    // Loop over all channels
+                    for(unsigned i = 0; i < _nChannels; i++)
+                    {
+                        // Generate a bool array to store block rfi switch
+                        unsigned blocks = _nSamples / _channelBlock;
+                        bool rfi[blocks];
+                        for(unsigned b = 0; b < blocks; b++) rfi[b] = false;
+
+                        // Loop over blocks
+                        for(unsigned j = 0; j < blocks; j++)
+                        {
+                            float value = 0;
+                            for(unsigned k = 0; k < _channelBlock; k++)
+                                value += _buffer[(j * _channelBlock + k) * _nChannels + i] / _channelBlock;
+
+                            if (value > thresh)
+                            {
+                                rfi[j] = true;
+                                if (j > 0) rfi[j-1] = true;
+                                if (j < blocks - 1) rfi[j+1] = true;
+                            }
+                        }
+
+                        // Mask rfi of affected blocks
+                        for(unsigned j = 0; j < blocks; j++)
+                            if (rfi[j])
+                                for(unsigned k = 0; k < _channelBlock; k++)
+                                    _buffer[(j * _channelBlock + k) * _nChannels + i] = _yB[i];
+                    }
+                }
+            }
+
+            // Perform spectrum clipping if required
+            if (_clipSpectrum)
+            {
+                float thresh = bandpass_mean + plotWidget->spectrumThresholdBox->value() * bandpass_std;
+                for(unsigned i = 0; i < _nSamples; i++)
+                {
+                    float value = 0;
+                    for(unsigned j = 0; j < _nChannels; j++)
+                        value += _buffer[i * _nChannels + j] / _nChannels;
+
+                    if (value > thresh)
+                        for(unsigned j = 0; j < _nChannels; j++)
+                            _buffer[i * _nChannels + j] = _yB[j];
+                }
+            }
+
+            gsl_multifit_linear_free(ws);
+            gsl_matrix_free(X);
+            gsl_matrix_free(cov);
+            gsl_vector_free(y);
+            gsl_vector_free(c);
         }
 
-        for(unsigned j = 0; j < _nChannels; j++)
-            for(unsigned k = 0; k < integrate; k++)
-                _buffer[i * _nChannels + j] += _temp[k * _nChannels + j] / integrate;
+        free(temp);
     }
 }
 
+// Plot channel when channel number changes
 void MainWindow::plotChannel(int i)
 {
     // Clear memory
@@ -443,10 +967,9 @@ void MainWindow::plotChannel(int i)
     memset(_y, 0, _nSamples * sizeof(double));
 
     // Populate buffers
-    unsigned channel = plotWidget->channelSpin->value();
-    for(unsigned i = 0; i < _nSamples; i++) {
-        _x[i] = i;
-        _y[i] = _buffer[i * _nChannels + channel];
+    for(unsigned j = 0; j < _nSamples; j++) {
+        _x[j] = j;
+        _y[j] = _buffer[j * _nChannels + i];
     }
 
     // Update plot
@@ -458,10 +981,11 @@ void MainWindow::plotChannel(int i)
     plotWidget -> chanPlot -> replot();
 }
 
+// Update plots
 void MainWindow::plot(bool reset)
 {
-     try
-     {
+//     try
+//     {
         // Read plot parameters
         unsigned integrate = plotWidget -> integrationBox -> value();
         unsigned channel = plotWidget->channelSpin->value();
@@ -475,7 +999,11 @@ void MainWindow::plot(bool reset)
        if (reset)
        {
            // Open file, read header and update internal parameters
-            file = fopen(filename.toUtf8().data(), "rb");
+           if (_folded)
+                file = fopen(profileFilename.toUtf8().data(), "rb");
+           else
+                file = fopen(filename.toUtf8().data(), "rb");
+
             header = read_header(file);
             _headerSize = (header == NULL) ? 0 : header -> total_bytes;
 
@@ -528,6 +1056,27 @@ void MainWindow::plot(bool reset)
             plotWidget -> chanPlot -> replot();
         }
 
+        // ------------ Do the time series plot ------------------------
+        if (plotWidget -> tabWidget -> currentIndex() == 3)
+        {
+            memset(_x, 0, _nSamples * sizeof(double));
+            memset(_y, 0, _nSamples * sizeof(double));
+            for(unsigned i = 0; i < _nSamples; i++)
+            {
+                _x[i] = i;
+                for(unsigned j = 0; j < _nChannels; j++)
+                    _y[i] += _buffer[i * _nChannels + j];
+            }
+
+            plotWidget -> timePlot -> clear();
+            plotWidget -> timePlot -> setCanvasBackground(Qt::black);
+            QwtPlotCurve *chan = new QwtPlotCurve("Time Series Plot");
+            chan -> setPen(QPen(Qt::yellow, 1));
+            chan -> attach(plotWidget -> timePlot);
+            chan -> setData(_x, _y, _nSamples);
+            plotWidget -> timePlot -> replot();
+        }
+
         // ------------ Do the bandpass plot ------------------------
         if (plotWidget -> tabWidget -> currentIndex() == 2)
         {
@@ -538,14 +1087,32 @@ void MainWindow::plot(bool reset)
 
             for(unsigned j = 0; j < _nSamples; j++)
                 for(unsigned i = 0; i < _nChannels; i++)
-                    _yB[i] += 10 * log10(_buffer[j * _nChannels + i] / _nChannels);
+                {
+                    float value = _buffer[j * _nChannels + i] / _nChannels;
+                    _yB[i] += (value != 0) ? value : 10e-4;
+                }
 
             plotWidget -> bandPlot -> clear();
             plotWidget -> bandPlot -> setCanvasBackground(Qt::black);
+
+            // Add bandpass plot
             QwtPlotCurve *band = new QwtPlotCurve("Bandpass Plot");
             band -> setPen(QPen(Qt::yellow));
             band -> attach(plotWidget -> bandPlot);
             band -> setData(_xB, _yB, _nChannels);
+
+            // If performing any clipping, add the bandpass fit as well
+            if (_clipChannel || _clipSpectrum)
+            {
+                band = new QwtPlotCurve("Bandpass Fit Plot");
+                QPen pen;
+                pen.setColor(Qt::red);
+                pen.setWidth(3);
+                pen.setStyle(Qt::DashLine);
+                band -> setPen(pen);
+                band -> attach(plotWidget -> bandPlot);
+                band -> setData(_xB, _bandpassFit, _nChannels);
+            }
             plotWidget -> bandPlot -> replot();
         }
 
@@ -564,9 +1131,9 @@ void MainWindow::plot(bool reset)
             plotWidget -> specPlot -> replot();
         }
 
-    } catch ( ... ) {
-        QMessageBox msgBox;
-        msgBox.setText("Not enough data in file");
-        msgBox.exec();
-    }
+//    } catch ( ... ) {
+//        QMessageBox msgBox;
+//        msgBox.setText("Not enough data in file");
+//        msgBox.exec();
+//    }
 }

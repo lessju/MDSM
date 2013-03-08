@@ -47,10 +47,391 @@
     <property name="verticalSpacing">
      <number>0</number>
     </property>
+    <item row="1" column="0" rowspan="4">
+     <layout class="QVBoxLayout" name="verticalGroupBox" stretch="5,5,8,10">
+      <property name="sizeConstraint">
+       <enum>QLayout::SetMinimumSize</enum>
+      </property>
+      <item>
+       <widget class="QGroupBox" name="groupBox">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="title">
+         <string>Plotter Settings</string>
+        </property>
+        <widget class="QWidget" name="gridLayoutWidget_2">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>20</y>
+           <width>341</width>
+           <height>68</height>
+          </rect>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_2" columnstretch="1,1,0">
+          <property name="leftMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>5</number>
+          </property>
+          <property name="horizontalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Integrate:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0" rowspan="2">
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>Beam Number:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1" colspan="2">
+           <widget class="QSpinBox" name="integrationBox">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>4096</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1" colspan="2">
+           <widget class="QSpinBox" name="beamNumber">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox_2">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="title">
+         <string>Time Control</string>
+        </property>
+        <widget class="QWidget" name="gridLayoutWidget_3">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>20</y>
+           <width>341</width>
+           <height>71</height>
+          </rect>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_3" columnstretch="1,4,2">
+          <property name="leftMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>5</number>
+          </property>
+          <property name="horizontalSpacing">
+           <number>10</number>
+          </property>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_5">
+            <property name="text">
+             <string>Finer Control:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0" colspan="3">
+           <widget class="QSlider" name="timeSlider">
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="tickPosition">
+             <enum>QSlider::TicksBelow</enum>
+            </property>
+            <property name="tickInterval">
+             <number>100</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="sampleSpin">
+            <property name="singleStep">
+             <number>100</number>
+            </property>
+            <property name="value">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="current_time_label">
+            <property name="text">
+             <string>0 s</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            </property>
+            <property name="indent">
+             <number>20</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox_3">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="title">
+         <string>Pulse utilities</string>
+        </property>
+        <widget class="QWidget" name="gridLayoutWidget_4">
+         <property name="geometry">
+          <rect>
+           <x>-1</x>
+           <y>19</y>
+           <width>341</width>
+           <height>128</height>
+          </rect>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_4">
+          <property name="leftMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>5</number>
+          </property>
+          <property name="horizontalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_6">
+            <property name="text">
+             <string>Dedisperse (DM)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Period (ms)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="dmSpinBox">
+            <property name="decimals">
+             <number>3</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="periodSpinBox">
+            <property name="decimals">
+             <number>4</number>
+            </property>
+            <property name="maximum">
+             <double>5000.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>10.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="foldingSpinBox">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>Number of profiles</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <widget class="QPushButton" name="plotButton">
+            <property name="text">
+             <string>Toggle Plot Type (Data)</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox_4">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="title">
+         <string>RFI utilities</string>
+        </property>
+        <widget class="QWidget" name="gridLayoutWidget_5">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>20</y>
+           <width>341</width>
+           <height>181</height>
+          </rect>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_5" rowstretch="0,0,0,0,0,0">
+          <property name="leftMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>5</number>
+          </property>
+          <property name="horizontalSpacing">
+           <number>10</number>
+          </property>
+          <item row="3" column="1">
+           <widget class="QDoubleSpinBox" name="channelThresholdBox">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="minimum">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>100.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="channelRfiBox">
+            <property name="text">
+             <string>Channel Clipper</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="spectrumRfiBox">
+            <property name="text">
+             <string>Spectrum Clipper</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>Channel Threshold</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Channel block length</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QSpinBox" name="channelBlockBox">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>2000</number>
+            </property>
+            <property name="singleStep">
+             <number>5</number>
+            </property>
+            <property name="value">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>Spectrum Threshold</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="spectrumThresholdBox">
+            <property name="minimum">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>100.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_11">
+            <property name="text">
+             <string>Polynomial Fit Degrees</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="fitDegreesBox">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>20</number>
+            </property>
+            <property name="singleStep">
+             <number>1</number>
+            </property>
+            <property name="value">
+             <number>12</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+     </layout>
+    </item>
     <item row="1" column="1" rowspan="4">
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <property name="movable">
        <bool>true</bool>
@@ -155,180 +536,64 @@
          <cursorShape>CrossCursor</cursorShape>
         </property>
        </widget>
+       <widget class="QWidget" name="horizontalLayoutWidget">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>500</y>
+          <width>471</width>
+          <height>41</height>
+         </rect>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QLabel" name="label_12">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>Clip Specific Channels (comma-separated:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="channelMaskEdit">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
       </widget>
-     </widget>
-    </item>
-    <item row="1" column="0" rowspan="4">
-     <layout class="QVBoxLayout" name="verticalGroupBox" stretch="1,1,3,1">
-      <property name="sizeConstraint">
-       <enum>QLayout::SetMinimumSize</enum>
-      </property>
-      <item>
-       <widget class="QGroupBox" name="groupBox">
-        <property name="enabled">
-         <bool>false</bool>
+      <widget class="QWidget" name="timeTab">
+       <attribute name="title">
+        <string>Time Series</string>
+       </attribute>
+       <widget class="QwtPlot" name="timePlot">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>681</width>
+          <height>501</height>
+         </rect>
         </property>
-        <property name="title">
-         <string>Plotter Settings</string>
-        </property>
-        <widget class="QWidget" name="gridLayoutWidget_2">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>20</y>
-           <width>341</width>
-           <height>71</height>
-          </rect>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_2" columnstretch="1,1,0">
-          <property name="leftMargin">
-           <number>10</number>
-          </property>
-          <property name="rightMargin">
-           <number>5</number>
-          </property>
-          <property name="horizontalSpacing">
-           <number>10</number>
-          </property>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_3">
-            <property name="text">
-             <string>Integrate:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0" rowspan="2">
-           <widget class="QLabel" name="label_7">
-            <property name="text">
-             <string>Beam Number:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1" colspan="2">
-           <widget class="QSpinBox" name="integrationBox">
-            <property name="maximum">
-             <number>4096</number>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1" colspan="2">
-           <widget class="QSpinBox" name="beamNumber">
-            <property name="minimum">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <number>8</number>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </widget>
-      </item>
-      <item>
-       <widget class="QGroupBox" name="groupBox_2">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="title">
-         <string>Time Control</string>
-        </property>
-        <widget class="QWidget" name="gridLayoutWidget_3">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>20</y>
-           <width>341</width>
-           <height>91</height>
-          </rect>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_3" columnstretch="1,2">
-          <property name="leftMargin">
-           <number>10</number>
-          </property>
-          <property name="rightMargin">
-           <number>5</number>
-          </property>
-          <property name="horizontalSpacing">
-           <number>10</number>
-          </property>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_5">
-            <property name="text">
-             <string>Finer Control</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0" colspan="2">
-           <widget class="QSlider" name="timeSlider">
-            <property name="maximum">
-             <number>1000</number>
-            </property>
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="tickPosition">
-             <enum>QSlider::TicksBelow</enum>
-            </property>
-            <property name="tickInterval">
-             <number>100</number>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QSpinBox" name="sampleSpin">
-            <property name="singleStep">
-             <number>100</number>
-            </property>
-            <property name="value">
-             <number>0</number>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0" colspan="2">
-           <widget class="QLabel" name="current_time_label">
-            <property name="text">
-             <string>0 s</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-            </property>
-            <property name="indent">
-             <number>20</number>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </widget>
-      </item>
-      <item>
-       <spacer name="verticalSpacer">
-        <property name="orientation">
-         <enum>Qt::Vertical</enum>
-        </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Expanding</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
+        <property name="minimumSize">
          <size>
-          <width>20</width>
-          <height>40</height>
+          <width>500</width>
+          <height>0</height>
          </size>
         </property>
-       </spacer>
-      </item>
-      <item>
-       <widget class="QPushButton" name="plotButton">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="text">
-         <string>Plot</string>
+        <property name="cursor">
+         <cursorShape>CrossCursor</cursorShape>
         </property>
        </widget>
-      </item>
-     </layout>
+      </widget>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -346,5 +611,118 @@
   <tabstop>channelSpin</tabstop>
  </tabstops>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>channelRfiBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>fitDegreesBox</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>80</x>
+     <y>436</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>217</x>
+     <y>467</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>spectrumRfiBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>fitDegreesBox</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>270</x>
+     <y>439</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>313</x>
+     <y>467</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>channelRfiBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>channelThresholdBox</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>56</x>
+     <y>435</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>342</x>
+     <y>563</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>channelRfiBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>channelBlockBox</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>35</x>
+     <y>442</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>342</x>
+     <y>600</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>spectrumRfiBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>spectrumThresholdBox</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>244</x>
+     <y>435</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>342</x>
+     <y>526</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>channelRfiBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_12</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>50</x>
+     <y>441</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>512</x>
+     <y>591</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>channelRfiBox</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>channelMaskEdit</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>75</x>
+     <y>450</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>730</x>
+     <y>589</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

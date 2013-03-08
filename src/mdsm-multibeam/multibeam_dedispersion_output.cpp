@@ -228,7 +228,7 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
                       survey -> dbscan_snr_range, survey -> dbscan_min_points);
 
     // Cluster data points
-    vector<Cluster*> clusters = clustering.performOptimisedClustering(dataPoints);
+    vector<Cluster*> clusters = clustering.performClustering(dataPoints);
     unsigned clustersFound = clusters.size();
 
     printf("%d. Found %ld data points with %d clusters\n", (int) (time(NULL) - start_time), dataPoints.size(), clustersFound);

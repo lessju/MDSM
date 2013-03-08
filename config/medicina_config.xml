@@ -1,11 +1,11 @@
-<!-- Based on Medicina parameters -->
+	<!-- Based on Medicina parameters -->
 <observation> 
 
-    <dm lowDM="0" numDMs="512" dmStep="0.1" />
+    <dm lowDM="0" numDMs="1024" dmStep="0.1" />
 
-    <channels nchans="1024" npols="1" ncoeffs="12" />
+    <channels nchans="512" npols="1" ncoeffs="12" />
 
-    <timing tsamp="0.0001024" />
+    <timing tsamp="0.0000512" />
 
     <samples number="131072" bits="32" voltage="0"/>
     
@@ -13,16 +13,18 @@
 
     <detection threshold="5" applyMedianFilter="0" applyDetrending="0" enableTBB="0" />
 
-    <clustering applyClustering="1" minPoints="20" timeRange="50" dmRange="5" snrRange="2" />
+    <clustering applyClustering="1" minPoints="20" timeRange="50" dmRange="5" snrRange="2" 
+                minPuleWidth="0.1" applyClassification="0"/>
 
-    <writer writeToFile="0" outputBits="8" compression="255" 
-            filePrefix="TestBeam" baseDirectory="." singleFileMode="1"
+    <writer writeToFile="0" outputBits="32" compression="255" 
+            filePrefix="B0329_beam0" baseDirectory="/home/lessju/Code/MDSM/working_dir" singleFileMode="1"
             secondsPerFile="300" usePCTime="1" />
 
     <gpus ids="0" />
 
+
     <beams>
-        <beam beamId="0" topFrequency="413.8984375" frequencyOffset="-0.01953125" />
+        <beam beamId="0" topFrequency="415.03125" frequencyOffset="-0.01953125" />
     </beams>
 
 </observation>

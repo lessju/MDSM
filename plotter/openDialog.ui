@@ -158,7 +158,7 @@
     <item row="4" column="1" colspan="2">
      <widget class="QLineEdit" name="sampling_edit">
       <property name="text">
-       <string>0.0001024</string>
+       <string>0.0000512</string>
       </property>
      </widget>
     </item>
@@ -193,8 +193,13 @@
   <tabstop>filenameEdit</tabstop>
   <tabstop>pushButton</tabstop>
   <tabstop>frequency_edit</tabstop>
+  <tabstop>bandwidth_edit</tabstop>
+  <tabstop>channels_edit</tabstop>
+  <tabstop>sampling_edit</tabstop>
+  <tabstop>beamsEdit</tabstop>
   <tabstop>bitsEdit</tabstop>
   <tabstop>sampleEdit</tabstop>
+  <tabstop>muLawEncoded_checkbox</tabstop>
   <tabstop>checkBox</tabstop>
   <tabstop>buttonBox</tabstop>
  </tabstops>

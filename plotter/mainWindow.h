@@ -17,6 +17,7 @@
 #include <qwt_scale_engine.h>
 #include <iostream>
 
+
 // SpectrogramData class for waterfall plot
 class SigprocSpectrogramData: public QwtRasterData
 {
@@ -83,23 +84,29 @@ class MainWindow : public QMainWindow
         void quit();
         void plot(bool reset = false);
         void sliderMoved(int i);
+        void dmChanged(double dm);
         void beamNumberChanged(int i);
         void plotChannel(int i);
         void sampleSpin(int i);
+        void applyRFI();
+        void applyFolding();
+        void foldNumberChanged(int);
         void initialisePlotter();
+        void exportPlot();
 
     private:
         void createDataBuffer(unsigned integrate);
 
     private:
         Ui::SigprocPlotter *plotWidget;
-        FILE *file;
+        FILE *file, *profileFile;
         QWidget *plotter;
         QMenu *fileMenu;
-        QAction *openAct, *exitAct, *liveAct, *saveAct;
+        QAction *openAct, *exitAct, *liveAct, *saveAct, *exportAct;
 
         FILE_HEADER* header;
         QString filename;
+        QString profileFilename;
 
         QwtPlotSpectrogram *spect;
         SigprocSpectrogramData *data;
@@ -108,12 +115,25 @@ class MainWindow : public QMainWindow
         bool _hasTotalPower, _muLawEncoded;
 
         int _nBits;
-        unsigned long _currentSample;
+        unsigned long _currentSample, _origTotalSamples, _origCurrentSample;
         unsigned long int _filesize, _headerSize, _totalSamples;
         float _topFrequency, _bandwidth, _timestep;
 
+        // Folding-related variables
+        int  _profileLength;
+        bool _folded;
+
+        // RFI-related variables
+        bool _clipChannel, _clipSpectrum;
+        double *_bandpassFit;
+        int  _degrees, _channelBlock;
+        QList<QPair<int, int> > _channelMask;
+
+        // Dispersion delay array
+        int *_delays;
+
         // Temporary memory buffers (hopefully malloced once)
-        float *_buffer, *_temp;
+        float *_buffer;
         double *_x, *_y;
         double *_xB, *_yB;
 };

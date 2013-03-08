@@ -56,7 +56,7 @@
   <variable>buildConfiguration-Release</variable>
   <valuemap type="QVariantMap">
    <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString">Release</value>
-   <value key="QtVersionId" type="int">3</value>
+   <value key="QtVersionId" type="int">2</value>
    <value key="ToolChain" type="int">0</value>
    <value key="addQDumper" type=""></value>
    <value key="buildConfiguration" type="int">0</value>
@@ -67,7 +67,7 @@
   <valuemap type="QVariantMap">
    <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString">Release</value>
    <valuelist key="abstractProcess.Environment" type="QVariantList">
-    <value type="QString">DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-K8EFXcxaB4,guid=f19e9eb424479d075ddbf0cc50ed3153</value>
+    <value type="QString">DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-xGhAzdwrSD,guid=acb4418e7b14ae4c24cb7286513868cb</value>
     <value type="QString">DEFAULTS_PATH=/usr/share/gconf/gnome.default.path</value>
     <value type="QString">DESKTOP_SESSION=gnome</value>
     <value type="QString">DISPLAY=:0.0</value>
@@ -75,102 +75,8 @@
     <value type="QString">GDM_KEYBOARD_LAYOUT=gb</value>
     <value type="QString">GDM_LANG=en_US.utf8</value>
     <value type="QString">GNOME_DESKTOP_SESSION_ID=this-is-deprecated</value>
-    <value type="QString">GNOME_KEYRING_CONTROL=/tmp/keyring-WwgQFH</value>
-    <value type="QString">GNOME_KEYRING_PID=1873</value>
-    <value type="QString">GTK_MODULES=canberra-gtk-module</value>
-    <value type="QString">HOME=/home/lessju</value>
-    <value type="QString">LANG=en_US.utf8</value>
-    <value type="QString">LD_LIBRARY_PATH=/usr/lib/qtcreator</value>
-    <value type="QString">LOGNAME=lessju</value>
-    <value type="QString">MANDATORY_PATH=/usr/share/gconf/gnome.mandatory.path</value>
-    <value type="QString">ORBIT_SOCKETDIR=/tmp/orbit-lessju</value>
-    <value type="QString">PATH=/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games</value>
-    <value type="QString">PWD=/home/lessju</value>
-    <value type="QString">QTDIR=/usr/share/qt4</value>
-    <value type="QString">SESSION_MANAGER=local/pulsar:@/tmp/.ICE-unix/1891,unix/pulsar:/tmp/.ICE-unix/1891</value>
-    <value type="QString">SHELL=/bin/bash</value>
-    <value type="QString">SPEECHD_PORT=7560</value>
-    <value type="QString">SSH_AGENT_PID=1925</value>
-    <value type="QString">SSH_AUTH_SOCK=/tmp/keyring-WwgQFH/ssh</value>
-    <value type="QString">USER=lessju</value>
-    <value type="QString">USERNAME=lessju</value>
-    <value type="QString">XAUTHORITY=/var/run/gdm/auth-for-lessju-pMkRzL/database</value>
-    <value type="QString">XDG_CONFIG_DIRS=/etc/xdg/xdg-gnome:/etc/xdg</value>
-    <value type="QString">XDG_DATA_DIRS=/usr/share/gnome:/usr/local/share/:/usr/share/</value>
-    <value type="QString">XDG_SESSION_COOKIE=8de6bfdbc5bc05fb490f2b1f506ee0c7-1357721939.539639-1046792600</value>
-   </valuelist>
-   <valuelist key="abstractProcess.arguments" type="QVariantList">
-    <value type="QString">/home/lessju/Code/sigproc-plotter/sigproc-plotter.pro</value>
-    <value type="QString">-spec</value>
-    <value type="QString">linux-g++</value>
-    <value type="QString">-r</value>
-   </valuelist>
-   <value key="abstractProcess.command" type="QString">/usr/bin/qmake-qt4</value>
-   <value key="abstractProcess.enabled" type="bool">false</value>
-   <value key="abstractProcess.workingDirectory" type="QString">/home/lessju/Code/sigproc-plotter</value>
-  </valuemap>
- </data>
- <data>
-  <variable>buildconfiguration-Release-buildstep1</variable>
-  <valuemap type="QVariantMap">
-   <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString">Release</value>
-   <valuelist key="abstractProcess.Environment" type="QVariantList">
-    <value type="QString">DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-K8EFXcxaB4,guid=f19e9eb424479d075ddbf0cc50ed3153</value>
-    <value type="QString">DEFAULTS_PATH=/usr/share/gconf/gnome.default.path</value>
-    <value type="QString">DESKTOP_SESSION=gnome</value>
-    <value type="QString">DISPLAY=:0.0</value>
-    <value type="QString">GDMSESSION=gnome</value>
-    <value type="QString">GDM_KEYBOARD_LAYOUT=gb</value>
-    <value type="QString">GDM_LANG=en_US.utf8</value>
-    <value type="QString">GNOME_DESKTOP_SESSION_ID=this-is-deprecated</value>
-    <value type="QString">GNOME_KEYRING_CONTROL=/tmp/keyring-WwgQFH</value>
-    <value type="QString">GNOME_KEYRING_PID=1873</value>
-    <value type="QString">GTK_MODULES=canberra-gtk-module</value>
-    <value type="QString">HOME=/home/lessju</value>
-    <value type="QString">LANG=en_US.utf8</value>
-    <value type="QString">LD_LIBRARY_PATH=/usr/lib/qtcreator</value>
-    <value type="QString">LOGNAME=lessju</value>
-    <value type="QString">MANDATORY_PATH=/usr/share/gconf/gnome.mandatory.path</value>
-    <value type="QString">ORBIT_SOCKETDIR=/tmp/orbit-lessju</value>
-    <value type="QString">PATH=/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games</value>
-    <value type="QString">PWD=/home/lessju</value>
-    <value type="QString">QTDIR=/usr/share/qt4</value>
-    <value type="QString">SESSION_MANAGER=local/pulsar:@/tmp/.ICE-unix/1891,unix/pulsar:/tmp/.ICE-unix/1891</value>
-    <value type="QString">SHELL=/bin/bash</value>
-    <value type="QString">SPEECHD_PORT=7560</value>
-    <value type="QString">SSH_AGENT_PID=1925</value>
-    <value type="QString">SSH_AUTH_SOCK=/tmp/keyring-WwgQFH/ssh</value>
-    <value type="QString">USER=lessju</value>
-    <value type="QString">USERNAME=lessju</value>
-    <value type="QString">XAUTHORITY=/var/run/gdm/auth-for-lessju-pMkRzL/database</value>
-    <value type="QString">XDG_CONFIG_DIRS=/etc/xdg/xdg-gnome:/etc/xdg</value>
-    <value type="QString">XDG_DATA_DIRS=/usr/share/gnome:/usr/local/share/:/usr/share/</value>
-    <value type="QString">XDG_SESSION_COOKIE=8de6bfdbc5bc05fb490f2b1f506ee0c7-1357721939.539639-1046792600</value>
-   </valuelist>
-   <value key="abstractProcess.IgnoreReturnValue" type="bool">false</value>
-   <valuelist key="abstractProcess.arguments" type="QVariantList">
-    <value type="QString">-w</value>
-   </valuelist>
-   <value key="abstractProcess.command" type="QString">/usr/bin/make</value>
-   <value key="abstractProcess.enabled" type="bool">true</value>
-   <value key="abstractProcess.workingDirectory" type="QString">/home/lessju/Code/sigproc-plotter</value>
-  </valuemap>
- </data>
- <data>
-  <variable>buildconfiguration-Release-cleanstep0</variable>
-  <valuemap type="QVariantMap">
-   <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString">Release</value>
-   <valuelist key="abstractProcess.Environment" type="QVariantList">
-    <value type="QString">DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-k5G0Y39i5K,guid=5f0ee5dcf3548021a5d9d07c50a0ad49</value>
-    <value type="QString">DEFAULTS_PATH=/usr/share/gconf/gnome.default.path</value>
-    <value type="QString">DESKTOP_SESSION=gnome</value>
-    <value type="QString">DISPLAY=:0.0</value>
-    <value type="QString">GDMSESSION=gnome</value>
-    <value type="QString">GDM_KEYBOARD_LAYOUT=gb</value>
-    <value type="QString">GDM_LANG=en_US.utf8</value>
-    <value type="QString">GNOME_DESKTOP_SESSION_ID=this-is-deprecated</value>
-    <value type="QString">GNOME_KEYRING_CONTROL=/tmp/keyring-QuAp4e</value>
-    <value type="QString">GNOME_KEYRING_PID=1981</value>
+    <value type="QString">GNOME_KEYRING_CONTROL=/tmp/keyring-megdtf</value>
+    <value type="QString">GNOME_KEYRING_PID=2080</value>
     <value type="QString">GTK_MODULES=canberra-gtk-module</value>
     <value type="QString">HOME=/home/lessju</value>
     <value type="QString">LANG=en_US.utf8</value>
@@ -182,26 +88,80 @@
     <value type="QString">PATH=/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games</value>
     <value type="QString">PWD=/home/lessju</value>
     <value type="QString">QTDIR=/usr/share/qt4</value>
-    <value type="QString">SESSION_MANAGER=local/pulsar:@/tmp/.ICE-unix/1999,unix/pulsar:/tmp/.ICE-unix/1999</value>
+    <value type="QString">SESSION_MANAGER=local/pulsar:@/tmp/.ICE-unix/2098,unix/pulsar:/tmp/.ICE-unix/2098</value>
     <value type="QString">SHELL=/bin/bash</value>
     <value type="QString">SPEECHD_PORT=7560</value>
-    <value type="QString">SSH_AGENT_PID=2033</value>
-    <value type="QString">SSH_AUTH_SOCK=/tmp/keyring-QuAp4e/ssh</value>
+    <value type="QString">SSH_AGENT_PID=2132</value>
+    <value type="QString">SSH_AUTH_SOCK=/tmp/keyring-megdtf/ssh</value>
     <value type="QString">USER=lessju</value>
     <value type="QString">USERNAME=lessju</value>
-    <value type="QString">XAUTHORITY=/var/run/gdm/auth-for-lessju-YIWnLi/database</value>
+    <value type="QString">XAUTHORITY=/var/run/gdm/auth-for-lessju-Tydq3T/database</value>
     <value type="QString">XDG_CONFIG_DIRS=/etc/xdg/xdg-gnome:/etc/xdg</value>
     <value type="QString">XDG_DATA_DIRS=/usr/share/gnome:/usr/local/share/:/usr/share/</value>
-    <value type="QString">XDG_SESSION_COOKIE=8de6bfdbc5bc05fb490f2b1f506ee0c7-1352707401.154796-117256655</value>
+    <value type="QString">XDG_SESSION_COOKIE=8de6bfdbc5bc05fb490f2b1f506ee0c7-1362651338.967898-1473676642</value>
    </valuelist>
-   <value key="abstractProcess.IgnoreReturnValue" type="bool">true</value>
+   <value key="abstractProcess.IgnoreReturnValue" type="bool">false</value>
    <valuelist key="abstractProcess.arguments" type="QVariantList">
-    <value type="QString">clean</value>
     <value type="QString">-w</value>
    </valuelist>
    <value key="abstractProcess.command" type="QString">/usr/bin/make</value>
    <value key="abstractProcess.enabled" type="bool">true</value>
-   <value key="abstractProcess.workingDirectory" type="QString">/home/lessju/Code/sigproc-plotter</value>
+   <value key="abstractProcess.workingDirectory" type="QString">/home/lessju/Code/MDSM/plotter</value>
+  </valuemap>
+ </data>
+ <data>
+  <variable>buildconfiguration-Release-buildstep1</variable>
+  <valuemap type="QVariantMap">
+   <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString">Release</value>
+   <valuelist key="abstractProcess.Environment" type="QVariantList">
+    <value type="QString">DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-xGhAzdwrSD,guid=acb4418e7b14ae4c24cb7286513868cb</value>
+    <value type="QString">DEFAULTS_PATH=/usr/share/gconf/gnome.default.path</value>
+    <value type="QString">DESKTOP_SESSION=gnome</value>
+    <value type="QString">DISPLAY=:0.0</value>
+    <value type="QString">GDMSESSION=gnome</value>
+    <value type="QString">GDM_KEYBOARD_LAYOUT=gb</value>
+    <value type="QString">GDM_LANG=en_US.utf8</value>
+    <value type="QString">GNOME_DESKTOP_SESSION_ID=this-is-deprecated</value>
+    <value type="QString">GNOME_KEYRING_CONTROL=/tmp/keyring-megdtf</value>
+    <value type="QString">GNOME_KEYRING_PID=2080</value>
+    <value type="QString">GTK_MODULES=canberra-gtk-module</value>
+    <value type="QString">HOME=/home/lessju</value>
+    <value type="QString">LANG=en_US.utf8</value>
+    <value type="QString">LANGUAGE=</value>
+    <value type="QString">LD_LIBRARY_PATH=/usr/lib/qtcreator</value>
+    <value type="QString">LOGNAME=lessju</value>
+    <value type="QString">MANDATORY_PATH=/usr/share/gconf/gnome.mandatory.path</value>
+    <value type="QString">ORBIT_SOCKETDIR=/tmp/orbit-lessju</value>
+    <value type="QString">PATH=/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games</value>
+    <value type="QString">PWD=/home/lessju</value>
+    <value type="QString">QTDIR=/usr/share/qt4</value>
+    <value type="QString">SESSION_MANAGER=local/pulsar:@/tmp/.ICE-unix/2098,unix/pulsar:/tmp/.ICE-unix/2098</value>
+    <value type="QString">SHELL=/bin/bash</value>
+    <value type="QString">SPEECHD_PORT=7560</value>
+    <value type="QString">SSH_AGENT_PID=2132</value>
+    <value type="QString">SSH_AUTH_SOCK=/tmp/keyring-megdtf/ssh</value>
+    <value type="QString">USER=lessju</value>
+    <value type="QString">USERNAME=lessju</value>
+    <value type="QString">XAUTHORITY=/var/run/gdm/auth-for-lessju-Tydq3T/database</value>
+    <value type="QString">XDG_CONFIG_DIRS=/etc/xdg/xdg-gnome:/etc/xdg</value>
+    <value type="QString">XDG_DATA_DIRS=/usr/share/gnome:/usr/local/share/:/usr/share/</value>
+    <value type="QString">XDG_SESSION_COOKIE=8de6bfdbc5bc05fb490f2b1f506ee0c7-1362651338.967898-1473676642</value>
+   </valuelist>
+   <valuelist key="abstractProcess.arguments" type="QVariantList">
+    <value type="QString">/home/lessju/Code/MDSM/plotter/sigproc-plotter.pro</value>
+    <value type="QString">-spec</value>
+    <value type="QString">linux-g++</value>
+    <value type="QString">-r</value>
+   </valuelist>
+   <value key="abstractProcess.command" type="QString">/usr/bin/qmake-qt4</value>
+   <value key="abstractProcess.enabled" type="bool">false</value>
+   <value key="abstractProcess.workingDirectory" type="QString">/home/lessju/Code/MDSM/plotter</value>
+  </valuemap>
+ </data>
+ <data>
+  <variable>buildconfiguration-Release-cleanstep0</variable>
+  <valuemap type="QVariantMap">
+   <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString">Release</value>
    <value key="cleanConfig" type="bool">true</value>
    <valuelist key="makeargs" type="QVariantList">
     <value type="QString">clean</value>
@@ -218,20 +178,20 @@
   <variable>buildstep0</variable>
   <valuemap type="QVariantMap">
    <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString"></value>
-   <value key="mkspec" type="QString"></value>
   </valuemap>
  </data>
  <data>
   <variable>buildstep1</variable>
   <valuemap type="QVariantMap">
    <value key="ProjectExplorer.BuildConfiguration.DisplayName" type="QString"></value>
+   <value key="mkspec" type="QString"></value>
   </valuemap>
  </data>
  <data>
   <variable>buildsteps</variable>
   <valuelist type="QVariantList">
-   <value type="QString">trolltech.qt4projectmanager.qmake</value>
    <value type="QString">trolltech.qt4projectmanager.make</value>
+   <value type="QString">trolltech.qt4projectmanager.qmake</value>
   </valuelist>
  </data>
  <data>
