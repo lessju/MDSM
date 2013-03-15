@@ -17,6 +17,11 @@ typedef struct
 
 } BEAM;
 
+typedef struct
+{
+    unsigned from, to;
+} RANGE;
+
 typedef struct {
 
     // Data parameters
@@ -44,14 +49,14 @@ typedef struct {
     char      use_pc_time, single_file_mode;
 
     // Bandpass parameters
-    float corrected_bandpass_mean, corrected_bandpass_std, corrected_bandpass_rms;
-    float bandpass_mean, bandpass_std, bandpass_rms;
+    float bandpass_mean, bandpass_std, bandpass_rmse;
     unsigned ncoeffs;
 
     // RFI parameters
     bool apply_rfi_clipper;
     float spectrum_thresh, channel_thresh;
-    unsigned channel_block;
+    unsigned channel_block, num_masks;
+    RANGE* channel_mask;
 
     // Detection parameters
     float detection_threshold;

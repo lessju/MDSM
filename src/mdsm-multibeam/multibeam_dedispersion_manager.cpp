@@ -122,6 +122,8 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> spectrum_thresh = 6;
     survey -> channel_thresh = 10;
     survey -> channel_block = 1024;
+    survey -> channel_mask = NULL;
+    survey -> num_masks = 0;
     survey -> apply_median_filter = 0;
     survey -> apply_detrending = 0;
     strcpy(survey -> fileprefix, "output");
@@ -168,6 +170,26 @@ SURVEY* processSurveyParameters(QString filepath)
                survey -> spectrum_thresh = e.attribute("spectrumThreshold").toFloat();
                survey -> channel_thresh = e.attribute("channelThreshold").toFloat();
                survey -> channel_block = e.attribute("channelBlock").toUInt();
+                
+               // Process channel mask               
+               QString mask = e.attribute("channelMask");
+               QStringList maskList = mask.split(",", QString::SkipEmptyParts);
+   
+               survey -> channel_mask = (RANGE *) malloc(maskList.count() * sizeof(RANGE));
+               survey -> num_masks = maskList.count();
+
+                // For each comma-separated item, check if we have a range
+                // specified as well
+                for(int i = 0; i < maskList.count(); i++)
+                    if (maskList[i].contains(QString("-")))
+                    {
+                        // We are dealing with a range, process accordingly
+                        QStringList range = maskList[i].split("-", QString::SkipEmptyParts);
+                        survey -> channel_mask[i].from = range[0].toUInt();
+                        survey -> channel_mask[i].to = range[1].toUInt();
+                    }
+                    else
+                        survey -> channel_mask[i].from = survey -> channel_mask[i].to = maskList[i].toUInt();
             }
             else if (QString::compare(e.tagName(), QString("detection"), Qt::CaseInsensitive) == 0) {
 			   survey -> detection_threshold = e.attribute("threshold").toFloat();

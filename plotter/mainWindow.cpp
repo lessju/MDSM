@@ -810,9 +810,10 @@ void MainWindow::createDataBuffer(unsigned integrate)
             for(unsigned i = 0; i < _nChannels; i++)
                 _xB[i] = i / (1.0 * _nChannels);
 
+            float invSamples = 1.0 / _nSamples;
             for(unsigned j = 0; j < _nSamples; j++)
                 for(unsigned i = 0; i < _nChannels; i++)
-                    _yB[i] += _buffer[j * _nChannels + i] / _nChannels;
+                    _yB[i] += _buffer[j * _nChannels + i] * invSamples;
 
             // Now that we have a bandpass, check if we need to mask any channels
             for(int i = 0; i < _channelMask.size(); i++)
@@ -822,16 +823,16 @@ void MainWindow::createDataBuffer(unsigned integrate)
                 {
                     int index = _channelMask[i].second;
                     if (index == 0)
-                        _yB[0] = (_yB[1] + _yB[2]) / 2.0;
+                        _yB[0] = (_yB[1] + _yB[2]) * 0.5;
                     else if (index == _nChannels - 1)
-                        _yB[_nChannels - 1] = (_yB[_nChannels - 2] + _yB[_nChannels - 3]) / 2.0;
+                        _yB[_nChannels - 1] = (_yB[_nChannels - 2] + _yB[_nChannels - 3]) * 0.5;
                     else
-                        _yB[index] = (_yB[index-1] + _yB[index+1]) / 2.0;
+                        _yB[index] = (_yB[index-1] + _yB[index+1]) * 0.5;
                 }
                 else
                 {
                     // Dealing with a frequency range, need to interpolate from range borders
-                    float value = (_yB[_channelMask[i].first - 1], _yB[_channelMask[i].first + 1]) / 2.0;
+                    float value = (_yB[_channelMask[i].first - 1], _yB[_channelMask[i].first + 1]) * 0.5;
                     for(int j = _channelMask[i].first; j <= _channelMask[i].second; j++)
                         _yB[j] = value;
                 }
@@ -870,7 +871,7 @@ void MainWindow::createDataBuffer(unsigned integrate)
                     _bandpassFit[i] += coeffs[j] * pow(_xB[i], j);
 
             // Calculate MSE between fit and banpass
-            float mse = 0;
+             float mse = 0;
             for(unsigned i = 0; i < _nChannels; i++)
                 mse += pow(_yB[i] - _bandpassFit[i], 2);
             mse /= _nChannels;
@@ -889,13 +890,13 @@ void MainWindow::createDataBuffer(unsigned integrate)
             // Perform channel clipping if required
             if (_clipChannel)
             {
-                float thresh = plotWidget->channelThresholdBox->value() * mse;
+                float thresh = plotWidget->channelThresholdBox->value();
 
                 if (_channelBlock == 1)
                 {
                     for(unsigned i = 0; i < _nSamples; i++)
                         for(unsigned j = 0; j < _nChannels; j++)
-                            if (_buffer[i * _nChannels + j] > thresh)
+                            if (_buffer[i * _nChannels + j] > _bandpassFit[i] + thresh * mse)
                                 _buffer[i * _nChannels + j] = _bandpassFit[i];
                 }
                 else
@@ -915,7 +916,7 @@ void MainWindow::createDataBuffer(unsigned integrate)
                             for(unsigned k = 0; k < _channelBlock; k++)
                                 value += _buffer[(j * _channelBlock + k) * _nChannels + i] / _channelBlock;
 
-                            if (value > thresh)
+                            if (value > _bandpassFit[i] + thresh * mse)
                             {
                                 rfi[j] = true;
                                 if (j > 0) rfi[j-1] = true;
@@ -927,7 +928,7 @@ void MainWindow::createDataBuffer(unsigned integrate)
                         for(unsigned j = 0; j < blocks; j++)
                             if (rfi[j])
                                 for(unsigned k = 0; k < _channelBlock; k++)
-                                    _buffer[(j * _channelBlock + k) * _nChannels + i] = _yB[i];
+                                    _buffer[(j * _channelBlock + k) * _nChannels + i] = _bandpassFit[i];
                     }
                 }
             }
@@ -942,7 +943,7 @@ void MainWindow::createDataBuffer(unsigned integrate)
                     for(unsigned j = 0; j < _nChannels; j++)
                         value += _buffer[i * _nChannels + j] / _nChannels;
 
-                    if (value > thresh)
+                    if (value > thresh);
                         for(unsigned j = 0; j < _nChannels; j++)
                             _buffer[i * _nChannels + j] = _yB[j];
                 }
@@ -1088,7 +1089,7 @@ void MainWindow::plot(bool reset)
             for(unsigned j = 0; j < _nSamples; j++)
                 for(unsigned i = 0; i < _nChannels; i++)
                 {
-                    float value = _buffer[j * _nChannels + i] / _nChannels;
+                    float value = _buffer[j * _nChannels + i] / _nSamples;
                     _yB[i] += (value != 0) ? value : 10e-4;
                 }
 

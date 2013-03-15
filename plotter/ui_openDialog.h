@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'openDialog.ui'
 **
-** Created: Tue Jan 8 18:34:57 2013
+** Created: Fri Mar 8 18:37:43 2013
 **      by: Qt User Interface Compiler version 4.6.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
@@ -164,9 +164,14 @@ public:
         gridLayout->setColumnStretch(0, 2);
         QWidget::setTabOrder(filenameEdit, pushButton);
         QWidget::setTabOrder(pushButton, frequency_edit);
-        QWidget::setTabOrder(frequency_edit, bitsEdit);
+        QWidget::setTabOrder(frequency_edit, bandwidth_edit);
+        QWidget::setTabOrder(bandwidth_edit, channels_edit);
+        QWidget::setTabOrder(channels_edit, sampling_edit);
+        QWidget::setTabOrder(sampling_edit, beamsEdit);
+        QWidget::setTabOrder(beamsEdit, bitsEdit);
         QWidget::setTabOrder(bitsEdit, sampleEdit);
-        QWidget::setTabOrder(sampleEdit, checkBox);
+        QWidget::setTabOrder(sampleEdit, muLawEncoded_checkbox);
+        QWidget::setTabOrder(muLawEncoded_checkbox, checkBox);
         QWidget::setTabOrder(checkBox, buttonBox);
 
         retranslateUi(OpenDialog);
@@ -193,7 +198,7 @@ public:
         label_7->setText(QApplication::translate("OpenDialog", "Number of Channels", 0, QApplication::UnicodeUTF8));
         channels_edit->setText(QApplication::translate("OpenDialog", "512", 0, QApplication::UnicodeUTF8));
         label_8->setText(QApplication::translate("OpenDialog", "Sampling Time", 0, QApplication::UnicodeUTF8));
-        sampling_edit->setText(QApplication::translate("OpenDialog", "0.0001024", 0, QApplication::UnicodeUTF8));
+        sampling_edit->setText(QApplication::translate("OpenDialog", "0.0000512", 0, QApplication::UnicodeUTF8));
         label_9->setText(QApplication::translate("OpenDialog", "Number of Beams", 0, QApplication::UnicodeUTF8));
         beamsEdit->setText(QApplication::translate("OpenDialog", "1", 0, QApplication::UnicodeUTF8));
         muLawEncoded_checkbox->setText(QApplication::translate("OpenDialog", "Values are Mu-Law Encoded", 0, QApplication::UnicodeUTF8));

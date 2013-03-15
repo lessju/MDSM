@@ -13,7 +13,7 @@ if __name__ == "__main__":
     data = np.reshape(data, (nchans, len(data) / nchans))
 
     # Plot data and fix axes
-    plt.imshow(data[:,800:1400], aspect='auto')
+    plt.imshow(data, aspect='auto')
     plt.xlabel('Time spectrum')
     plt.ylabel('Frequency channel')
     plt.colorbar()

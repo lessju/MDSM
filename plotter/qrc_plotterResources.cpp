@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Resource object code
 **
-** Created: Mon Nov 12 18:22:56 2012
+** Created: Fri Mar 8 18:37:48 2013
 **      by: The Resource Compiler for Qt version 4.6.2
 **
 ** WARNING! All changes made in this file will be lost!
@@ -10,7 +10,7 @@
 #include <QtCore/qglobal.h>
 
 static const unsigned char qt_resource_data[] = {
-  // /home/lessju/Code/sigproc-plotter/medicina.jpg
+  // /home/lessju/Code/MDSM/plotter/medicina.jpg
   0x0,0x0,0x55,0xc4,
   0xff,
   0xd8,0xff,0xe0,0x0,0x10,0x4a,0x46,0x49,0x46,0x0,0x1,0x1,0x1,0x0,0x48,0x0,

@@ -296,58 +296,77 @@ __global__ void bandpass_power_sum(float *input, double *bandpass, unsigned shif
 }
 
 // --------------------- Perform rudimentary RFI clipping: clip channels ------------------------------
-__global__ void channel_clipper(float *input, double *bandpass, float bandpass_mean, unsigned channel_block, unsigned nsamp, 
-                                unsigned nchans, unsigned shift, unsigned total, float channelThresh)
+__global__ void channel_flagger(float *input, double *bandpass, char *flags, unsigned nsamp, unsigned nchans, 
+                                unsigned channel_block, unsigned num_blocks, float channelThresh,
+                                unsigned total, unsigned shift )
 {
     __shared__ float local_mean[BANDPASS_THREADS];
-
-    if (blockIdx.x * blockDim.x + threadIdx.x > nsamp)
-        return;
 
     // 2D Grid, Y-dimension handles channels, X-dimension handles spectra
     float bp_value = __double2float_rz(bandpass[blockIdx.y]);
     local_mean[threadIdx.x] = 0;
 
-    // Load all required values to shared memory
-    for(unsigned s = threadIdx.x; 
-                 s < channel_block; 
-                 s += blockDim.x)
-        local_mean[threadIdx.x] += input[blockIdx.y * total + blockIdx.x * channel_block + shift + s] - bp_value;
-
-    __syncthreads();
-
-    // Perform reduction-sum to calculate the mean for current channel block
-    for(unsigned i = BANDPASS_THREADS / 2; i >= 1; i /= 2)
+    // Loop over all blocks allocated to this threadblock
+    for(unsigned b = blockIdx.x; 
+                 b < num_blocks; 
+                 b += gridDim.x)
     {
-        if (threadIdx.x < i)
-            local_mean[threadIdx.x] += local_mean[threadIdx.x + i];
+        // Load all required value for current block into shared memory
+        for(unsigned s = threadIdx.x;
+                     s < channel_block;
+                     s += blockDim.x)
+            local_mean[threadIdx.x] += input[blockIdx.y * total + b * channel_block + s + shift];
+        
+        __syncthreads();
+
+        // Perform reduction-sum to calculate the mean for current channel block
+        for(unsigned i = BANDPASS_THREADS / 2; i > 0; i /= 2)
+        {
+            if (threadIdx.x < i)
+                local_mean[threadIdx.x] += local_mean[threadIdx.x + i];
+            __syncthreads();
+        }
+
+        // Check if block exceed desired threshold
+        if (threadIdx.x == 0 && (local_mean[0] / channel_block) > bp_value + channelThresh)
+        { 
+            // Flag current block
+            flags[blockIdx.y * num_blocks + b] = 1;
+
+            // Flag neighboring block
+            if (b > 0)
+                flags[blockIdx.y * num_blocks + b - 1] = 1;
+            if (b < num_blocks - 2)
+                flags[blockIdx.y * num_blocks + b + 1] = 1;
+        }
+
+        // Synchronise threads
         __syncthreads();
     }
+}
 
-    // Compute channel mean
-    if (threadIdx.x == 0)
-        local_mean[0] /= channel_block;
+__global__ void channel_clipper(float *input, double *bandpass, char *flags, unsigned nsamp, unsigned nchans, 
+                                unsigned channel_block, unsigned num_blocks, unsigned total, unsigned shift)
+{
+    // 2D Grid, Y-dimension handles channels, X-dimension handles spectra
+    float bp_value = __double2float_rz(bandpass[blockIdx.y]);
 
-    __syncthreads();
-
-    // This should be handled as a shared-memory broadcast, check
-    // Check if channel block exceeds acceptable limit, if not flag
-    if (blockIdx.y >= 85 && blockIdx.y <= 95)
+    // Loop over all channels blocks    
+    for (unsigned b = blockIdx.x; 
+                  b < num_blocks; 
+                  b += gridDim.x)
     {
-        for(unsigned s = threadIdx.x; 
-                     s < channel_block; 
-                     s += blockDim.x)
-            input[blockIdx.y * total + blockIdx.x * channel_block + shift + s] = bp_value; 
-        return;
+        // Check if current block is flagged
+        if (flags[blockIdx.y * num_blocks + b])
+        {
+            // This block contains RFI, set to bandpass value
+            for(unsigned s = threadIdx.x;
+                         s < channel_block;
+                         s += blockDim.x)
+                input[blockIdx.y * total + b * channel_block + s + shift] = -50;//  (input[blockIdx.y * total + blockIdx.x * channel_block + s + shift] - bp_value);
+        }
+        
     }
-
-    if (local_mean[0] > channelThresh)
-        for(unsigned s = threadIdx.x; 
-                     s < channel_block; 
-                     s += blockDim.x)
-        input[blockIdx.y * total + blockIdx.x * channel_block + shift + s] -= 
-                (input[blockIdx.y * total + blockIdx.x * channel_block + shift + s] - bp_value);
-
 }
 
 // --------------------- Perform rudimentary RFI clipping: clip spectra ------------------------------
@@ -365,7 +384,7 @@ __global__ void spectrum_clipper(float *input, double *bandpass, float bandpass_
 
         // All these memory accesses should be coalesced (as thread-spectrum mapping is contiguous)    
         for(unsigned c = 0; c < nchans; c++)
-            spectrum_mean += (input[c * total + shift + s] - __double2float_rz(bandpass[c]));
+            spectrum_mean += input[c * total + shift + s];
         spectrum_mean /= nchans;
 
         // We have the spectrum mean, check if it satisfies spectrum threshold

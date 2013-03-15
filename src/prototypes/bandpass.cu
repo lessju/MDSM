@@ -10,17 +10,18 @@
 #include "file_handler.h"
  
 
-#define BANDPASS_THREADS 256
+#define BANDPASS_THREADS 64
 
 //char *filename = "/data/Data/SETI/B1839+56_8bit.fil";
 //char *filename = "/data/Data/SETI/samplePulsar.fil";
-//char *filename = "/home/lessju/Kepler_Pulsar_RFI.dat";
+char *filename = "/home/lessju/Kepler_Pulsar_RFI.dat";
 //char *filename = "/home/lessju/Medicina_Channel_RFI_and_Pulsar.dat";
-char *filename = "/home/lessju/Medicina_Time_RFI.dat";
+//char *filename = "/home/lessju/Medicina_Time_RFI.dat";
 //char *filename = "/home/lessju/Medicina_Channel_RFI_and_Pulse.dat";
-int nchans = 512, nsamp = 16384, ncoeffs = 12;
-float channel_thresh = 4, spectrum_thresh = 7;
-unsigned channel_block = 1024;
+//char *filename  = "/tmp/0.dat";
+int nchans = 2048, nsamp = 8192, ncoeffs = 12;
+float channel_thresh = 3, spectrum_thresh = 0.5;
+unsigned channel_block = 64;
 
 // ======================== CUDA HELPER FUNCTIONS ==========================
 
@@ -142,8 +143,8 @@ __global__ void bandpass_power_sum(float *input, double *bandpass, unsigned nsam
 }
 
 // --------------------- Perform rudimentary RFI clipping: clip channels ------------------------------
-__global__ void channel_clipper(float *input, double *bandpass, float bandpass_mean, unsigned channel_block, 
-                                unsigned nsamp, unsigned nchans, float channelThresh)
+__global__ void channel_flagger(float *input, double *bandpass, char *flags, unsigned nsamp, unsigned nchans, 
+                                unsigned channel_block, unsigned num_blocks, float channelThresh)
 {
     __shared__ float local_mean[BANDPASS_THREADS];
 
@@ -151,41 +152,72 @@ __global__ void channel_clipper(float *input, double *bandpass, float bandpass_m
     float bp_value = __double2float_rz(bandpass[blockIdx.y]);
     local_mean[threadIdx.x] = 0;
 
-    // Load all required value to shared memory
-    for(unsigned s = threadIdx.x; 
-                 s < channel_block; 
-                 s += blockDim.x)
-        local_mean[threadIdx.x] += input[blockIdx.y * nsamp + blockIdx.x * channel_block + s] - bp_value;
-
-    __syncthreads();
-
-    // Perform reduction-sum to calculate the mean for current channel block
-    for(unsigned i = BANDPASS_THREADS / 2; i > 0; i /= 2)
+    // Loop over all blocks allocated to this threadblock
+    for(unsigned b = blockIdx.x; 
+                 b < num_blocks; 
+                 b += gridDim.x)
     {
-        if (threadIdx.x < i)
-            local_mean[threadIdx.x] += local_mean[threadIdx.x + i];
+        // Load all required value for current block into shared memory
+        for(unsigned s = threadIdx.x;
+                     s < channel_block;
+                     s += blockDim.x)
+            local_mean[threadIdx.x] += input[blockIdx.y * nsamp + b * channel_block + s];
+        
+        __syncthreads();
+
+        // Perform reduction-sum to calculate the mean for current channel block
+        for(unsigned i = BANDPASS_THREADS / 2; i > 0; i /= 2)
+        {
+            if (threadIdx.x < i)
+                local_mean[threadIdx.x] += local_mean[threadIdx.x + i];
+            __syncthreads();
+        }
+
+        // Check if block exceed desired threshold
+        if (threadIdx.x == 0 && local_mean[0] / channel_block > bp_value + channelThresh)
+        { 
+            // Flag current block
+            flags[blockIdx.y * num_blocks + b] = 1;
+
+            // Flag neighboring block
+            if (b > 0)
+                flags[blockIdx.y * num_blocks + b - 1] = 1;
+            if (b < num_blocks - 2)
+                flags[blockIdx.y * num_blocks + b + 1] = 1;
+        }
+
+        // Synchronise threads
         __syncthreads();
     }
+}
 
-    // Compute channel mean
-    if (threadIdx.x == 0)
-        local_mean[0] /= channel_block;
+__global__ void channel_clipper(float *input, double *bandpass, char *flags, unsigned nsamp, unsigned nchans, 
+                                unsigned channel_block, unsigned num_blocks)
+{
+    // 2D Grid, Y-dimension handles channels, X-dimension handles spectra
+    float bp_value = __double2float_rz(bandpass[blockIdx.y]);
 
-    __syncthreads();
-
-    // This should be handled as a shared-memory broadcast, check
-    // Check if channel block exceeds acceptable limit, if not flag
-    if (local_mean[0] > channelThresh)
-        for(unsigned s = threadIdx.x; 
-                     s < channel_block; 
-                     s += blockDim.x)
-        input[blockIdx.y * nsamp + blockIdx.x * channel_block + s] -= (input[blockIdx.y * nsamp + blockIdx.x * channel_block + s] - bp_value);
-
+    // Loop over all channels blocks    
+    for (unsigned b = blockIdx.x; 
+                  b < num_blocks; 
+                  b += gridDim.x)
+    {
+        // Check if current block is flagged
+        if (flags[blockIdx.y * num_blocks + b])
+        {
+            // This block contains RFI, set to bandpass value
+            for(unsigned s = threadIdx.x;
+                         s < channel_block;
+                         s += blockDim.x)
+                input[blockIdx.y * nsamp + b * channel_block + s] -= (input[blockIdx.y * nsamp + blockIdx.x * channel_block + s] - bp_value);
+        }
+        
+    }
 }
 
 // --------------------- Perform rudimentary RFI clipping: clip spectra ------------------------------
-__global__ void spectrum_clipper(float *input, double *bandpass, double *corrected_bandpass, float bandpass_mean,
-                                 unsigned nsamp, unsigned nchans, float spectrumThresh)
+__global__ void spectrum_clipper(float *input, double *bandpass, unsigned nsamp, 
+                                 unsigned nchans, float spectrum_thresh)
 {
     // First pass done, on to second step
     // Second pass: Perform wide-band RFI clipping
@@ -198,19 +230,14 @@ __global__ void spectrum_clipper(float *input, double *bandpass, double *correct
 
         // All these memory accesses should be coalesced (as thread-spectrum mapping is contiguous)    
         for(unsigned c = 0; c < nchans; c++)
-            spectrum_mean += (input[c * nsamp + s] - __double2float_rz(bandpass[c]));
+            spectrum_mean += input[c * nsamp + s];
         spectrum_mean /= nchans;
 
         // We have the spectrum mean, check if it satisfies spectrum threshold
-        if (spectrum_mean > spectrumThresh)
-            // Spectrum is RFI, clear (zero out for now)
+        if (spectrum_mean > spectrum_thresh)
+            // Spectrum is RFI, replace with bandpass
             for(unsigned c = 0; c < nchans; c++)
-                input[c * nsamp + s] = 500;//bandpass[c];
-
-        // Check for singe high-intensity pixels
-        for(unsigned c = 0; c < nchans; c++)
-            if (input[c*nsamp+s] > 3467 * 10)
-                input[c*nsamp+s] = bandpass[c];
+                input[c * nsamp + s] = 512;//__double2float_rz(bandpass[c]);
     }
 }
 
@@ -283,20 +310,21 @@ int main(int argc, char *argv[])
 	cudaEventCreate(&event_stop); 
 
     // Allocate and initialise CPU and GPU memory for data and bandpass
-    float *buffer; double *bandpass, *corrected_bandpass;
+    float *buffer; double *bandpass, *fitted_bandpass;
     CudaSafeCall(cudaMallocHost((void **) &buffer, nchans * nsamp * sizeof(float), cudaHostAllocPortable));
-    CudaSafeCall(cudaMallocHost((void **) &corrected_bandpass, nchans * sizeof(double), cudaHostAllocPortable));
+    CudaSafeCall(cudaMallocHost((void **) &fitted_bandpass, nchans * sizeof(double), cudaHostAllocPortable));
     CudaSafeCall(cudaMallocHost((void **) &bandpass, nchans * sizeof(double), cudaHostAllocPortable));
 
     // Read data from file and reset initialise bandpass to 0
     read_data(buffer, nsamp, nchans);
     memset(bandpass, 0, nchans * sizeof(double));
 
-    float *d_buffer; double *d_bandpass, *d_corrected_bandpass;
+    float *d_buffer; double *d_bandpass; char *d_flags;
     cudaMalloc((void **) &d_buffer, nchans * nsamp * sizeof(float));
-	cudaMalloc((void **) &d_corrected_bandpass, nchans * sizeof(double) );
 	cudaMalloc((void **) &d_bandpass, nchans * sizeof(double) );
+    cudaMalloc((void **) &d_flags, nchans * (nsamp / channel_block) * sizeof(char));
     cudaMemset(d_bandpass, 0, nchans * sizeof(double));
+    cudaMemset(d_flags, 0, (nchans * nsamp / channel_block) * sizeof(char));
 
     // Copy input buffer to GPU memory
     cudaEventRecord(event_start, 0);
@@ -330,48 +358,35 @@ int main(int argc, char *argv[])
 
     // Generate 1D polynomial using bandpass co-efficients
     // We also need the fit-corrected bandpass to compute the bandpass RMS
-    memcpy(corrected_bandpass, bandpass, nchans * sizeof(double)); // Copy bandpass to corrected_bandpass
-    memset(bandpass, 0, nchans * sizeof(double));
+    memset(fitted_bandpass, 0, nchans * sizeof(double));
     for(i = 0; i < nchans; i++)
-    {
         for(j = 0; j < ncoeffs; j++)
-            bandpass[i] += coeffs[j] * pow(X[i], j);
-        corrected_bandpass[i] -= bandpass[i];
-    }
+            fitted_bandpass[i] += coeffs[j] * pow(X[i], j);
 
     fwrite(bandpass, sizeof(double), nchans, fpb);
-    fwrite(corrected_bandpass, sizeof(double), nchans, fpb);
+    fwrite(fitted_bandpass, sizeof(double), nchans, fpb);
     fclose(fpb);
 
     // Compute bandpass RMS
-    float corr_bandpass_mean = 0, corr_bandpass_std = 0, corr_bandpass_rms = 0;
-    float bandpass_mean = 0, bandpass_std = 0, bandpass_rms = 0;
+    float bandpass_mean = 0, bandpass_std = 0;
 
     // First iteration to compute mean
     for(i = 0; i < nchans; i++)
-    {
-        bandpass_mean += bandpass[i];
-        bandpass_rms += bandpass[i] * bandpass[i];
-        corr_bandpass_mean += corrected_bandpass[i];
-        corr_bandpass_rms += corrected_bandpass[i] * corrected_bandpass[i];
-    }
-    bandpass_mean /= nchans;
-    bandpass_rms = sqrt(bandpass_rms / nchans);
-    corr_bandpass_mean /= nchans;
-    corr_bandpass_rms = sqrt(corr_bandpass_rms / nchans);
+        bandpass_mean += bandpass[i] / nchans;
     
     // Second iteration, compute standard deviation
     for(i = 0; i < nchans; i++)
-    {
         bandpass_std += (bandpass[i] - bandpass_mean) * (bandpass[i] - bandpass_mean);
-        corr_bandpass_std += (bandpass[i] - corr_bandpass_mean) * (bandpass[i] - corr_bandpass_mean);
-    }
     bandpass_std = sqrt(bandpass_std / nchans);
-    corr_bandpass_std = sqrt(corr_bandpass_std / nchans);
+
+    // Calculate the RMSE 
+    float rmse = 0;
+    for(i = 0; i < nchans; i++)
+        rmse += pow(bandpass[i] - fitted_bandpass[i], 2);
+    rmse = sqrt(rmse / nchans);
 
     // Copy bandpass back to GPU memory
-    CudaSafeCall(cudaMemcpy(d_corrected_bandpass, corrected_bandpass, nchans * sizeof(double), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_bandpass, bandpass, nchans * sizeof(double), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_bandpass, fitted_bandpass, nchans * sizeof(double), cudaMemcpyHostToDevice));
 
     gettimeofday(&end, NULL);
     seconds  = end.tv_sec  - start.tv_sec;
@@ -380,14 +395,25 @@ int main(int argc, char *argv[])
     printf("Calculated Bandpass co-efficients and fit in : %ldms\n", mtime);
 
     // RFI Clipping, launch GPU-RFI clipper
-    channel_thresh  *= corr_bandpass_rms;
-    spectrum_thresh *=  corr_bandpass_rms;
+    channel_thresh  *= rmse;
+    spectrum_thresh = bandpass_mean + spectrum_thresh * bandpass_std;
 
-    printf("Corrected Bandpass RMS: %f\nBandpass RMS: %f\nBandpass Std: %f\nSpectrum Thresh: %f\nChannel Thresh: %f\n", corr_bandpass_rms, bandpass_rms, bandpass_std, spectrum_thresh, channel_thresh);
+    // We need two passes to perform channel clipping
+    // Pass one: mark all blocks which contain RFI
+    cudaEventRecord(event_start, 0);
+    printf("RMSE: %f, threshold: %f\n", rmse, channel_thresh);
+    channel_flagger<<< dim3(nsamp/channel_block, nchans), BANDPASS_THREADS >>>
+                   (d_buffer, d_bandpass, d_flags, nsamp, nchans, channel_block, nsamp / channel_block, channel_thresh);
 
+    cudaEventRecord(event_stop, 0);
+	cudaEventSynchronize(event_stop);
+	cudaEventElapsedTime(&timestamp, event_start, event_stop);
+	printf("Marked channels in : %lf\n", timestamp);
+
+    // Pass two: Set the value with RFI blocks to bandpass value
     cudaEventRecord(event_start, 0);
     channel_clipper<<< dim3(nsamp/channel_block, nchans), BANDPASS_THREADS >>>
-                   (d_buffer, d_bandpass, bandpass_mean, channel_block, nsamp, nchans, channel_thresh);
+                   (d_buffer, d_bandpass, d_flags, nsamp, nchans, channel_block, nsamp / channel_block);
 
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
@@ -395,8 +421,9 @@ int main(int argc, char *argv[])
 	printf("Clipped channels in : %lf\n", timestamp);
 
     cudaEventRecord(event_start, 0);
+    printf("Bandpass mean: %f, std: %f, threshold: %f\n", bandpass_mean, bandpass_std, spectrum_thresh);
     spectrum_clipper<<< nsamp / BANDPASS_THREADS, BANDPASS_THREADS >>>
-                   (d_buffer, d_bandpass, d_corrected_bandpass, bandpass_mean, nsamp, nchans, spectrum_thresh);
+                   (d_buffer, d_bandpass, nsamp, nchans, spectrum_thresh);
 
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);

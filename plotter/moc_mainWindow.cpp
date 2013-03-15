@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'mainWindow.h'
 **
-** Created: Tue Jan 8 18:37:17 2013
+** Created: Wed Mar 13 16:45:54 2013
 **      by: The Qt Meta Object Compiler version 62 (Qt 4.6.2)
 **
 ** WARNING! All changes made in this file will be lost!
@@ -23,7 +23,7 @@ static const uint qt_meta_data_MainWindow[] = {
        4,       // revision
        0,       // classname
        0,    0, // classinfo
-      11,   14, // methods
+      16,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
@@ -38,10 +38,15 @@ static const uint qt_meta_data_MainWindow[] = {
       61,   55,   11,   11, 0x08,
       72,   11,   11,   11, 0x28,
       81,   79,   11,   11, 0x08,
-      98,   79,   11,   11, 0x08,
-     121,   79,   11,   11, 0x08,
-     138,   79,   11,   11, 0x08,
-     154,   11,   11,   11, 0x08,
+     101,   98,   11,   11, 0x08,
+     119,   79,   11,   11, 0x08,
+     142,   79,   11,   11, 0x08,
+     159,   79,   11,   11, 0x08,
+     175,   11,   11,   11, 0x08,
+     186,   11,   11,   11, 0x08,
+     201,   11,   11,   11, 0x08,
+     224,   11,   11,   11, 0x08,
+     244,   11,   11,   11, 0x08,
 
        0        // eod
 };
@@ -49,9 +54,12 @@ static const uint qt_meta_data_MainWindow[] = {
 static const char qt_meta_stringdata_MainWindow[] = {
     "MainWindow\0\0openFile()\0liveFiles()\0"
     "saveBuffer()\0quit()\0reset\0plot(bool)\0"
-    "plot()\0i\0sliderMoved(int)\0"
-    "beamNumberChanged(int)\0plotChannel(int)\0"
-    "sampleSpin(int)\0initialisePlotter()\0"
+    "plot()\0i\0sliderMoved(int)\0dm\0"
+    "dmChanged(double)\0beamNumberChanged(int)\0"
+    "plotChannel(int)\0sampleSpin(int)\0"
+    "applyRFI()\0applyFolding()\0"
+    "foldNumberChanged(int)\0initialisePlotter()\0"
+    "exportPlot()\0"
 };
 
 const QMetaObject MainWindow::staticMetaObject = {
@@ -90,13 +98,18 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
         case 4: plot((*reinterpret_cast< bool(*)>(_a[1]))); break;
         case 5: plot(); break;
         case 6: sliderMoved((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 7: beamNumberChanged((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 8: plotChannel((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 9: sampleSpin((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 10: initialisePlotter(); break;
+        case 7: dmChanged((*reinterpret_cast< double(*)>(_a[1]))); break;
+        case 8: beamNumberChanged((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 9: plotChannel((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 10: sampleSpin((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 11: applyRFI(); break;
+        case 12: applyFolding(); break;
+        case 13: foldNumberChanged((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 14: initialisePlotter(); break;
+        case 15: exportPlot(); break;
         default: ;
         }
-        _id -= 11;
+        _id -= 16;
     }
     return _id;
 }

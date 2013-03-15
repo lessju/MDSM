@@ -222,61 +222,57 @@ void bandpass_fitting(float *d_input, double *bandpass, double *d_bandpass, THRE
     double X[survey -> nchans], coeffs[survey -> ncoeffs];
     for(unsigned i = 0; i < survey -> nchans; i++) X[i] = 0 + i / (1.0 * survey -> nchans);
 
+    // Mask any unwanted channels from bandpass
+    for(unsigned i = 0; i < survey -> num_masks; i++)
+    {
+        unsigned from = (survey -> channel_mask[i]).from, to = (survey -> channel_mask[i]).to;
+        float value;
+        if (from == 0)
+            value = (bandpass[to + 1] + bandpass[to + 2]) * 0.5;
+        else if (to >= survey -> nchans - 1)
+            value = (bandpass[from - 1] + bandpass[from - 2]) * 0.5;
+        else
+            value = (bandpass[from - 1] + bandpass[to + 1]) * 0.5;
+
+        for(unsigned i = from; i <= to; i++)
+            bandpass[i] = value;
+    }
+
     // Fit polynomial using GNU Scientific Library
     polynomialfit(survey -> nchans, survey -> ncoeffs, X, bandpass, coeffs); 
 
     // Generate 1D polynomial using bandpass co-efficients
-    // We also need the fit-corrected bandpass to compute the bandpass RMS
-    double corrected_bandpass[survey -> nchans], summed_bandpass[survey -> nchans];
-    
-    // Copy bandpass to corrected_bandpass
-    memcpy(corrected_bandpass, bandpass, survey -> nchans * sizeof(double)); 
-    memcpy(summed_bandpass, bandpass, survey -> nchans * sizeof(double)); 
-    memset(bandpass, 0, survey -> nchans * sizeof(double));
+    double fitted_bandpass[survey -> nchans];
+    memset(fitted_bandpass, 0, survey -> nchans * sizeof(double)); 
 
     for(unsigned i = 0; i < survey -> nchans; i++)
-    {
         for(unsigned j = 0; j < survey -> ncoeffs; j++)
-            bandpass[i] += coeffs[j] * pow(X[i], j);
-        corrected_bandpass[i] -= bandpass[i];
-    }
+            fitted_bandpass[i] += coeffs[j] * pow(X[i], j);
 
     // Asynchronous copy of bandpass
-    CudaSafeCall(cudaMemcpyAsync(d_bandpass, bandpass, survey -> nchans * sizeof(double), 
+    CudaSafeCall(cudaMemcpyAsync(d_bandpass, fitted_bandpass, survey -> nchans * sizeof(double), 
                  cudaMemcpyHostToDevice));
 
     // Calculate bandpass statistics to be used later on    
-    float corr_bandpass_mean = 0, corr_bandpass_std = 0, corr_bandpass_rms = 0;
-    float bandpass_mean = 0, bandpass_std = 0, bandpass_rms = 0;
+    float bandpass_mean = 0, bandpass_std = 0;
 
     // First iteration to compute mean
     for(unsigned i = 0; i < survey -> nchans; i++)
-    {
-        bandpass_mean += bandpass[i];
-        bandpass_rms += bandpass[i] * bandpass[i];
-        corr_bandpass_mean += corrected_bandpass[i];
-        corr_bandpass_rms += corrected_bandpass[i] * corrected_bandpass[i];
-    }
-    bandpass_mean /= survey -> nchans;
-    bandpass_rms = sqrt(bandpass_rms / survey -> nchans);
-    corr_bandpass_mean /= survey -> nchans;
-    corr_bandpass_rms = sqrt(corr_bandpass_rms / survey -> nchans);
+        bandpass_mean += bandpass[i] / survey -> nchans;
     
     // Second iteration, compute standard deviation
     for(unsigned i = 0; i < survey -> nchans; i++)
-    {
         bandpass_std += (bandpass[i] - bandpass_mean) * (bandpass[i] - bandpass_mean);
-        corr_bandpass_std += (bandpass[i] - corr_bandpass_mean) * (bandpass[i] - corr_bandpass_mean);
-    }
     bandpass_std = sqrt(bandpass_std / survey -> nchans);
-    corr_bandpass_std = sqrt(corr_bandpass_std / survey -> nchans);
 
-    survey -> corrected_bandpass_mean = corr_bandpass_mean;
-    survey -> corrected_bandpass_std = corr_bandpass_std;
-    survey -> corrected_bandpass_rms = corr_bandpass_rms;
+    // Calculate root mean square error between fitted and original bandpass
+    survey -> bandpass_rmse = 0;
+    for(unsigned i = 0; i < survey -> nchans; i++)
+        survey -> bandpass_rmse += pow(bandpass[i] - fitted_bandpass[i], 2);
+
+    survey -> bandpass_rmse = sqrt(survey -> bandpass_rmse / survey -> nchans);
     survey -> bandpass_mean = bandpass_mean;
     survey -> bandpass_std = bandpass_std;
-    survey -> bandpass_rms = bandpass_rms;
 
     // If required, show bandpass plot
     #if SHOW_BANDPASS
@@ -289,7 +285,7 @@ void bandpass_fitting(float *d_input, double *bandpass, double *d_bandpass, THRE
         {
             x_vals[i] = 0 + i * (1.0 / nchans);
             y_vals[i] = (float) bandpass[i];
-            orig_vals[i] = (float) summed_bandpass[i];
+            orig_vals[i] = (float) fitted_bandpass[i];
             y_min = (y_vals[i] < y_min) ? y_vals[i] : y_min;
             y_min = (orig_vals[i] < y_min) ? orig_vals[i] : y_min;
             y_max = (y_vals[i] > y_max) ? y_vals[i] : y_max;
@@ -306,10 +302,6 @@ void bandpass_fitting(float *d_input, double *bandpass, double *d_bandpass, THRE
         cpgmtxt("T", 2.0, 0.0, 0.0, "Bandpass Plot");
     }
     #endif
-
-//    printf("Bandpass. Mean: %f, Std: %f, RMS: %f\n", bandpass_mean, bandpass_std, bandpass_rms);
-//    printf("Corrected Bandpass. Mean: %f, Std: %f, RMS: %f\n", corr_bandpass_mean,
-//                                    corr_bandpass_std, corr_bandpass_rms);
 
     // Wait for memcpy to finish
     cudaThreadSynchronize();
@@ -330,22 +322,39 @@ void rfi_clipping(float *d_input, double *d_bandpass, THREAD_PARAMS* params, cud
     float timestamp;    
     
     // Calculate rejection thresholds
-    float channel_thresh  = survey -> channel_thresh * survey -> corrected_bandpass_rms;
-    float spectrum_thresh = survey -> spectrum_thresh *  survey -> corrected_bandpass_rms;
+    float channel_thresh  = survey -> channel_thresh * survey -> bandpass_rmse;
+    float spectrum_thresh = survey -> bandpass_mean + survey -> spectrum_thresh * survey -> bandpass_std;
 
-//    printf("Channel thresh: %f, spectrum thresh: %f\n", channel_thresh, spectrum_thresh);
-
+    // Start recording GPU execution time
     cudaEventRecord(event_start, 0);
-    channel_clipper<<< dim3(ceil(nsamp / (float) survey -> channel_block), survey -> nchans), BANDPASS_THREADS >>>
-                   (d_input, d_bandpass, survey -> bandpass_mean, survey -> channel_block, nsamp, 
-                    survey -> nchans, shift, total, channel_thresh);
+
+    // Allocate temporary GPU buffer for channel flags
+    char *d_flags;
+    unsigned num_blocks = ceil(nsamp / (float) survey -> channel_block);
+    cudaMalloc((void **) &d_flags, survey -> nchans * num_blocks * sizeof(char));
+    cudaMemset(d_flags, 0, survey -> nchans * num_blocks * sizeof(char));
+
+    // Flag channel blocks
+    channel_flagger<<< dim3(num_blocks, survey -> nchans), BANDPASS_THREADS >>>
+                   (d_input, d_bandpass, d_flags, nsamp, survey -> nchans, survey -> channel_block, num_blocks, channel_thresh, total, shift);
 
     cudaThreadSynchronize();
 
+    // Clip channel blocks
+    channel_clipper<<< dim3(num_blocks, survey -> nchans), BANDPASS_THREADS >>>
+                   (d_input, d_bandpass, d_flags, nsamp, survey -> nchans, survey -> channel_block, num_blocks, total, shift);
+
+    cudaThreadSynchronize();
+
+    // Free GPU channel flags
+    cudaFree(d_flags);
+
+    // Clip spectra
     spectrum_clipper<<< nsamp / BANDPASS_THREADS, BANDPASS_THREADS >>>
                    (d_input, d_bandpass, survey -> bandpass_mean, nsamp, survey -> nchans, 
                     shift, total, spectrum_thresh);
 
+    // All done
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
 	cudaEventElapsedTime(&timestamp, event_start, event_stop);
@@ -413,7 +422,7 @@ void* dedisperse(void* thread_params)
     cudaSetDeviceFlags( cudaDeviceBlockingSync );
 
     // Avoid initialisation conflicts
-    sleep(1);
+    sleep(tid);
 
     // Allocate device memory and copy dmshifts and dmvalues to constant memory
     float *d_input, *d_output, *d_dmshifts;
@@ -547,15 +556,11 @@ void* dedisperse(void* thread_params)
                              maxshift, nsamp, nsamp + maxshift);
             }
 
-//            if (loop_counter >= params -> iterations)
+//            if (loop_counter >= 7)
 //            {
 //                // =========== TEMP: Stop here for testing
 //                float *temp = (float *) malloc(nchans * (nsamp+maxshift) * sizeof(float));
-//                for(unsigned i =0; i < nchans; i++)
-//                      CudaSafeCall(cudaMemcpy( &temp[i * (nsamp+maxshift)], 
-//                                               &d_input[i * (nsamp + maxshift)], 
-//                                               (nsamp+maxshift) * sizeof(float),      
-//                                               cudaMemcpyDeviceToHost));
+//                CudaSafeCall(cudaMemcpy( temp, d_input, nchans * (nsamp + maxshift) * sizeof(float), cudaMemcpyDeviceToHost));
 //                char filename[256];
 //                char beam_no[2];
 //                sprintf(beam_no, "%d", beam.beam_id);
@@ -566,7 +571,6 @@ void* dedisperse(void* thread_params)
 //                fwrite(temp, sizeof(float), nchans * (nsamp+maxshift), fp);
 //                free(temp);
 //                fclose(fp);
-//                sleep(3);
 //                exit(0);            
 //            }
 
