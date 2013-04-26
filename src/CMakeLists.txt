@@ -27,7 +27,7 @@ if(NOT BINARY_INSTALL_DIR)
 endif(NOT BINARY_INSTALL_DIR)
 
 if(NOT GPU_VERSION_ARCHITECTURE)
-    set(GPU_ARCHITECTURE "sm_13")
+    set(GPU_ARCHITECTURE "sm_30")
 endif(NOT GPU_VERSION_ARCHITECTURE)
 
 # === Compiler dependancies if compiler is GCC

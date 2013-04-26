@@ -172,14 +172,14 @@ void calculate_power(float *d_input, THREAD_PARAMS* params, cudaEvent_t event_st
 
 // Cache-optimised brute force dedispersion algorithm on the GPU
 void cached_brute_force(float *d_input, float *d_output, float *d_dmshifts, THREAD_PARAMS* params, 
-                        cudaEvent_t event_start, cudaEvent_t event_stop, int maxshift)
+                        cudaEvent_t event_start, cudaEvent_t event_stop, unsigned nsamp, int maxshift)
 {
     SURVEY *survey = params -> survey;
 
     int num_reg         = NUMREG;
     int divisions_in_t  = DIVINT;
     int divisions_in_dm = DIVINDM;
-    int num_blocks_t    = (survey -> nsamp / (divisions_in_t * num_reg));
+    int num_blocks_t    = nsamp / (divisions_in_t * num_reg);
     int num_blocks_dm   = survey -> tdms / divisions_in_dm;
 
     float timestamp;       
@@ -189,7 +189,7 @@ void cached_brute_force(float *d_input, float *d_output, float *d_dmshifts, THRE
     cudaEventRecord(event_start, 0);	
 
     cache_dedispersion<<< num_blocks, threads_per_block >>>
-                      (d_output, d_input, d_dmshifts, survey -> nsamp, 
+                      (d_output, d_input, d_dmshifts, nsamp, 
                        survey -> nchans, survey -> lowdm / survey -> tsamp, 
                        survey -> dmstep/survey -> tsamp, maxshift);
 
@@ -352,7 +352,7 @@ void rfi_clipping(float *d_input, double *d_bandpass, THREAD_PARAMS* params, cud
     // Clip spectra
     spectrum_clipper<<< nsamp / BANDPASS_THREADS, BANDPASS_THREADS >>>
                    (d_input, d_bandpass, survey -> bandpass_mean, nsamp, survey -> nchans, 
-                    shift, total, spectrum_thresh);
+                    shift, total, spectrum_thresh, survey -> bandpass_mean - survey -> spectrum_thresh * survey -> bandpass_std);
 
     // All done
     cudaEventRecord(event_stop, 0);
@@ -363,8 +363,7 @@ void rfi_clipping(float *d_input, double *d_bandpass, THREAD_PARAMS* params, cud
 
 
 // Perform median-filtering on dedispersed-time series
-void apply_median_filter(float *d_input, THREAD_PARAMS* params, 
-                         cudaEvent_t event_start, cudaEvent_t event_stop)
+void apply_median_filter(float *d_input, THREAD_PARAMS* params, cudaEvent_t event_start, cudaEvent_t event_stop, unsigned nsamp)
 {
     SURVEY *survey = params -> survey;
     unsigned tid = params -> thread_num;
@@ -373,9 +372,9 @@ void apply_median_filter(float *d_input, THREAD_PARAMS* params,
     cudaEventRecord(event_start, 0);	
 
     // Apply median filter on GPU
-    dim3(survey -> nsamp / MEDIAN_THREADS, survey -> tdms); 
-    median_filter<<<dim3(survey -> nsamp / MEDIAN_THREADS, survey -> tdms), MEDIAN_THREADS>>>
-                   (d_input, survey -> nsamp);
+    dim3(nsamp / MEDIAN_THREADS, survey -> tdms); 
+    median_filter<<<dim3(nsamp / MEDIAN_THREADS, survey -> tdms), MEDIAN_THREADS>>>
+                   (d_input, nsamp);
 
     // All processing ready, wait for kernel execution
     cudaEventRecord(event_stop, 0);
@@ -386,16 +385,15 @@ void apply_median_filter(float *d_input, THREAD_PARAMS* params,
 }
 
 // Detrend dedispersion time series
-void apply_detrending(float *d_input, THREAD_PARAMS* params, 
-                         cudaEvent_t event_start, cudaEvent_t event_stop)
+void apply_detrending(float *d_input, THREAD_PARAMS* params, cudaEvent_t event_start, cudaEvent_t event_stop, unsigned nsamp)
 {
     SURVEY *survey = params -> survey;
     unsigned tid = params -> thread_num;
     float timestamp;
 
     cudaEventRecord(event_start, 0);	
-    unsigned detrend = survey -> nsamp;
-	detrend_normalise<<<dim3(ceil(survey -> nsamp / (1.0 * detrend)), survey -> tdms), BANDPASS_THREADS>>>(d_input, detrend);
+    unsigned detrend = nsamp;
+	detrend_normalise<<<dim3(ceil(nsamp / (1.0 * detrend)), survey -> tdms), BANDPASS_THREADS>>>(d_input, detrend);
 
     // All processing ready, wait for kernel execution
     cudaEventRecord(event_stop, 0);
@@ -576,15 +574,15 @@ void* dedisperse(void* thread_params)
 
             // Perform Dedispersion
 		    cached_brute_force(d_input, d_output, d_dmshifts, params, 
-                                event_start, event_stop, beam.maxshift);
+                                event_start, event_stop, nsamp, beam.maxshift);
 
             // Apply median filter if required
             if (params -> survey -> apply_median_filter)
-                apply_median_filter(d_output, params, event_start, event_stop);
+                apply_median_filter(d_output, params, event_start, event_stop, nsamp);
 
             // Apply detrending and normalisation
             if (params -> survey -> apply_detrending)
-                apply_detrending(d_output, params, event_start, event_stop);
+                apply_detrending(d_output, params, event_start, event_stop, nsamp);
         }
 
         // Wait output barrier

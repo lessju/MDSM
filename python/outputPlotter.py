@@ -1,6 +1,7 @@
 import pyinotify
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+import matplotlib
 import pylab
 from sys import argv
 import os, fnmatch, sys, time, logging
@@ -49,7 +50,7 @@ def processFiles():
         # All plots
         elif argv[3] == 'all':
 
-            fig = pylab.figure()
+            fig = pylab.figure(figsize=(8*3, 6*3))
             fig.subplots_adjust(left=0.2, wspace=0.2)
             
             ax1 = fig.add_subplot(224)
@@ -73,7 +74,10 @@ def processFiles():
             ax3.set_ylabel('Intensity')
             ax3.set_title('Intensity vs Time plot')
 
-            pylab.show()
+            if len(argv) == 5:
+                plt.savefig(argv[4])
+	    else:
+                pylab.show()
 
         else:
             print "Invalid x/y values"

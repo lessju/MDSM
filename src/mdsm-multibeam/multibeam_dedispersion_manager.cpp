@@ -530,6 +530,8 @@ float **next_chunk_multibeam(unsigned int data_read, unsigned &samples,
     // Stopping clause (handled internally)
     if (data_read == 0) 
     { 
+        survey -> nsamp     = data_read;
+
         output_params.stop = 1;
         writer_params.stop = 1;
         for(unsigned k = 0; k < survey -> nbeams; k++) 
@@ -547,6 +549,7 @@ float **next_chunk_multibeam(unsigned int data_read, unsigned &samples,
     //  Update timing parameters
     survey -> timestamp = timestamp;
     survey -> blockRate = blockRate;
+    survey -> nsamp     = data_read;
 
     // Release rw_lock
     if (pthread_rwlock_unlock(&rw_lock))

@@ -2,6 +2,7 @@
 #include "multibeam_dedispersion_output.h"
 #include "unistd.h"
 #include "math.h"
+#include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -185,6 +186,9 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
 {
     unsigned int j, k, l;
 
+    struct timeval start, end;
+    long mtime, seconds, useconds;
+
     // Initialise Data Points vector
     vector<DataPoint> dataPoints;
     
@@ -204,7 +208,10 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         { localmean = 0; localrms = 1; }
 
     printf("%d: Mean: %f, Stddev: %f\n", (int) (time(NULL) - start_time), localmean, localrms);
-        
+
+    // Start performance counter
+    gettimeofday(&start, NULL);        
+
     // Subtract DM mean from all samples and apply threshold
     for (k = 0; k < survey -> tdms; k++) 
     {
@@ -222,27 +229,86 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         }   
     }
 
+    // Stop performance counter
+    gettimeofday(&end, NULL);
+    printf("Thresholding time: %d\n", end.tv_usec - start.tv_usec);
+
+    // Start performance counter
+    gettimeofday(&start, NULL);    
+
     // We have now created a list of data points which exceed the threshold
     // Initialise clustering with computed values
     DBScan clustering(survey -> dbscan_time_range * survey -> blockRate, survey -> dbscan_dm_range, 
                       survey -> dbscan_snr_range, survey -> dbscan_min_points);
 
     // Cluster data points
-    vector<Cluster*> clusters = clustering.performClustering(dataPoints);
+    vector<Cluster*> clusters = clustering.performOptimisedClustering(dataPoints);
     unsigned clustersFound = clusters.size();
 
-    printf("%d. Found %ld data points with %d clusters\n", (int) (time(NULL) - start_time), dataPoints.size(), clustersFound);
+    // Stop performance counter
+    gettimeofday(&end, NULL);
+    printf("Clustering time [%d points in %d clusters]: %d\n", dataPoints.size(), clustersFound, end.tv_usec - start.tv_usec);
 
-    // For now, just output clusters to file
-    for(unsigned i = 0; i < clusters.size(); i++)
-    {   
-        vector<int> *indices = clusters[i] -> getIndices();
-        for(j = 0; j < indices -> size(); j++)
+    // Start performance counter
+    gettimeofday(&start, NULL);    
+
+    unsigned validClusters = 0;
+    for(unsigned i = 0; i < clustersFound; i++)
+        if (1)
         {
-            DataPoint dataPoint = dataPoints[(*indices)[j]];
-            fprintf(output, "%lf,%f,%f,%d,%d\n", dataPoint.time, dataPoint.dm, dataPoint.snr, dataPoint.cluster + numClusters, dataPoint.type);
+            // Classify current cluster
+            float val = clusters[i] -> computeTransientProbability(survey -> lowdm, survey -> dmstep, survey -> tdms);
+
+            // For now, just notify plotter that the cluster was classified as RFI
+            if (val < 0.06)
+            {
+                vector<int> *indices = clusters[i] -> getIndices();
+                for(j = 0; j < indices -> size(); j++)
+                {
+                    DataPoint dataPoint = dataPoints[(*indices)[j]];
+                    fprintf(output, "%lf,%f,%f,%d,%d\n", dataPoint.time, dataPoint.dm, dataPoint.snr, 
+                                                         dataPoint.cluster + numClusters, dataPoint.type);
+                }
+                validClusters++;
+            }
+            else
+            {
+                vector<int> *indices = clusters[i] -> getIndices();
+                for(j = 0; j < indices -> size(); j++)
+                {
+                    DataPoint dataPoint = dataPoints[(*indices)[j]];
+                    fprintf(output, "%lf,%f,%f,%d,%d\n", dataPoint.time, dataPoint.dm, dataPoint.snr, 
+                                                         -2, dataPoint.type);
+                }
+                validClusters++;
+            }
         }
+        else  // Just dump clusters to disk
+        {
+            // Dump clusters
+            vector<int> *indices = clusters[i] -> getIndices();
+            for(j = 0; j < indices -> size(); j++)
+            {
+                DataPoint dataPoint = dataPoints[(*indices)[j]];
+                fprintf(output, "%lf,%f,%f,%d,%d\n", dataPoint.time, dataPoint.dm, dataPoint.snr, 
+                                                     dataPoint.cluster + numClusters, dataPoint.type);
+            }
+            validClusters++;
+        }
+
+    // Dump noise
+    for(j = 0; j < dataPoints.size(); j++)
+    {
+        DataPoint dataPoint = dataPoints[j];
+        if (dataPoint.cluster == -1)
+        fprintf(output, "%lf,%f,%f,%d,%d\n", dataPoint.time, dataPoint.dm, dataPoint.snr, 
+                                             dataPoint.cluster, dataPoint.type);
     }
+
+    // Stop performance counter
+    gettimeofday(&end, NULL);
+    printf("Classification time: %d\n", end.tv_usec - start.tv_usec);
+
     fflush(output);
 
     // Erase all cluster data

@@ -363,7 +363,7 @@ __global__ void channel_clipper(float *input, double *bandpass, char *flags, uns
             for(unsigned s = threadIdx.x;
                          s < channel_block;
                          s += blockDim.x)
-                input[blockIdx.y * total + b * channel_block + s + shift] = -50;//  (input[blockIdx.y * total + blockIdx.x * channel_block + s + shift] - bp_value);
+                input[blockIdx.y * total + b * channel_block + s + shift] = bp_value;
         }
         
     }
@@ -371,7 +371,7 @@ __global__ void channel_clipper(float *input, double *bandpass, char *flags, uns
 
 // --------------------- Perform rudimentary RFI clipping: clip spectra ------------------------------
 __global__ void spectrum_clipper(float *input, double *bandpass, float bandpass_mean, unsigned nsamp, 
-                                 unsigned nchans, unsigned shift, unsigned total, float spectrumThresh)
+                                 unsigned nchans, unsigned shift, unsigned total, float spectrumThresh, float spectrumThreshLow)
 {
     // First pass done, on to second step
     // Second pass: Perform wide-band RFI clipping
@@ -388,7 +388,7 @@ __global__ void spectrum_clipper(float *input, double *bandpass, float bandpass_
         spectrum_mean /= nchans;
 
         // We have the spectrum mean, check if it satisfies spectrum threshold
-        if (spectrum_mean > spectrumThresh)
+        if (spectrum_mean > spectrumThresh || spectrum_mean < spectrumThreshLow )
             // Spectrum is RFI, clear (replace with bandpass for now)
             for(unsigned c = 0; c < nchans; c++)
                 input[c * total + shift + s] = __double2float_rz(bandpass[c]);

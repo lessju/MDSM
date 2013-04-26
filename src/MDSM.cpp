@@ -47,10 +47,9 @@ SURVEY* file_process_arguments(int argc, char *argv[])
     survey -> fp = fopen(argv[file], "rb");
     header = read_header(survey -> fp);
     if (header == NULL)
-        survey -> nbits = 32;
+        survey -> nbits = 8;
     else
         survey -> nbits = header -> nbits;
-//    printf("Header size: %d, %f\n", header -> total_bytes, header -> tsamp);
 
     // Load in additional parameters
     while(i < argc) {  
