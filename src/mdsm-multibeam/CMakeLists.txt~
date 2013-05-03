@@ -9,18 +9,21 @@ CUDA_ADD_LIBRARY(mdsm-multibeam-cuda STATIC ${nvcc_multibeam_SRC})
 
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
-      target_link_libraries(foo )
-
 
 target_link_libraries(mdsm-multibeam-cuda
     ${CUDA_LIBRARIES}
+    ${OpenMP_CXX_FLAGS}
+    ${GSL_LIBRARIES} 
+    ${GSLCBLAS_LIBRARIES}
 )
 
 # C++ source files
 set(dedispersion_multibeam_SRC
     multibeam_dedispersion_manager.cpp
     multibeam_dedispersion_output.cpp
+    multibeam_dedispersion_writer.cpp
     file_handler.cpp
+    dbscan.cpp
 )
 
 add_library(mdsm-multibeam STATIC ${dedispersion_multibeam_SRC})
@@ -28,7 +31,9 @@ add_library(mdsm-multibeam STATIC ${dedispersion_multibeam_SRC})
 target_link_libraries(mdsm-multibeam
     ${QT_QTCORE_LIBRARY}
     ${QT_QTXML_LIBRARY}
-    ${Boost_LIBRARIES}
+    ${GSL_LIBRARIES} 
+    ${GSLCBLAS_LIBRARIES}
+    ${PGPLOT_LIBRARIES}
     mdsm-multibeam-cuda
 )
  

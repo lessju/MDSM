@@ -8,7 +8,7 @@
 
 #define SWAP(x,y) unsigned t; t=x; x=y; y=t;
 #define HEAP_BUFFERS 4
-#define BUSY_WAIT    0.001
+#define BUSY_WAIT    0.1
 
 // Class constructor
 DoubleBuffer::DoubleBuffer(unsigned nantennas, unsigned nchans, unsigned nsamp) 
@@ -131,6 +131,7 @@ void DoubleBuffer::run()
 
         // Increment sample count
         _samplesBuffered += _heapNsamp;
+        printf("%d\n", _samplesBuffered);
 
         // Dealing with a new heap, check if buffer is already full
         if (_samplesBuffered == _nsamp)

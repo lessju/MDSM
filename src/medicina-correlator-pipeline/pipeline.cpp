@@ -7,7 +7,8 @@
 #include <stdlib.h>
 
 // Global arguments
-unsigned samplesPerHeap = 128, port = 10000, samplesPerSecond = 78125, packetsPerHeap = 128;
+unsigned samplesPerPacket = 128, port = 10000, bandwidth = 20e6,
+         numberOfAntennas = 32,  numberOfChannels = 1024;
 
 // Process command-line parameters
 void process_arguments(int argc, char *argv[])
@@ -23,14 +24,10 @@ void process_arguments(int argc, char *argv[])
 //    }
 //    
     while(i < argc) {
-       if (!strcmp(argv[i], "-samplesPerHeap"))
-           samplesPerHeap = atoi(argv[++i]);
-       else if (!strcmp(argv[i], "-packetsPerHeap"))
-           packetsPerHeap = atoi(argv[++i]);
-       else if (!strcmp(argv[i], "-port"))
+       if (!strcmp(argv[i], "-port"))
            port = atoi(argv[++i]);
-       else if (!strcmp(argv[i], "-samplesPerSecond"))
-           samplesPerSecond = atoi(argv[++i]);
+       else if (!strcmp(argv[i], "-samplesPerPacket"))
+           samplesPerPacket = atoi(argv[++i]);
        i++;
     }
 }
@@ -48,12 +45,13 @@ int main(int argc, char *argv[])
     process_arguments(argc, argv);   
     
     // Initialise Circular Buffer and set thread priority
-    DoubleBuffer doubleBuffer(32, 1024, 65536);
+    DoubleBuffer doubleBuffer(numberOfAntennas, numberOfChannels, 32768);
     doubleBuffer.start();
     doubleBuffer.setPriority(QThread::TimeCriticalPriority);
 
     // Initialise UDP Chunker and set thread priority
-    PacketChunker chunker(port, 32, 1024, samplesPerHeap, samplesPerSecond, 1024 * 16 );
+    PacketChunker chunker(port, numberOfAntennas, numberOfChannels, samplesPerPacket, 
+                          numberOfAntennas * numberOfChannels / 2 );
     chunker.setDoubleBuffer(&doubleBuffer);
     chunker.start();
     chunker.setPriority(QThread::TimeCriticalPriority);
@@ -73,5 +71,6 @@ int main(int argc, char *argv[])
 
         // Done reading from buffer
         doubleBuffer.readReady();
+//        sleep(10000);
     } 
 }
