@@ -93,9 +93,9 @@ int main()
 
     // Set up PACKET_MMAP capturing mode (hard-coded values for now)
     struct tpacket_req req;
-    req.tp_block_size = page_size * 2;
-    req.tp_block_nr   = 8192;
-    req.tp_frame_size = 8192;
+    req.tp_block_size = page_size * 17;  // Size to be exactly divisible by frame size
+    req.tp_block_nr   = 1;
+    req.tp_frame_size = 4096 + 256;      // Hard-coded frame size for our application
     req.tp_frame_nr   = req.tp_block_nr * req.tp_block_size / req.tp_frame_size;
 
     printf("Block Size: \t\t%d\nNumber of Blocks: \t%d\nFrame Size: \t\t%d\nNumber of frames: \t%d\n",
@@ -129,42 +129,23 @@ int main()
     char *heap = (char *) malloc(32 * 1024 * 128 * sizeof(char));
 
     // Main processing loop
-    unsigned long global_counter = 0;
     for(unsigned i = 0;;)
     {
         // Fetch next frame and check whether it is available for processing
-        struct tpacket_hdr *header = (struct tpacket_hdr *) ring[i].iov_base;
+        volatile struct tpacket_hdr *header = (struct tpacket_hdr *) ring[i].iov_base;
 
         // Data not available yet, wait until it is
         // We can just spin lock over here, packets will be available very soon
         while(!(header -> tp_status & TP_STATUS_USER))
         {
-            struct pollfd pfd;
-            pfd.fd      = _socket;
-            pfd.events  = POLLIN | POLLERR;
-            pfd.revents = 0;
-            poll(&pfd, 1, -1);
+            ;
         }
 
         // Data is now available, we can process the current frame
-
-        // Sanity check for frame validty
-        if (header -> tp_status & TP_STATUS_LOSING)
-        {
-            // Packet drops detected, get statistics from socket
-            struct tpacket_stats stats;
-            socklen_t size_sock = sizeof(tpacket_stats);
-            printf("We are losing packets\n");
-            if (getsockopt(_socket, SOL_PACKET, PACKET_STATISTICS, &stats, &size_sock) > -1)
-            {
-                printf("Dropped packets: [%d, %d, %ld]\n", stats.tp_drops, stats.tp_packets, header -> tp_status);
-            }
-        }
-
         // NOTE: The data routines will be able to detect whether we're losing packets
 
         // Get pointer to frame data
-        unsigned char *frame = (unsigned char *) header + PKT_OFFSET + 2;
+        unsigned char *frame           = (unsigned char *) header + PKT_OFFSET + 2;
 
         // Extract IP information from packet
         struct iphdr  *ip_header       = (struct iphdr  *) (frame + sizeof(ethhdr));
@@ -207,7 +188,7 @@ int main()
             else
             {
                 // We are processing a packet from a new heap
-                fprintf(stderr, "############### We have lost some packets: %d of %d for %ld\n", _numPackets, _npackets, _currTime);
+                fprintf(stderr, "We have lost some packets: %d of %d for %ld\n", _numPackets, _npackets, _currTime);
                 _numPackets = 1;
                 _currTime = time;
             }
@@ -223,7 +204,6 @@ int main()
             _numPackets++;
             if (_numPackets == _npackets)
             {
-             //   printf("Oh yeah full heap\n");
                 _currTime = 0;
                 _numPackets = 0;
             }

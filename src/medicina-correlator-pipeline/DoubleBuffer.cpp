@@ -99,6 +99,9 @@ char *DoubleBuffer::writeHeap(double timestamp, double blockrate)
 // Write data to buffer
 void DoubleBuffer::run()
 {
+    // Temporary working buffer for local heap re-organisation
+    unsigned char *local_heap = (unsigned char *) malloc(_nantennas * _heapNsamp * sizeof(unsigned char));
+
     // Infinite loop which read heap data from network thread and write it to buffer
     while(true)
     {
@@ -112,26 +115,32 @@ void DoubleBuffer::run()
 
         // Reader has advanced one buffer, we can start writing current buffer
 
-        // Data format is channel/antenna/spectra, where 2 antennas are interleaved
-        // [[chan1 [A|B|A|B...|B][C|D|C|D...|D] ][chan2 ...] ... [chanN]]
-        // Output format data format will be: channel - antenna - spectra (so will probably need)
-        // a transpose for each channel for optimised correlator
+        // Heap is in channel/spectra/antenna order. For each channel:
+        // A0x[0]A0y[1]   ... A0x[127]A0y[127]
+        //                ...
+        // A15x[0]A15y[1] ... A15x[127]A15y[127]
+        // 8-bits per value (4-bit real, 4-bit imaginary)
+
+//        for(unsigned i = 0; i < 4096 * 1024; i++)
+//            printf("%d ", (unsigned char) _heapBuffers[_writerHeap][i]);
+ 
         for(unsigned c = 0; c < _heapChans; c++)
-            for(unsigned a = 0; a < _nantennas; a += 2)
-            {
-                unsigned ant1Index = c * _nantennas * _nsamp + a     * _nsamp + _samplesBuffered;
-                unsigned ant2Index = c * _nantennas * _nsamp + (a+1) * _nsamp + _samplesBuffered;
-                unsigned heapIndex = c * _nantennas * _heapNsamp + a * _heapNsamp;
+        {
+            // Loop over groups of antennas to populate local heap buffer
+            for(unsigned a = 0; a < _nantennas / 2; a++)
                 for(unsigned s = 0; s < _heapNsamp; s++)
                 {
-                    _buffer[_writerBuffer][ant1Index + s] = _heapBuffers[_writerHeap][heapIndex + s * 2];
-                    _buffer[_writerBuffer][ant2Index + s] = _heapBuffers[_writerHeap][heapIndex + s * 2 + 1];
+                    local_heap[s * _nantennas + a * 2]     = (unsigned char) _heapBuffers[_writerHeap][c * _nantennas * _heapNsamp + a * _heapNsamp * 2 + s * 2];
+                    local_heap[s * _nantennas + a * 2 + 1] = (unsigned char) _heapBuffers[_writerHeap][c * _nantennas * _heapNsamp + a * _heapNsamp * 2 + s * 2 + 1];
                 }
-            }
+
+            // Write re-organised channel to double buffer
+//            memcpy(&_buffer[_writerBuffer][c * _nsamp * _nantennas + _samplesBuffered * _nantennas],
+//                   local_heap, _nantennas * _heapNsamp * sizeof(unsigned char));
+        }
 
         // Increment sample count
         _samplesBuffered += _heapNsamp;
-        printf("%d\n", _samplesBuffered);
 
         // Dealing with a new heap, check if buffer is already full
         if (_samplesBuffered == _nsamp)

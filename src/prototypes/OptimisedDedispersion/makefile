@@ -18,7 +18,7 @@ LDFLAGS 	:= -L${CUDA_PATH}/lib -L${CUDA_PATH}/lib64 -L${CUDA_SDK_PATH}/lib \
 ############################ CUDA DEDISPERSE ###################################
 
 dedispersion:
-	$(NVCC) -o dedispersion dedispersion.cu $(LDFLAGS) $(INC) -L/lib --use_fast_math --gpu-architecture=sm_30 --ptxas-options=-v -O3 --use_fast_math --ptxas-options=-dlcm=ca
+	$(NVCC) -o dedispersion dedispersion.cu $(LDFLAGS) $(INC) -L/lib -D DEDISP_DMS=$(DEDISP_DMS) -D DEDISP_THREADS=$(DEDISP_THREADS) --use_fast_math --gpu-architecture=sm_30 --ptxas-options=-v -O3 --use_fast_math -Xptxas -dlcm=ca
 	rm -f *.cu.o *.linkinfo
 
 ################################################################################

@@ -14,7 +14,6 @@ typedef struct {
 
     // Separate output buffer per beam
     float  **output_buffer, **input_buffer;
-    size_t dedispersed_size;
    
     // Thread-specific info + synchronisation objects
     unsigned short stop;

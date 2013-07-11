@@ -17,8 +17,11 @@ float  **next_chunk_multibeam(unsigned int data_read, unsigned &samples,
 // Request a buffer pointer for the next data samples
 float *get_buffer_pointer();
 
+// Request a buffer pointer for the next antenna samples
+unsigned char *get_antenna_pointer();
+
 // Process current data buffer
-int    start_processing(unsigned int data_read);
+int start_processing(unsigned int data_read);
 
 // Tear down and clear/close everything
 void   tearDownMDSM();

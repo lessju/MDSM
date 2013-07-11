@@ -17,14 +17,23 @@ typedef struct
 
 } BEAM;
 
+typedef struct
+{
+    unsigned from, to;
+} RANGE;
+
 typedef struct {
 
     // Data parameters
-    unsigned nbeams, npols, nchans, nsamp, nbits;
+    bool voltage;
+    unsigned nbeams, npols, nchans, nsamp, nbits, nantennas;
     float    tsamp;
 
     // Beam parameters
     BEAM *beams;
+
+    // Beamforming parameters
+    bool apply_beamforming;
 
     // Brute Force parameters
     float    lowdm, dmstep;
@@ -42,14 +51,31 @@ typedef struct {
     unsigned  secs_per_file;
     char      use_pc_time, single_file_mode;
 
+    // Bandpass parameters
+    float bandpass_mean, bandpass_std, bandpass_rmse;
+    unsigned ncoeffs;
+
     // RFI parameters
-    bool  apply_huber_filter;
-    float huber_threshold, c;
+    bool apply_rfi_clipper;
+    float spectrum_thresh, channel_thresh;
+    unsigned channel_block, num_masks;
+    RANGE* channel_mask;
 
     // Detection parameters
-    float *global_mean, *global_stddev;
     float detection_threshold;
     bool  apply_median_filter;
+    bool  apply_detrending;
+
+    // Clustering parameters
+    bool apply_clustering, apply_classification;
+    unsigned dbscan_min_points;
+    float dbscan_time_range, dbscan_dm_range, dbscan_snr_range;
+
+    // Write parameters
+    bool tbb_enabled;
+    bool dump_to_disk;
+    unsigned output_bits;
+    unsigned output_compression;    
 
     // Number of GPUs which are used
     unsigned num_threads;

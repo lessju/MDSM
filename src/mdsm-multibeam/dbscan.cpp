@@ -1,12 +1,16 @@
 #include "dbscan.h"
+#include "float.h"
+#include "math.h"
+#include "cpgplot.h"
 
 // ------------------------- CLUSTER CLASS ---------------------------------
 
 // Class constructor
-Cluster::Cluster(unsigned id, const vector<DataPoint> &dataPoints)
+Cluster::Cluster(SURVEY *survey, unsigned id, const vector<DataPoint> &dataPoints)
 {
     this -> dataPoints = dataPoints;
     this -> id = id;
+    this -> survey = survey;
 }
 
 // Add point to current cluster
@@ -17,7 +21,7 @@ void Cluster::addPoint(unsigned pointIndex)
 
 // Compute a value indicating the probability that this cluster
 // is due to an astrophysical transient
-float Cluster::computeTransientProbability(float minDm, float dmStep, int numDMs)
+float Cluster::computeTransientProbability(float minDm, float dmStep, unsigned numDMs)
 {
     // Initialise DM-SNR histogram
     float dmHistogram[numDMs];
@@ -26,22 +30,155 @@ float Cluster::computeTransientProbability(float minDm, float dmStep, int numDMs
     // Generate DM-SNR curve for current cluster (flatten in the X-dimenion)
     for(unsigned i = 0; i < indices.size(); i++)
     {
-        DataPoint point = dataPoints[indices[i]];
-        dmHistogram[(int) round((point.dm - minDm) / dmStep)] += point.snr;
+        DataPoint pnt = (this -> dataPoints)[indices[i]];
+        dmHistogram[(int) round((pnt.dm - minDm) / dmStep)] += pnt.snr;
     }
 
-    return 0;
+    // Smoothen DM-SNR curve using an N-element window moving average
+    {
+        float temp[numDMs];
+        for(unsigned i = 1; i < numDMs - 1; i++)
+            temp[i] = (dmHistogram[i] + dmHistogram[i] + dmHistogram[i + 1]) / 3.0;
+
+        for(unsigned i = 1; i < numDMs - 1; i++)
+            dmHistogram[i] = temp[i];
+    }
+
+    // Find all DMs having a normalised histogram value > 0.9, get the median
+    // DM value and normalise by the mean value of the same range. This provides
+    // better accuracy for wide pulses
+    float maxValue = 0;
+    {       
+        for(unsigned i = 0; i < numDMs; i++) maxValue = max(maxValue, dmHistogram[i]);
+        float invMaxValue = 1.0 / maxValue;
+
+        vector<int> dmList;
+        maxValue = 0;
+        for(unsigned i = 0; i < numDMs; i++)
+            if (dmHistogram[i] * invMaxValue > 0.9)
+            {
+                dmList.push_back(i);
+                maxValue += dmHistogram[i];
+            }
+
+        unsigned size = dmList.size();
+
+        // Compute mean high SNR
+        maxValue /= (float) size;
+
+        // Find median value
+        std::sort(dmList.begin(), dmList.end());
+        if (size % 2 == 0)
+            this -> maxDM = (dmList[size / 2 - 1] + dmList[size / 2]) * 0.5 * dmStep + minDm;
+        else
+            this -> maxDM = dmList[size / 2] * dmStep + minDm;
+    }
+
+    // Sanity check on maximum DM
+    if (this -> maxDM <= 2.0)
+    {  
+        printf("Cluster caused due to RFI (DM = %f)\n", this -> maxDM);
+        return 1;
+    }
+
+    // Find maximum SNR for given DM
+    this -> maxSNR = 0;
+    for(unsigned i = 0; i < indices.size(); i++)
+    {
+        DataPoint pnt = (this -> dataPoints)[indices[i]];
+        this -> maxSNR = (fabs(pnt.dm - maxDM) < dmStep * 0.5 && pnt.snr > this -> maxSNR) ? pnt.snr : this -> maxSNR;
+    }
+    
+    // Find pulse FWHM
+    double minT = FLT_MAX, maxT = FLT_MIN;
+    for(unsigned i = 0; i < indices.size(); i++)
+    {
+        DataPoint pnt = (this -> dataPoints)[indices[i]];
+        if (fabs(pnt.dm - this -> maxDM) < dmStep)
+        {
+            minT = (pnt.time < minT) ? pnt.time : minT;
+            maxT = (pnt.time > maxT) ? pnt.time : maxT;
+        }
+    }
+    this -> width = (maxT - minT) * 1e3 * 0.4;
+    this -> position = minT + (maxT - minT) / 2;
+
+    // Sanity checking on pulse width
+    if (!(this -> width <= FLT_MAX && width >= FLT_MIN && this -> width > this -> survey -> min_pulse_width))
+    {
+        printf("Invalid cluster, pulse width is < %f, NaN or Inf = %f [%f, %f]\n", 
+                this -> survey -> min_pulse_width, this -> width, maxT, minT);
+        return 1;
+    }
+
+    printf("Cluster %d: maxDM = %f, maxSNR = %f,  minT = %f, maxT = %f, width = %f ms, ", 
+            this -> id, this -> maxDM, this -> maxSNR, minT, maxT, this -> width);
+
+    // Compute curve for incorrect de-disperison 
+    // NOTE: Currently assumes homogeneous beams
+    float snrFit[numDMs];
+    float band = fabs((survey -> beams)[0].foff * survey -> nchans);
+    float freq = pow(1e-3 * (survey -> beams)[0].fch1 - (band * 1e-3) * 0.5, 3);
+    float fitMax = 0;
+    for(unsigned i = 0; i < numDMs; i++)
+    {
+        // Calculate x-value 
+        float x = i * dmStep + minDm - this -> maxDM;
+
+        // Calculate y-value
+        float y = 6.91e-3 * x * (band / (width * freq));
+        snrFit[i] = sqrt(M_PI) * 0.5 * (1.0 / y) * erf(y);
+
+        // Keep fit maximum for sanity check
+        fitMax = (fitMax > snrFit[i]) ? fitMax : snrFit[i];
+    }    
+    
+    // Overwrite snrFit value for MaxDM
+    snrFit[(int) round((this -> maxDM - minDm) / dmStep)] = 1;
+
+    // Sanity check on SNR fit
+    if ((fitMax - 1.0) > 0.1)
+    {
+        printf("Invalid cluster, SNR fit not possible\n");
+        return 1;
+    }
+
+    // Normalise SNR-DM histogram first
+    for(unsigned i = 0; i < numDMs; i++) dmHistogram[i] /= maxValue;
+
+    // Compute Mean Square Error between signals
+    float mse = 0;
+    for(unsigned i = 0; i < numDMs; i++)
+        mse += (dmHistogram[i] - snrFit[i]) * (dmHistogram[i] - snrFit[i]);
+    mse /= (float) numDMs;
+   
+    printf("MSE = %f\n", mse);
+
+/*    if(cpgbeg(0, "/xwin", 1, 1) != 1) printf("Couldn't initialise PGPLOT\n");
+    cpgask(false);
+    float xvals[numDMs];
+    for(unsigned i = 0; i < numDMs; i++) xvals[i] = i;
+    cpgenv(0, numDMs, 0, 1, 0, 1);
+    cpgsci(7);
+    cpgline(numDMs, xvals, dmHistogram);
+    cpgsci(8);
+    cpgline(numDMs, xvals, snrFit);
+
+    sleep(1.5);
+*/
+    return mse;
 }
 
 // ------------------------- DBSCAN CLASS ---------------------------------
 // Class constructor
-DBScan::DBScan(float minTime, float minDm, float minSnr, unsigned minPoints)
+DBScan::DBScan(SURVEY *survey, float minTime, float minDm, float minSnr, unsigned minPoints)
 {
     // Initialise variables
     this -> min_dm     = minDm;
     this -> min_snr    = minSnr;
     this -> min_time   = minTime;
     this -> min_points = minPoints;
+    this -> survey     = survey;
 }
 
 // Class destructor
@@ -91,7 +228,7 @@ vector<Cluster*> DBScan::performClustering(vector<DataPoint> &dataPoints)
             continue;
         }
 
-        Cluster *cluster = new Cluster(clusters.size() + 1, dataPoints);
+        Cluster *cluster = new Cluster(this -> survey, clusters.size() + 1, dataPoints);
         clusters.push_back(cluster);
 
         // Assign point to new cluster
@@ -165,12 +302,18 @@ vector<Cluster*> DBScan::performOptimisedClustering(vector<DataPoint> &dataPoint
         }
 
         // Create new cluster
-        Cluster *cluster = new Cluster(clusters.size() + 1, dataPoints);
+        Cluster *cluster = new Cluster(this -> survey, clusters.size() + 1, dataPoints);
         clusters.push_back(cluster);
 
         // Assign point and neighborhood to new cluster
         dataPoints[i].cluster = cluster -> ClusterId();
         cluster -> addPoint(i);
+
+        for(unsigned j = 0; j < neighbors.size(); j++)
+        {
+            dataPoints[neighbors[j]].cluster = cluster -> ClusterId();
+            cluster -> addPoint(neighbors[j]);
+        }
 
         // Get representative seeds for this cluster
         vector<int> candidates = selectCandidates(points, neighbors);
@@ -251,7 +394,7 @@ unsigned DBScan::getNeighbours(DataPoint* dataPoints, unsigned numberOfPoints, u
     for(unsigned i = 0; i < numberOfPoints; i++)
     {
         // Avoid computing distance to same point
-        if (index != i)
+        if (index != i && dataPoints[i].cluster <= 0)
         {
             // Compute distance to current point
             float x = fabs(dataPoints[index].time - dataPoints[i].time);

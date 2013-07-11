@@ -47,7 +47,7 @@ SURVEY* file_process_arguments(int argc, char *argv[])
     survey -> fp = fopen(argv[file], "rb");
     header = read_header(survey -> fp);
     if (header == NULL)
-        survey -> nbits = 8;
+        survey -> nbits = 32;
     else
         survey -> nbits = header -> nbits;
 
@@ -111,6 +111,11 @@ int main(int argc, char *argv[])
 		// Read data from file
 		data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, 
                                    survey -> nsamp, survey -> nchans, survey -> nbeams);
+
+        // If we have more than one input beam, copy to all beams
+//        for(unsigned i = 1; i < survey -> nbeams; i++)
+//            memcpy(input_buffer + survey -> nsamp * survey -> nchans * i, input_buffer, 
+//                                  survey -> nsamp * survey -> nchans * sizeof(float));
 
         // Check if there is more processing to be done
 		unsigned int x;

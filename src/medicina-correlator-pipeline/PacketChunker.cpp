@@ -11,8 +11,8 @@
 
 // NOTE: These are hardcoded values which depend on the backend F-engine design
 // which is sending data throug 10GigE-interface using a custom packet-format
-#define PACKET_DATA_LEN    256 // bytes
-#define PACKET_HEADER_LEN  8   // bytes
+#define PACKET_DATA_LEN    4096  // bytes
+#define PACKET_HEADER_LEN  8     // bytes
 
 // Maximum size allocatable by kmalloc
 #define SIZE_MAX     131072
@@ -81,14 +81,14 @@ void PacketChunker::connectDevice()
 
     // Set up PACKET_MMAP capturing mode (hard-coded values for now)
     struct tpacket_req req;
-    req.tp_block_size = page_size;
-    req.tp_block_nr   = SIZE_MAX / sizeof(void *);
-    req.tp_frame_size = 512;  // Hard-coded for our needs, and is a divisor of pagesize()
+    req.tp_block_size = page_size * 17;         // Hard-coded to be exactly divisible by frame size
+    req.tp_block_nr   = 1024;
+    req.tp_frame_size = PACKET_DATA_LEN + 256;  // Hard-coded for our needs, and is a divisor of pagesize()
     req.tp_frame_nr   = req.tp_block_nr * req.tp_block_size / req.tp_frame_size;
     _nframes          = req.tp_frame_nr;
 
-    printf("Block Size: \t\t%d\nNumber of Blocks: \t%d\nFrame Size: \t\t%d\nNumber of frames: \t%d\n",
-            req.tp_block_size, req.tp_block_nr, req.tp_frame_size, req.tp_frame_nr);
+//    printf("Block Size: \t\t%d\nNumber of Blocks: \t%d\nFrame Size: \t\t%d\nNumber of frames: \t%d\n",
+//            req.tp_block_size, req.tp_block_nr, req.tp_frame_size, req.tp_frame_nr);
 
     if(setsockopt(_socket, SOL_PACKET, PACKET_RX_RING, (void *) &req, sizeof(req)) < 0)
     {
@@ -115,7 +115,6 @@ void PacketChunker::connectDevice()
     }
     
     // We are ready to start receiving data...
-    
 }
 
 // Set double buffer
@@ -133,62 +132,49 @@ void PacketChunker::run()
     unsigned _numPackets = 0;
 
     // Main processing loop
-    unsigned long global_counter = 0;
     for(unsigned i = 0;;)
     {
         // Fetch next frame and check whether it is available for processing
-        struct tpacket_hdr *header = (struct tpacket_hdr *) _ring[i].iov_base;
+        volatile struct tpacket_hdr *header = (struct tpacket_hdr *) _ring[i].iov_base;
 
         // Data not available yet, wait until it is
         // We can just spin lock over here, packets will be available very soon
         while(!(header -> tp_status & TP_STATUS_USER))
-        {
-          //  if (global_counter % 1000 == 0)
-          //      printf("Busy spin [%ld - %i]\n", global_counter, i);
-            ; // Busy-spin
-        }
+            ;
 
         // Data is now available, we can process the current frame
-
-        // Sanity check for frame validty
-        if (header -> tp_status & TP_STATUS_COPY)
-            fprintf(stderr, "Skipped packet: incomplete\n");
-
         // NOTE: The data routines will be able to detect whether we're losing packets
 
         // Get pointer to frame data
-        unsigned char *frame      = (unsigned char *) header + FRAME_OFFSET; 
+        unsigned char *frame           = (unsigned char *) header + FRAME_OFFSET;
 
         // Extract IP information from packet
-        struct iphdr  *ip_header  = (struct iphdr  *) (frame + sizeof(ethhdr));
+        struct iphdr  *ip_header       = (struct iphdr  *) (frame + sizeof(ethhdr));
 
         // TODO: Check whether packet was meant for us
 
         // Extract UDP information
-        struct udphdr *udp_header = (struct udphdr *) (((char *) ip_header) + ip_header -> ihl * 4);
+        struct udphdr *udp_header      = (struct udphdr *) (((char *) ip_header) + ip_header -> ihl * 4);
 
         // Check whether ports match, otherwise skip
         if (ntohs(udp_header -> dest) != _port)
         {
-            printf("This packet was not meant for us [%d], %d\n", ntohs(udp_header -> dest), _port);
             header -> tp_status = 0;
             i = ( i == _nframes - 1) ? 0 : i + 1;
+            printf("Invalid packet\n");
             continue;
         }
-
-        global_counter++;
 
         // Get UDP packet contents
         unsigned char *data = (unsigned char *) (((char *) udp_header) + sizeof(udphdr));
 
-        // Process packet header
         long unsigned int data_header =  be64toh(((uint64_t *) data)[0]);
         unsigned long  time    = data_header >> 26;
-        unsigned short antenna = (data_header & 0x000000000000FFFF) * 2;
         unsigned short channel = (data_header >> 16) & 0x03FF;
 
         // Check if we are processing a new heap
-        if (_currTime == 0) _currTime = time;
+        if (_currTime == 0)
+            _currTime = time;
 
         // Check if the time in the header corresponds to the time of the
         // heap being processed, or if we've advanced one heap
@@ -202,18 +188,16 @@ void PacketChunker::run()
             else
             {
                 // We are processing a packet from a new heap
-                printf("We have lost some packets: %d of %d for %ld\n", 
-                        _numPackets, _npackets, _currTime);
+                fprintf(stderr, "We have lost some packets: %d of %d for %ld\n", _numPackets, _npackets, _currTime);
 
-                // Forward heap to Double Buffer (with timing parameters)
-                // This will return a new heap 
-//                _heap =  _buffer -> writeHeap(1351174098.5 + (1024 * _currTime) / (40e6/2.0/128.0),
-//                                              1 / 19531.25);
+                // Mark previous heap as finished
+                _heap =  _buffer -> writeHeap(1351174098.5 + (1024 * _currTime) / (40e6/2.0/128.0),
+                                              1 / 19531.25);
 
-                // Copy new packet to new heap
-  //              memcpy(_heap + channel * _nantennas * _nsamp + antenna * _nsamp, &(data[4]), PACKET_DATA_LEN);
+                // Copy to new heap
+                memcpy(_heap + channel * _nantennas * _nsamp, data + PACKET_HEADER_LEN, PACKET_DATA_LEN);
 
-                _numPackets = 0;
+                _numPackets = 1;
                 _currTime = time;
             }
         }
@@ -222,22 +206,15 @@ void PacketChunker::run()
         else
         {
             // Place packet data in circular buffer
-       //     memcpy(_heap + channel * _nantennas * _nsamp + antenna * _nsamp, &(data[4]), PACKET_DATA_LEN);
-
-       // if (abs((int) (_numPackets - _npackets)) < 1000)
-          //   printf("Read packet [%d - %d]\n", _numPackets, _npackets);
-
-            // Increment packet number
-            _numPackets++;
+            memcpy(_heap + channel * _nantennas * _nsamp, data + PACKET_HEADER_LEN, PACKET_DATA_LEN);
 
             // If we have processed enough packet to form one heap, advance to the next heap
+            _numPackets++;
             if (_numPackets == _npackets)
             {
-                printf("Oh yeah, full heap\n");
-                // Forward heap to Double Buffer (with timing parameters)
-                // This will return a new heap pointer
-            //    _heap =  _buffer -> writeHeap(1351174098.5 + (1024 * _currTime) / (40e6/2.0/128.0),
-            //                                  1 / 19531.25);
+                // Mark heap as finished
+                _heap =  _buffer -> writeHeap(1351174098.5 + (1024 * _currTime) / (40e6/2.0/128.0),
+                                              1 / 19531.25);
                 _currTime = 0;
                 _numPackets = 0;
             }

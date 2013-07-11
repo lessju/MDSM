@@ -3,12 +3,16 @@
 
 #include <QCoreApplication>
 
+#include "multibeam_dedispersion_manager.h"
+#include "survey.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
 // Global arguments
 unsigned samplesPerPacket = 128, port = 10000, bandwidth = 20e6,
-         numberOfAntennas = 32,  numberOfChannels = 1024;
+         numberOfAntennas = 32,  numberOfChannels = 1024, nsamp = 4096;
+        
 
 // Process command-line parameters
 void process_arguments(int argc, char *argv[])
@@ -18,16 +22,16 @@ void process_arguments(int argc, char *argv[])
     while((fopen(argv[i], "r")) != NULL)
         i++;
         
-//    if (i != 2) {
-//        printf("MDSM needs observation file!\n");
-//        exit(-1);
-//    }
-//    
+    if (i != 2) {
+        printf("MDSM needs observation file!\n");
+        exit(-1);
+    }
+    
     while(i < argc) {
-       if (!strcmp(argv[i], "-port"))
-           port = atoi(argv[++i]);
-       else if (!strcmp(argv[i], "-samplesPerPacket"))
+       if (!strcmp(argv[i], "-samplesPerPacket"))
            samplesPerPacket = atoi(argv[++i]);
+       else if (!strcmp(argv[i], "-port"))
+           port = atoi(argv[++i]);
        i++;
     }
 }
@@ -36,22 +40,32 @@ void process_arguments(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     double    timestamp, sampRate;
-//    float     *inputBuffer;
     
     // Create mait QCoreApplication instance
     QCoreApplication app(argc, argv);
 
     // Process arguments
-    process_arguments(argc, argv);   
+    process_arguments(argc, argv);  
+
+    // Initialise MDSM
+    SURVEY *survey = processSurveyParameters(argv[1]);
+    initialiseMDSM(survey);
+
+    // Check if requested nsamp is a divisible by the incoming samples per heap
+    if (survey -> nsamp % samplesPerPacket != 0)
+    {
+        printf("Number of samples (%d) must be exactle divisble by number of spectra per Heap (%d)\n",
+                survey -> nsamp, samplesPerPacket);
+        exit(0);
+    } 
     
     // Initialise Circular Buffer and set thread priority
-    DoubleBuffer doubleBuffer(numberOfAntennas, numberOfChannels, 32768);
+    DoubleBuffer doubleBuffer(numberOfAntennas, numberOfChannels, survey -> nsamp);
     doubleBuffer.start();
     doubleBuffer.setPriority(QThread::TimeCriticalPriority);
 
     // Initialise UDP Chunker and set thread priority
-    PacketChunker chunker(port, numberOfAntennas, numberOfChannels, samplesPerPacket, 
-                          numberOfAntennas * numberOfChannels / 2 );
+    PacketChunker chunker(port, numberOfAntennas, numberOfChannels, samplesPerPacket, numberOfChannels);
     chunker.setDoubleBuffer(&doubleBuffer);
     chunker.start();
     chunker.setPriority(QThread::TimeCriticalPriority);
@@ -62,15 +76,19 @@ int main(int argc, char *argv[])
         // Get pointer to next buffer   
         char *udpBuffer = doubleBuffer.prepareRead(&timestamp, &sampRate);
 
-        // For testing purposes, we just dump to disk for further analysis
-        #if 0
-        FILE *fp = fopen("Test_correlator_packet_format.dat", "wb");
-        fwrite(udpBuffer, 65536 * 1024 * 32, sizeof(char), fp);
-        fclose();
-        #endif
+        // Get destination buffer from MDSM
+        unsigned char *inputBuffer = get_antenna_pointer();
+
+        // Copy UDP data to buffer
+        memcpy(inputBuffer, udpBuffer, survey -> nantennas * survey -> nchans * 
+                                       survey -> nsamp * sizeof(unsigned char));
 
         // Done reading from buffer
         doubleBuffer.readReady();
-//        sleep(10000);
+        
+        // Call MDSM for dedispersion
+        unsigned int samplesProcessed;
+        next_chunk_multibeam(survey -> nsamp, samplesProcessed, timestamp, sampRate);
+        if (!start_processing(survey -> nsamp)) printf("MDSM stopped....\n");
     } 
 }

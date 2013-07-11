@@ -2,7 +2,6 @@
 #include "multibeam_dedispersion_output.h"
 #include "unistd.h"
 #include "math.h"
-#include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -17,6 +16,9 @@
 
 // Clustering Class
 #include "dbscan.h"
+
+// Temporary file for pipeline analysis
+FILE *pulses_found = fopen("found_pulses.txt", "w");
 
 // ========================== FILE HERLPER ===================================
 void create_files(FILE** fp, SURVEY* survey, double timestamp)
@@ -186,9 +188,6 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
 {
     unsigned int j, k, l;
 
-    struct timeval start, end;
-    long mtime, seconds, useconds;
-
     // Initialise Data Points vector
     vector<DataPoint> dataPoints;
     
@@ -208,10 +207,7 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         { localmean = 0; localrms = 1; }
 
     printf("%d: Mean: %f, Stddev: %f\n", (int) (time(NULL) - start_time), localmean, localrms);
-
-    // Start performance counter
-    gettimeofday(&start, NULL);        
-
+        
     // Subtract DM mean from all samples and apply threshold
     for (k = 0; k < survey -> tdms; k++) 
     {
@@ -229,38 +225,26 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         }   
     }
 
-    // Stop performance counter
-    gettimeofday(&end, NULL);
-    printf("Thresholding time: %d\n", end.tv_usec - start.tv_usec);
-
-    // Start performance counter
-    gettimeofday(&start, NULL);    
-
     // We have now created a list of data points which exceed the threshold
     // Initialise clustering with computed values
-    DBScan clustering(survey -> dbscan_time_range * survey -> blockRate, survey -> dbscan_dm_range, 
-                      survey -> dbscan_snr_range, survey -> dbscan_min_points);
+    DBScan clustering(survey, survey -> dbscan_time_range * survey -> blockRate, survey -> dbscan_dm_range, 
+                              survey -> dbscan_snr_range, survey -> dbscan_min_points);
 
     // Cluster data points
-    vector<Cluster*> clusters = clustering.performOptimisedClustering(dataPoints);
+    vector<Cluster*> clusters = clustering.performClustering(dataPoints);
     unsigned clustersFound = clusters.size();
 
-    // Stop performance counter
-    gettimeofday(&end, NULL);
-    printf("Clustering time [%d points in %d clusters]: %d\n", dataPoints.size(), clustersFound, end.tv_usec - start.tv_usec);
-
-    // Start performance counter
-    gettimeofday(&start, NULL);    
+    printf("%d. Found %ld data points with %d clusters\n", (int) (time(NULL) - start_time), dataPoints.size(), clustersFound);
 
     unsigned validClusters = 0;
     for(unsigned i = 0; i < clustersFound; i++)
-        if (1)
+        if (survey -> apply_classification)
         {
             // Classify current cluster
             float val = clusters[i] -> computeTransientProbability(survey -> lowdm, survey -> dmstep, survey -> tdms);
 
             // For now, just notify plotter that the cluster was classified as RFI
-            if (val < 0.06)
+            if (val < 0.1)
             {
                 vector<int> *indices = clusters[i] -> getIndices();
                 for(j = 0; j < indices -> size(); j++)
@@ -270,6 +254,11 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
                                                          dataPoint.cluster + numClusters, dataPoint.type);
                 }
                 validClusters++;
+
+                // TEMP
+                fprintf(pulses_found, "{'dm' : %.2f, 'width' : %f, 'snr' : %.2f, 'pos' : %lf, 'rmse' : %.4f },", 
+                                       clusters[i] -> getDM(), clusters[i] -> getWidth(), clusters[i] -> getMaxSnr(), 
+                                       clusters[i] -> getPosition(), val);
             }
             else
             {
@@ -282,6 +271,8 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
                 }
                 validClusters++;
             }
+
+            fflush(pulses_found);
         }
         else  // Just dump clusters to disk
         {
@@ -304,10 +295,6 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         fprintf(output, "%lf,%f,%f,%d,%d\n", dataPoint.time, dataPoint.dm, dataPoint.snr, 
                                              dataPoint.cluster, dataPoint.type);
     }
-
-    // Stop performance counter
-    gettimeofday(&end, NULL);
-    printf("Classification time: %d\n", end.tv_usec - start.tv_usec);
 
     fflush(output);
 
@@ -345,6 +332,9 @@ void* process_output(void* output_params)
 
     unsigned numClusters[params -> nthreads];
     memset(numClusters, 0, params -> nthreads * sizeof(unsigned));
+
+    // TEMP
+    fprintf(pulses_found, "[");
 
     // Processing loop
     while (1) 
@@ -439,7 +429,12 @@ void* process_output(void* output_params)
             { fprintf(stderr, "Error releasing rw_lock [output]\n"); exit(0); }
 
         loop_counter++;
-    }   
+    }  
+
+    // TEMP
+    fseek(pulses_found, -1, SEEK_CUR); // Remove extra trailing comma
+    fprintf(pulses_found, "]");
+    fclose(pulses_found);
 
     printf("%d: Exited gracefully [output]\n", (int) (time(NULL) - start));
     pthread_exit((void*) output_params);

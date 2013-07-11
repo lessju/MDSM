@@ -8,9 +8,10 @@
 #include <math.h>
 
 #define BEAMFORMER_THREADS 128
-#define BEAMS 16
+#define BEAMS_PER_TB 16
+#define BEAMS 32
 #define ANTS 32
-unsigned nchans = 512, nants = 32, nsamp = 16384;
+unsigned nchans = 1024, nants = 32, nsamp = 8192;
 
 // ======================== CUDA HELPER FUNCTIONS ==========================
 
@@ -42,163 +43,23 @@ inline void _cudaCheckError( const char *file, const int line )
         fprintf( stderr, "cudaCheckError() failed at %s:%i : %s\n",
                  file, line, cudaGetErrorString( err ) );
         exit( -1 );
-    }   
+    }
 #endif
 
-    return; 
+    return;
 }
 
 // ==========================================================================
 
-
-// ==========================================================================
-
-typedef struct
-{
-    char4 real[8];
-    char4 imag[8];
-} ANTENNAS;
-
-__global__ void beamform_struct(ANTENNAS* input, float *output, float4 *shifts, unsigned nsamp,
-                                unsigned nants, unsigned nchans)
-{
-    __shared__ float beams[BEAMFORMER_THREADS * BEAMS];
-
-    // Loop over all time samples
-    for(unsigned time = blockIdx.x;
-                 time < nsamp;
-                 time += gridDim.x)
-    {
-        // Synchronise threads
-        __syncthreads();
-
-        // Loop over channel
-        for(unsigned channel = threadIdx.x;
-                     channel < nchans;
-                     channel += blockDim.x)
-        {
-            // Initialise shared memory storing beams
-            for(unsigned i = 0; i < BEAMS; i++)
-                beams[blockDim.x * i + threadIdx.x] = 0;
-        
-            // Synchronise threads
-            __syncthreads();
-
-            // Load antennas
-            ANTENNAS antennas = input[time * nchans + channel];
-
-            // Loop over all antennas and beamform
-            for(unsigned antenna = 0;
-            			 antenna < nants / 4;
-            			 antenna ++)
-            {
-                char4 real = antennas.real[antenna];
-                char4 imag = antennas.imag[antenna];
-
-                // Loop over all beams
-				for(unsigned beam = 0; beam < BEAMS; beam++)
-				{
-                    // Add four antennas at a time (to reduce shared memory overhead and increase arithmetic intensity)
-                    float4 phase_shifts = shifts[beam * nchans * nants / 4 + antenna * nchans + channel];
-
-                    float temp1 = real.w * real.w + (phase_shifts.w * imag.w) * (phase_shifts.w * imag.w);
-                    float temp2 = real.x * real.x + (phase_shifts.x * imag.x) * (phase_shifts.x * imag.x);
-                    float temp3 = real.y * real.y + (phase_shifts.y * imag.y) * (phase_shifts.y * imag.y);
-                    float temp4 = real.z * real.z + (phase_shifts.z * imag.z) * (phase_shifts.z * imag.z);
- 					beams[blockDim.x * beam + threadIdx.x] += temp1 + temp2 + temp3 + temp4;
-				}
-            }
-
-            // Synchronise threads
-            __syncthreads();
-
-            // Save beam value to global memory
-            for(unsigned beam = 0; beam < BEAMS; beam++)
-//                output[beam * nsamp * nchans + channel * nsamp + time] = beams[blockDim.x * beam + threadIdx.x];//beams[blockDim.x * beam + threadIdx.x];
-                    output[blockIdx.x * blockDim.x * beam + threadIdx.x] = beams[beam];
-
-            // Synchronise threads
-            __syncthreads();
-        }
-    }	
-}
-
-
-__global__ void beamform_shared(char4 *input, float *output, float4 *shifts, unsigned nsamp,
-                                unsigned nants, unsigned nchans)
-{
-    __shared__ char4 shared[BEAMFORMER_THREADS * 16];
-    __shared__ float beams[BEAMFORMER_THREADS * BEAMS];
-
-    // Loop over all time samples
-    for(unsigned time = blockIdx.x;
-                 time < nsamp;
-                 time += gridDim.x)
-    {
-        // Synchronise threads
-        __syncthreads();
-
-        // Loop over channe
-        for(unsigned channel = threadIdx.x;
-                     channel < nchans;
-                     channel += blockDim.x)
-        {
-            // Load data to shared memory
-            unsigned index = 16 * (time * nchans + (channel / blockDim.x) * blockDim.x );
-            for(unsigned i = threadIdx.x;
-                         i < blockDim.x * 16;
-                         i += blockDim.x)
-                shared[i] = input[index + i];
-
-            // Initialise shared memory storing beams
-            for(unsigned i = 0; i < BEAMS; i++)
-                beams[blockDim.x * i + threadIdx.x] = 0;
-        
-            // Synchronise threads
-            __syncthreads();
-
-            // Loop over all antennas and beamform
-            for(unsigned antenna = 0;
-            			 antenna < nants / 4;
-            			 antenna ++)
-            {
-                char4 real = shared[threadIdx.x * 16 + (antenna + threadIdx.x) % 8];
-				char4 imag = shared[threadIdx.x * 16 + 8 + (antenna + threadIdx.x) % 8];
-
-                // Loop over all beams
-				for(unsigned beam = 0; beam < BEAMS; beam++)
-				{
-                    // Add four antennas at a time (to reduce shared memory overhead and increase arithmetic intensity)
-                    float4 phase_shifts = shifts[beam * nchans * nants / 4 + antenna * nchans + channel];
-
-                    float temp1 = real.w * real.w + (phase_shifts.w * imag.w) * (phase_shifts.w * imag.w);
-                    float temp2 = real.x * real.x + (phase_shifts.x * imag.x) * (phase_shifts.x * imag.x);
-                    float temp3 = real.y * real.y + (phase_shifts.y * imag.y) * (phase_shifts.y * imag.y);
-                    float temp4 = real.z * real.z + (phase_shifts.z * imag.z) * (phase_shifts.z * imag.z);
- 					beams[blockDim.x * beam + threadIdx.x] += temp1 + temp2 + temp3 + temp4;
-				}
-            }
-
-            // Synchronise threads
-            __syncthreads();
-
-            // Save beam value to global memory
-            for(unsigned beam = 0; beam < BEAMS; beam++)
-//                output[beam * nsamp * nchans + channel * nsamp + time] = beams[blockDim.x * beam + threadIdx.x];//beams[blockDim.x * beam + threadIdx.x];
-                    output[blockIdx.x * blockDim.x * beam + threadIdx.x] = beams[beam];
-
-            // Synchronise threads
-            __syncthreads();
-        }
-    }	
-}
+// Kernel which paralellises over time instead of frequency within the blocks
 __global__ void 
 __launch_bounds__(BEAMFORMER_THREADS) 
 beamform_time(char4 *input, float *output, float *shifts, unsigned nsamp,
               unsigned nants, unsigned nchans)
 {
-    __shared__ char4   shared[BEAMFORMER_THREADS * 16];
-    __shared__ float   phase_shifts[BEAMS * 4];
+    __shared__ char4   shared[BEAMFORMER_THREADS * 8];
+    __shared__ float   real[BEAMFORMER_THREADS];
+    __shared__ float   phase_shifts[BEAMS_PER_TB * 4];
 
     // Thread block will loop over time for a single channel
     // Channel changes in the y direction
@@ -211,64 +72,212 @@ beamform_time(char4 *input, float *output, float *shifts, unsigned nsamp,
     {
         // Load data to shared memory
         unsigned index = (time / blockDim.x) * blockDim.x * nchans * 16;
+
         #pragma unroll 8
         for(unsigned i = threadIdx.x; i < blockDim.x * 16; i += blockDim.x)
-            shared[i] = input[index + (i / 16) * nchans * 16 + blockIdx.y * 16 + i % 16];
+        {
+            // Grab some antenna data from global memory
+            char4 value = input[index + (i / 16) * nchans * 16 + blockIdx.y * 16 + i % 16];
+
+            // The first eight threads in a half-warp will contains the real components
+            if (i % 16 < 8)
+            {
+                // First, combine current antennas
+                float4 real_value = { value.w, value.x, value.y, value.z };
+                float  curr_value = real_value.w * real_value.w + real_value.x * real_value.x + real_value.y * real_value.y + real_value.z * real_value.z;
+
+                // We need to combine antennas from 8 different threads... use warp shuffle!
+                curr_value += __shfl_down(curr_value, 1, 2);
+                curr_value += __shfl_down(curr_value, 2, 4);
+                curr_value += __shfl_down(curr_value, 4, 8);
+
+                // Write final value to shared memory
+                if (i % 16 == 0)
+                    real[i / 16] = curr_value;
+            }
+            // The second eight threads in a half-warp will contain the imaginary components
+            else
+                shared[(i / 8) - 1 + (i - 8) % 8] = value;
+        }
 
         // Synchronise threads
         __syncthreads();
 
         // Initialise beams registers
-        register float beams[BEAMS] = {0};
+        register float beams[BEAMS_PER_TB] = {0};
 
         // Loop over all antennas
         for(unsigned antenna = 0; antenna < ANTS / 4; antenna++)
         {
             // Add four antennas at a time (to reduce shared memory overhead and increase arithmetic intensity)
-            char4 real_char = shared[threadIdx.x * 16 + antenna];
-            char4 imag_char = shared[threadIdx.x * 16 + antenna + 8];
+            char4 imag_char  = shared[threadIdx.x * 8 + antenna];
+            float real_value = real[threadIdx.x];
 
-            float realw = real_char.w;
             float imagw = imag_char.w;
-            float realx = real_char.x; 
             float imagx = imag_char.x;
-            float realy = real_char.y;
             float imagy = imag_char.y;
-            float realz = real_char.z;
             float imagz = imag_char.z;
 
             // Load shifts associated with these four antennas and all beams
-            for(unsigned i = threadIdx.x; i < 4 * BEAMS; i+= blockDim.x)
-                phase_shifts[i] = shifts[(blockIdx.y * nants + antenna * 4) * BEAMS + i];
+            for(unsigned i = threadIdx.x; i < 4 * BEAMS_PER_TB; i+= blockDim.x)
+                phase_shifts[i] = shifts[blockIdx.y * BEAMS * nants + antenna * 4 * BEAMS + blockIdx.z * BEAMS_PER_TB + i];
 
             // Synchronise threads
             __syncthreads();
 
             // Loop over all the beams
-            for(unsigned beam = 0; beam < BEAMS; beam++)
+            for(unsigned beam = 0; beam < BEAMS_PER_TB; beam++)
             {
                 // Read shifts from shared memory and apply to current four antennas
                 float shift1 = phase_shifts[beam];
-                float shift2 = phase_shifts[beam + BEAMS];
-                float shift3 = phase_shifts[beam + BEAMS * 2];
-                float shift4 = phase_shifts[beam + BEAMS * 3];
+                float shift2 = phase_shifts[BEAMS_PER_TB + beam];
+                float shift3 = phase_shifts[2 * BEAMS_PER_TB + beam];
+                float shift4 = phase_shifts[3 * BEAMS_PER_TB + beam];
 
-                float temp1 = realw * realw;
                 float temp2 = (shift1 * imagw) * (shift1 * imagw);
-                temp1 += realx * realx;
                 temp2 += (shift2* imagx) * (shift2 * imagx);
-                temp1 += realy * realy;
                 temp2 += (shift3 * imagy) * (shift3 * imagy);
-                temp1 += realz * realz;
                 temp2 += (shift4 * imagz) * (shift4 * imagz);
 
                 // Add value to beam in global memory
-                beams[beam] += temp1 + temp2;
+                beams[beam] += real_value + temp2;
             }
         }
 
-        for(unsigned beam = 0; beam < BEAMS; beam++)
-            output[beam * nsamp * nchans + blockIdx.y * nsamp + time] = beams[beam];
+        for(unsigned beam = 0; beam < BEAMS_PER_TB; beam++)
+            output[(blockIdx.z * BEAMS_PER_TB + beam) * nsamp * nchans + blockIdx.y * nsamp + time] = beams[beam];
+
+        // Synchronise threads
+        __syncthreads();
+    }
+}
+
+// Kernel which paralellises over time instead of frequency within the blocks
+// Medicina implementation... this assumes 32 antennas
+__global__ void 
+__launch_bounds__(BEAMFORMER_THREADS) 
+beamform_medicina(char4 *input, float *output, float *shifts, unsigned nsamp, unsigned nchans)
+{
+    // Shared memory store for imaginary components (BEAMFORMER_THREADS * 8 [*4 for char4 implied])   
+    __shared__ char4 shared[BEAMFORMER_THREADS * 8];
+
+    // Shared memory store for combined real components (one combined value per thread)
+    __shared__ float real[BEAMFORMER_THREADS];
+
+    // Shared memory store for phase shifts
+    // The inner-most loop will split antennas into groups of four, so we only need
+    // BEAM_PER_TB * 4 float per iteration
+    __shared__ float phase_shifts[BEAMS_PER_TB * 4];
+
+    // Threablock will loop over time for a single channel
+    // Groups of beams change in the z-direction
+    // Channel changes in the y-direction
+    // Multiple blocks in the x-direction
+    
+    // Loop over time samples for current block
+    for(unsigned time = blockIdx.x * blockDim.x + threadIdx.x;
+                 time < nsamp;
+                 time += gridDim.x * blockDim.x)
+    {
+        // Load antenna data for current spectra subset (BEAMFORMER_THREADS in all) to shared
+        // memory, placing phase components in shared and combined amplitudes in real
+
+        // Compute index to start of block
+        unsigned index = (blockIdx.y * nsamp + blockIdx.x) * ANTS;
+        
+        // Loop over antennas in groups of four
+        for(unsigned i = threadIdx.x;
+                     i < blockDim.x * 8; // One memory request will load 4 full antennas
+                     i += blockDim.x)
+        {
+            // Grab 4 antennas from global memory. This a quarter warp will contain all the antenna values
+            // TODO: Check if this is correct
+            register char4 value = input[index + i];
+
+            // Each warp make up a single spectrum. Combine the amplitude components and store in real
+            float4 real_value = { (value.w >> 4) & 0xF, (value.x >> 4) & 0xF, 
+                                  (value.y >> 4) & 0xF, (value.z >> 4) & 0xF };
+
+            // Combine antennas belonging to the current thread
+            float   amplitude = real_value.w * real_value.w + real_value.x * real_value.x +
+                                real_value.y * real_value.y + real_value.z * real_value.z;
+
+            
+            // Use warp-shuffle to combine antennas from 8 different threads
+            amplitude += __shfl_down(amplitude, 1, 2);
+            amplitude += __shfl_down(amplitude, 2, 4);
+            amplitude += __shfl_down(amplitude, 4, 8);
+
+            // Each 8th thread will contain a valid ampltiude value. Store this to real
+            if (i % 8 == 0)
+                real[i / 8] = amplitude;
+
+            // We are ready from processing the amplitude value. Next we just need to store the
+            // phase components to shared
+            value.w = value.w & 0x0F;
+            value.x = value.x & 0x0F;
+            value.y = value.y & 0x0F;
+            value.z = value.z & 0x0F;
+
+            shared[i] = value;
+        }        
+
+        // Finished pre-computation. Synchronise threads
+        __syncthreads();
+
+        // Initialise beam registers
+        register float beams[BEAMS_PER_TB] = { 0 };
+
+        // Loop over all antennas
+        for(unsigned antenna = 0;
+                     antenna < ANTS / 4;
+                     antenna++)
+        {
+            // Add four antennas at a time (to reduce shared memory overhead and increase arithmetic intensity)
+            char4 imag_char = shared[threadIdx.x * 8 + antenna];
+            float real_val  = real[threadIdx.x];
+
+            float imagw = imag_char.w;
+            float imagx = imag_char.x;
+            float imagy = imag_char.y;
+            float imagz = imag_char.z;
+
+            // Load shifts associated with these four antennas and all beams for current thread block
+            for(unsigned i = threadIdx.x; 
+                         i < 4 * BEAMS_PER_TB; 
+                         i += blockDim.x)
+                phase_shifts[i] = shifts[blockIdx.y * BEAMS * ANTS + 
+                                         antenna * 4 * BEAMS + blockIdx.z * BEAMS_PER_TB + 
+                                         i];
+
+            // Synchronise threads
+            __syncthreads();
+            
+            // Loop over all beams 
+            for(unsigned beam = 0;
+                         beam < BEAMS_PER_TB;
+                         beam++)
+            {
+                // Read shifts from shared memory and apply to current four antennas
+                float shift1 = phase_shifts[beam];
+                float shift2 = phase_shifts[BEAMS_PER_TB + beam];
+                float shift3 = phase_shifts[2 * BEAMS_PER_TB + beam];
+                float shift4 = phase_shifts[3 * BEAMS_PER_TB + beam];
+
+                float temp2 = (shift1 * imagw) * (shift1 * imagw);
+                temp2 += (shift2 * imagx) * (shift2 * imagx);
+                temp2 += (shift3 * imagy) * (shift3 * imagy);
+                temp2 += (shift4 * imagz) * (shift4 * imagz);
+
+                // Add value to beam in beam registers
+                // TODO: Check if this is correct
+               beams[beam] += real_val * real_val + temp2 * temp2;
+            }
+        }
+
+        // Save computed beams to global memory
+        for(unsigned beam = 0; beam < BEAMS_PER_TB; beam++)
+            output[(blockIdx.z * BEAMS_PER_TB + beam) * nsamp * nchans + blockIdx.y * nsamp + time] = beams[beam];
 
         // Synchronise threads
         __syncthreads();
@@ -283,6 +292,8 @@ int main(int agrc, char *argv[])
 //    long mtime, seconds, useconds;
 
     cudaSetDevice(0);
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
+    cudaFuncSetSharedMemConfig( beamform_time, cudaSharedMemBankSizeEightByte );
 
 	cudaEvent_t event_start, event_stop;
 	float timestamp;
@@ -308,6 +319,7 @@ int main(int agrc, char *argv[])
     float *d_output_buffer, *output_buffer;
     float *d_shifts;
     CudaSafeCall(cudaMallocHost((void **) &output_buffer, nchans * nsamp * BEAMS * sizeof(float)));
+    CudaSafeCall(cudaMallocHost((void **) &output_buffer, nchans * nsamp * BEAMS * sizeof(float)));
     CudaSafeCall(cudaMalloc((void **) &d_output_buffer, nchans * nsamp * BEAMS * sizeof(float)));
     CudaSafeCall(cudaMalloc((void **) &d_shifts, nchans * BEAMS * nants * sizeof(float)));
     printf("Allocated output buffers\n");
@@ -321,6 +333,7 @@ int main(int agrc, char *argv[])
     printf("Generated fake data\n");
 
     // Generate shifts
+    
     cudaMemset((void *) d_shifts, 1, nchans * BEAMS * nants * sizeof(float));
 
     // Copy input buffer to GPU
@@ -332,17 +345,8 @@ int main(int agrc, char *argv[])
 	printf("Copied data to GPU in: %lf\n", timestamp);
 
     // Run beamformer kernel
-//    cudaEventRecord(event_start, 0);
-//    beamform_shared<<< 1024, BEAMFORMER_THREADS >>>
-//            ((char4 *) d_input_buffer, d_output_buffer, (float4 *) d_shifts, nsamp, nants, nchans);
-//    cudaEventRecord(event_stop, 0);
-//	cudaEventSynchronize(event_stop);
-//	cudaEventElapsedTime(&timestamp, event_start, event_stop);
-//    double kernel_time = timestamp;
-//	printf("Performed beamforming [shared] in : %lf\n", timestamp);
-
     cudaEventRecord(event_start, 0);
-    beamform_time<<< dim3(64, nchans), BEAMFORMER_THREADS >>>
+    beamform_time<<< dim3(nsamp / BEAMFORMER_THREADS, nchans, BEAMS / BEAMS_PER_TB), BEAMFORMER_THREADS >>>
             ((char4 *) d_input_buffer, d_output_buffer, d_shifts, nsamp, nants, nchans);
     cudaEventRecord(event_stop, 0);
 	cudaEventSynchronize(event_stop);
@@ -350,12 +354,16 @@ int main(int agrc, char *argv[])
     double kernel_time = timestamp;
 	printf("Performed beamforming [time] in : %lf\n", timestamp);
 
-//    cudaEventRecord(event_start, 0);
-//    CudaSafeCall(cudaMemcpy(output_buffer, d_output_buffer, nsamp * nchans * BEAMS * sizeof(float), cudaMemcpyDeviceToHost));
-//    cudaEventRecord(event_stop, 0);
-//	cudaEventSynchronize(event_stop);
-//	cudaEventElapsedTime(&timestamp, event_start, event_stop);
-//	printf("Copied results back to CPU memory in : %lf\n", timestamp);
+    float flops = 24.0f * nchans * nsamp * BEAMS * (nants * 0.25) * (1.0 / (kernel_time * 0.001)) * 1e-9;
+    printf("Performance: %.2f Gflops (%.1f)\%\n", flops, flops / 2500.0 * 100);
+
+    // Copy results back to GPU memory 
+    cudaEventRecord(event_start, 0);
+    CudaSafeCall(cudaMemcpy(output_buffer, d_output_buffer, nsamp * nchans * BEAMS * sizeof(float), cudaMemcpyDeviceToHost));
+    cudaEventRecord(event_stop, 0);
+	cudaEventSynchronize(event_stop);
+	cudaEventElapsedTime(&timestamp, event_start, event_stop);
+	printf("Copied results back to CPU memory in : %lf\n", timestamp);
 
 //    cudaEventRecord(event_start, 0);
 //    CudaSafeCall(cudaMemcpy(input_buffer, d_input_buffer, nsamp * nchans * nants * sizeof(char2), cudaMemcpyDeviceToHost));
@@ -364,17 +372,15 @@ int main(int agrc, char *argv[])
 //	cudaEventElapsedTime(&timestamp, event_start, event_stop);
 //	printf("Copied results back to CPU memory in : %lf\n", timestamp);
 
-    printf("Performance: %.2f Gflops\n", 24.0f * nchans * nsamp * BEAMS * (nants * 0.25) * (1.0 / (kernel_time * 0.001)) * 1e-9);
-
     // Check to see if all output has been successful
-//    for(unsigned i = 0; i < BEAMS; i++)
-//        for(unsigned j = 0; j < nchans; j++)
-//            for(unsigned k = 0; k < nsamp; k++)
-//                if ((output_buffer[i * nchans * nsamp + j * nsamp + k] - (j*j + j*i)*nants * 2) > 0.001)
-//                {
-//                    printf("!! %d.%d.%d = %f != %f\n", i, j, k, output_buffer[i * nchans * nsamp + j * nsamp + k],(j*j + j*j)*nants * 2);
-//                    exit(0);
-//                }
+    for(unsigned i = 0; i < BEAMS; i++)
+        for(unsigned j = 0; j < nchans; j++)
+            for(unsigned k = 0; k < nsamp; k++)
+                if (abs(output_buffer[i * nchans * nsamp + j * nsamp + k] - 32.0)  > 0.001)
+                {
+                    printf("!! %d.%d.%d = %f != %f\n", i, j, k, output_buffer[i * nchans * nsamp + j * nsamp + k], 64.0);
+                    exit(0);
+                }
 
     // Check to see if all output has been successful
 //    for(unsigned i = 0; i < nsamp; i++)

@@ -26,11 +26,14 @@ typedef struct {
 
     // Data parameters
     bool voltage;
-    unsigned nbeams, npols, nchans, nsamp, nbits;
+    unsigned nbeams, npols, nchans, nsamp, nbits, nantennas;
     float    tsamp;
 
     // Beam parameters
     BEAM *beams;
+
+    // Beamforming parameters
+    bool apply_beamforming;
 
     // Brute Force parameters
     float    lowdm, dmstep;
@@ -64,9 +67,10 @@ typedef struct {
     bool  apply_detrending;
 
     // Clustering parameters
-    bool apply_clustering;
+    bool apply_clustering, apply_classification;
     unsigned dbscan_min_points;
     float dbscan_time_range, dbscan_dm_range, dbscan_snr_range;
+    float min_pulse_width;
 
     // Write parameters
     bool tbb_enabled;

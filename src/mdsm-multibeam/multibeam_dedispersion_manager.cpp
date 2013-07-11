@@ -36,11 +36,12 @@ pthread_barrier_t input_barrier, output_barrier;
 
 pthread_mutex_t writer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-THREAD_PARAMS* threads_params;
+THREAD_PARAMS** threads_params;
 OUTPUT_PARAMS output_params;
 WRITER_PARAMS writer_params;
 
 unsigned long *inputsize, *outputsize;
+unsigned char *antenna_buffer;
 float** output_buffer;
 float** input_buffer;
 float*  writer_buffer;
@@ -113,9 +114,11 @@ SURVEY* processSurveyParameters(QString filepath)
     // Assign default values
     survey -> voltage = 0;
     survey -> nsamp = 0;
+    survey -> nantennas = 32;
     survey -> nbits = 0;
     survey -> gpu_ids = NULL;
     survey -> num_gpus = 0;
+    survey -> apply_beamforming = 0;
     survey -> detection_threshold = 5.0;
     survey -> ncoeffs = 8;
     survey -> apply_rfi_clipper = 0;
@@ -134,10 +137,12 @@ SURVEY* processSurveyParameters(QString filepath)
     survey -> dump_to_disk = 0;
     survey -> tbb_enabled = 0;
     survey -> apply_clustering = 0;
+    survey -> apply_classification = 0;
     survey -> dbscan_min_points = 1;
     survey -> dbscan_time_range = 1;
     survey -> dbscan_dm_range = 1;
     survey -> dbscan_snr_range = 1;
+    survey -> min_pulse_width = 1;
     survey -> output_bits = 32;
     survey -> output_compression = 1;
 
@@ -157,6 +162,9 @@ SURVEY* processSurveyParameters(QString filepath)
                 survey -> nchans   = e.attribute("nchans").toUInt();
                 survey -> npols    = e.attribute("npols").toUInt();
                 survey -> ncoeffs  = e.attribute("ncoeffs").toUInt();
+            }
+            else if (QString::compare(e.tagName(), QString("antennas"), Qt::CaseInsensitive) == 0) {
+                survey -> nantennas    = e.attribute("number").toUInt();
             }
             else if (QString::compare(e.tagName(), QString("timing"), Qt::CaseInsensitive) == 0)
                 survey -> tsamp = e.attribute("tsamp").toFloat();
@@ -202,7 +210,9 @@ SURVEY* processSurveyParameters(QString filepath)
                survey -> dbscan_min_points = e.attribute("minPoints").toUInt();
                survey -> dbscan_time_range = e.attribute("timeRange").toFloat();   
                survey -> dbscan_dm_range   = e.attribute("dmRange").toFloat();   
-               survey -> dbscan_snr_range  = e.attribute("snrRange").toFloat();   
+               survey -> dbscan_snr_range  = e.attribute("snrRange").toFloat(); 
+               survey -> min_pulse_width      = e.attribute("minPuleWidth").toFloat();
+               survey -> apply_classification = e.attribute("applyClassification").toUInt();  
             }
             else if (QString::compare(e.tagName(), QString("writer"), Qt::CaseInsensitive) == 0) {
                 survey -> dump_to_disk = e.attribute("writeToFile").toUInt();
@@ -230,6 +240,8 @@ SURVEY* processSurveyParameters(QString filepath)
             // Read beam parameters
             else if (QString::compare(e.tagName(), QString("beams"), Qt::CaseInsensitive) == 0)
             {
+                survey -> apply_beamforming = e.attribute("applyBeamforming").toUInt();
+
                 // Process list of beams
                 if (survey -> nbeams == 0)
                     continue;
@@ -272,8 +284,6 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigne
 
     *inputsize = (survey -> nsamp + maxshift) * survey -> nchans * sizeof(float);
     *outputsize = survey -> nsamp * survey -> tdms * sizeof(float);
-    printf("Memory Required (per beam): Input = %d MB; Output = %d MB\n", 
-            (int) (*inputsize / 1024 / 1024), (int) (*outputsize/1024/1024));
 
 	return survey -> nsamp;
 }
@@ -306,6 +316,9 @@ void initialiseMDSM(SURVEY* input_survey)
 
         greatest_maxshift = ( maxshift > greatest_maxshift) 
                             ? maxshift : greatest_maxshift;
+
+        // Round up maxshift to the nearest multiple of 256
+        greatest_maxshift = (greatest_maxshift / 256) * 256 + 256;
     }
 
     // TEMPORARY: ASSIGN ALL BEAMS SAME MAXSHIFT
@@ -320,7 +333,7 @@ void initialiseMDSM(SURVEY* input_survey)
     // Calculate global nsamp for all beams
     size_t inputsize, outputsize;
     survey -> nsamp = calculate_nsamp(greatest_maxshift, &inputsize, &outputsize, 
-                                     devices -> minTotalGlobalMem);
+                                      devices -> minTotalGlobalMem);
 
     // Check if nsamp is greater than maxshift
     if (greatest_maxshift > survey -> nsamp)
@@ -330,38 +343,57 @@ void initialiseMDSM(SURVEY* input_survey)
         exit(-1);
     }
 
-    // Allocate GPUs to beams (split beams among GPUs, one beam cannot be processed on more than 1 GPU)
-    for(i = 0; i < survey -> nbeams; i++)
-        survey -> beams[i].gpu_id = (survey -> gpu_ids)[i % survey -> num_gpus];
+    // When beamforming, antenna data will be copied to the output buffer, so it's size
+    // should be large enough to accommodate both
+    if (survey -> apply_beamforming)
+    {
+        if (survey -> nantennas == 0)
+        {
+            printf("Number of antennas should not be 0!\n");
+            exit(0);
+        }
 
-    // Calculate output dedispersion size
-    size_t outsize = outputsize / sizeof(float);
+        size_t beamforming_size = survey -> nantennas * survey -> nchans * survey -> nsamp * sizeof(unsigned char);
+        outputsize = max(outputsize, beamforming_size);
 
-    //TODO: When GPU's memory is not cleared properly, this might not work
-    // Create memory-pinned CPU buffers (holds input for all beams)
-//    input_buffer = (float **) safeMalloc(MDSM_STAGES * sizeof(float *));
-//    for(i = 0; i < MDSM_STAGES; i++)
-//        call_allocateInputBuffer(&input_buffer[i], survey -> nbeams * survey -> nsamp * 
-//                                                   survey -> nchans * sizeof(float));
+         printf("Memory Required (per GPU): Input = %d MB; Output = %d MB\n", 
+              (int) (survey -> nbeams * inputsize / 1024 / 1024 / survey -> num_gpus), (int) (outputsize/1024/1024));
+    }
+    else
+    {
+        printf("Memory Required (per beam): Input = %d MB; Output = %d MB\n", 
+              (int) (inputsize / 1024 / 1024), (int) (outputsize/1024/1024));
+    }
 
+    // Allocate input buffer (MDSM_STAGES separate buffer to allow dumping to disk
+    // during any iteration)
     input_buffer = (float **) safeMalloc(MDSM_STAGES * sizeof(float *));
+//    for(i = 0; i < MDSM_STAGES; i++)
+//    {
+//        float *pointer;
+//        allocateInputBuffer(&pointer, survey -> nbeams * survey -> nsamp * survey -> nchans * sizeof(float));
+//        input_buffer[i] = pointer;
+//    }
+
+
     for(i = 0; i < MDSM_STAGES; i++)
         input_buffer[i] = (float *) safeMalloc(survey -> nbeams * survey -> nsamp * 
-                                           survey -> nchans * sizeof(float));
+                                               survey -> nchans * sizeof(float));
 
-    // Output buffer (one for each beam)
-//    output_buffer = (float **) safeMalloc(survey -> nbeams * sizeof(float *));
-//    for(i = 0; i < survey -> nbeams; i++)
-//        call_allocateOutputBuffer(&(output_buffer[i]), outsize * sizeof(float));
-
+    // Allocate output buffer (one for each beam)
     output_buffer = (float **) safeMalloc(survey -> nbeams * sizeof(float *));
-    for (i=0; i < survey -> nbeams; i++)
-        output_buffer[i] = (float *) safeMalloc(outsize * sizeof(float));
+//    for (i=0; i < survey -> nbeams; i++)
+//        output_buffer[i] = (float *) safeMalloc(survey -> nsamp * survey -> tdms * sizeof(float));
+
+    // Allocate antenna buffer if beamforming
+    antenna_buffer = NULL;
+    if (survey -> apply_beamforming)
+        antenna_buffer = (unsigned char *) malloc(survey -> nantennas * survey -> nchans * survey -> nsamp * sizeof(unsigned char));
 
     // Create writer buffer 
     // TODO: Provide kernel suggestions for high speed I/O
     writer_buffer = (float *) safeMalloc(survey -> nbeams * survey -> nsamp * 
-                                     survey -> nchans * sizeof(float));
+                                         survey -> nchans * sizeof(float));
 
     // Log parameters
     printf("Observation Params: ndms = %d, maxDM = %f\n", survey -> tdms, 
@@ -369,9 +401,6 @@ void initialiseMDSM(SURVEY* input_survey)
 
     printf("Observation Params: nchans = %d, nsamp = %d, tsamp = %f\n", 
             survey -> nchans, survey -> nsamp, survey -> tsamp);
-
-    if (survey -> dump_to_disk) printf("Dump to disk mode enabled\n");
-    if (survey -> tbb_enabled) 	printf("TBB mode enabled\n");
 
     printf("Beam Params:\n");
     for(i = 0; i < survey -> nbeams; i++)
@@ -381,6 +410,18 @@ void initialiseMDSM(SURVEY* input_survey)
                     beam.beam_id, beam.fch1, beam.foff, beam.maxshift, beam.gpu_id);
     }
 
+
+    printf("\n");
+    if (survey -> apply_beamforming) printf("- Performing beamforming\n");
+    if (survey -> apply_rfi_clipper ) printf("- Clipping RFI\n");
+    printf("- Performing dedispersion\n");
+    if (survey -> apply_detrending ) printf("- Performing detrending\n");
+    if (survey -> apply_median_filter ) printf("- Performing median filtering\n");
+    if (survey -> dump_to_disk) printf("- Dump to disk mode enabled\n");
+    if (survey -> apply_clustering) printf("- Applying DBSCAN\n");
+    if (survey -> tbb_enabled) 	printf("- TBB mode enabled\n");
+    printf("\n");
+
     printf("============================================================================\n");
 
     // Initialise processing threads
@@ -388,7 +429,10 @@ void initialiseMDSM(SURVEY* input_survey)
     pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
     survey -> num_threads = survey -> nbeams;
     threads = (pthread_t *) calloc(sizeof(pthread_t), survey -> num_threads);
-    threads_params = (THREAD_PARAMS *) safeMalloc(survey -> num_threads * sizeof(THREAD_PARAMS));
+
+    threads_params = (THREAD_PARAMS **) safeMalloc(survey -> num_threads * sizeof(THREAD_PARAMS*));
+    for(i = 0; i < survey -> num_threads; i++)
+        threads_params[i] = (THREAD_PARAMS *) safeMalloc(sizeof(THREAD_PARAMS));
 
     // Initialise barriers
     if (pthread_barrier_init(&input_barrier, NULL, survey -> num_threads + 2))
@@ -397,13 +441,47 @@ void initialiseMDSM(SURVEY* input_survey)
     if (pthread_barrier_init(&output_barrier, NULL, survey -> num_threads + 2))
         { fprintf(stderr, "Unable to initialise output barrier\n"); exit(0); }
 
+    // Create GPU objects and allocate beams/threads to them
+    GPU **gpus = (GPU **) malloc(survey -> num_gpus * sizeof(GPU *));
+    for(i = 0; i < survey -> num_gpus; i++)
+    {
+        gpus[i] = (GPU *) malloc(sizeof(GPU));
+        gpus[i] -> device_id   = survey -> gpu_ids[i];
+        gpus[i] -> num_threads = 0;
+        gpus[i] -> primary_thread = 0;
+        gpus[i] -> thread_ids = (unsigned *) malloc(8 * sizeof(unsigned));        
+    }
+
+    // Allocate GPUs to beams (split beams among GPUs, one beam cannot be processed on more than 1 GPU)
+    for(i = 0; i < survey -> num_threads; i++)
+    {
+        unsigned gpu = (survey -> gpu_ids)[i % survey -> num_gpus];
+
+        // Update GPU properties
+        for(j = 0; j < survey -> num_gpus; j++)
+        {
+            if (gpus[j] -> device_id == gpu)
+            {
+                if (gpus[j] -> num_threads == 0) gpus[j] -> primary_thread = i;
+                threads_params[i] -> gpu_index = j;
+                gpus[j] -> thread_ids[gpus[j] -> num_threads] = i;
+                gpus[j] -> num_threads++;
+                break;
+            }
+        }
+    }  
+
+    // Initialise GPU barriers
+    for(i = 0; i < survey -> num_gpus; i++)
+        if (pthread_barrier_init(&(gpus[i] -> barrier), NULL, gpus[i] -> num_threads))
+            { fprintf(stderr, "Unable to initialise input barrier\n"); exit(0); }
+
     // Create output params and output file
     output_params.nthreads = survey -> num_threads;
     output_params.iterations = 3;
     output_params.maxiters = 2;
     output_params.output_buffer = output_buffer;
     output_params.input_buffer = input_buffer;
-    output_params.dedispersed_size = outsize;
     output_params.stop = 0;
     output_params.rw_lock = &rw_lock;
     output_params.input_barrier = &input_barrier;
@@ -414,7 +492,6 @@ void initialiseMDSM(SURVEY* input_survey)
     output_params.writer_buffer = writer_buffer;
     output_params.writer_params = &writer_params;
 
-
     // Create output thread 
     if (pthread_create(&output_thread, &thread_attr, process_output, (void *) &output_params))
         { fprintf(stderr, "Error occured while creating output thread\n"); exit(0); }
@@ -424,24 +501,26 @@ void initialiseMDSM(SURVEY* input_survey)
 
         // Create THREAD_PARAMS for thread, based on input data and DEVICE_INFO
         // Input and output buffer pointers will point to beginning of beam
-        threads_params[k].iterations = 2;
-        threads_params[k].maxiters = 2;
-        threads_params[k].stop = 0;
-        threads_params[k].dedispersed_size = outsize;
-        threads_params[k].output = output_buffer[k];
-        threads_params[k].input = input_buffer;
-        threads_params[k].thread_num = k;
-        threads_params[k].num_threads = survey -> num_threads;
-        threads_params[k].rw_lock = &rw_lock;
-        threads_params[k].input_barrier = &input_barrier;
-        threads_params[k].output_barrier = &output_barrier;
-        threads_params[k].start = start;
-        threads_params[k].survey = survey;
-        threads_params[k].inputsize = inputsize;
-        threads_params[k].outputsize = outputsize;
+        threads_params[k] -> iterations = 2;
+        threads_params[k] -> maxiters = 2;
+        threads_params[k] -> stop = 0;
+        threads_params[k] -> output = output_buffer;
+        threads_params[k] -> input = input_buffer;
+        threads_params[k] -> antenna_buffer = antenna_buffer;
+        threads_params[k] -> thread_num = k;
+        threads_params[k] -> num_threads = survey -> num_threads;
+        threads_params[k] -> rw_lock = &rw_lock;
+        threads_params[k] -> input_barrier = &input_barrier;
+        threads_params[k] -> output_barrier = &output_barrier;
+        threads_params[k] -> start = start;
+        threads_params[k] -> survey = survey;
+        threads_params[k] -> inputsize = inputsize;
+        threads_params[k] -> outputsize = outputsize;
+        threads_params[k] -> gpus = gpus;
+        threads_params[k] -> cpu_threads = threads_params;
 
          // Create thread (using function in dedispersion_thread)
-         if (pthread_create(&threads[k], &thread_attr, call_dedisperse, (void *) &threads_params[k]))
+         if (pthread_create(&threads[k], &thread_attr, call_dedisperse, (void *) threads_params[k]))
             { fprintf(stderr, "Error occured while creating thread\n"); exit(0); }
     }
 
@@ -474,6 +553,12 @@ void initialiseMDSM(SURVEY* input_survey)
 float *get_buffer_pointer()
 {
     return input_buffer[loop_counter % MDSM_STAGES];
+}
+
+// Get antenna pointer
+unsigned char *get_antenna_pointer()
+{
+    return antenna_buffer;
 }
 
 // Cleanup MDSM
@@ -535,7 +620,7 @@ float **next_chunk_multibeam(unsigned int data_read, unsigned &samples,
         output_params.stop = 1;
         writer_params.stop = 1;
         for(unsigned k = 0; k < survey -> nbeams; k++) 
-            threads_params[k].stop = 1;
+            threads_params[k] -> stop = 1;
 
         // Release rw_lock
         if (pthread_rwlock_unlock(&rw_lock))

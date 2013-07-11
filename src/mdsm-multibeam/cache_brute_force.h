@@ -1,9 +1,17 @@
 #ifndef CACHE_BRUTE_FORCE
 #define CACHE_BUTE_FORCE
 
-#define NUMREG 16
-#define DIVINT 16
+#define BEAMFORMER_THREADS 128
+#define BEAMS_PER_TB 4
+#define BEAMS 4
+#define ANTS 32
+
+#define NUMREG 8
+#define DIVINT 4
 #define DIVINDM 32
+
+#define DEDISP_DMS 32
+#define DEDISP_THREADS 128
 
 #define BANDPASS_THREADS 64
 
