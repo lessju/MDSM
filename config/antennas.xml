@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+
+<array name='Medicina : BEST-2'>
+    <receiver>
+        <center_freq>0.408</center_freq><!-- Center frequency in GHz -->
+    </receiver>
+
+    <grid>
+        <x_spacing>8.0</x_spacing>
+        <y_spacing>13.609415</y_spacing>
+    </grid>
+
+    <antennas>
+        <reference>
+            <position>
+                <lat>44:31:24.88N</lat>
+                <long>11:38:45.56E</long>
+            </position>
+        </reference>
+    
+        <ant id='0' pols='1' name='1N-1-1'>
+            <adc_chan pol='x'>0</adc_chan>
+            <position>
+                <grid x='0' y='0'/>
+                <x>-34.8875321</x>
+                <y>6.804708</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='1' pols='1' name='1N-1-2'>
+            <adc_chan pol='x'>8</adc_chan>
+            <position>
+                <grid x='1' y='0'/>
+                <x>-26.8875321</x>
+                <y>6.804708</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='2' pols='1' name='1N-1-3'>
+            <adc_chan pol='x'>16</adc_chan>
+            <position>
+                <grid x='2' y='0'/>
+                <x>-18.8875321</x>
+                <y>6.804708</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='3' pols='1' name='1N-1-4'>
+            <adc_chan pol='x'>24</adc_chan>
+            <position>
+                <grid x='3' y='0'/>
+                <x>-10.8875321</x>
+                <y>6.804708</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='4' pols='1' name='1N-2-1'>
+            <adc_chan pol='x'>4</adc_chan>
+            <position>
+                <grid x='0' y='1'/>
+                <x>-34.8875321</x>
+                <y>20.414123</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='5' pols='1' name='1N-2-2'>
+            <adc_chan pol='x'>12</adc_chan>
+            <position>
+                <grid x='1' y='1'/>
+                <x>-26.8875321</x>
+                <y>20.414123</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='6' pols='1' name='1N-2-3'>
+            <adc_chan pol='x'>20</adc_chan>
+            <position>
+                <grid x='2' y='1'/>
+                <x>-18.8875321</x>
+                <y>20.414123</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='7' pols='1' name='1N-2-4'>
+            <adc_chan pol='x'>28</adc_chan>
+            <position>
+                <grid x='3' y='1'/>
+                <x>-10.8875321</x>
+                <y>20.414123</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='8' pols='1' name='1N-3-1'>
+            <adc_chan pol='x'>1</adc_chan>
+            <position>
+                <grid x='0' y='2'/>
+                <x>-34.8875321</x>
+                <y>34.023538</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='9' pols='1' name='1N-3-2'>
+            <adc_chan pol='x'>9</adc_chan>
+            <position>
+                <grid x='1' y='2'/>
+                <x>-26.8875321</x>
+                <y>34.023538</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='10' pols='1' name='1N-3-3'>
+            <adc_chan pol='x'>17</adc_chan>
+            <position>
+                <grid x='2' y='2'/>
+                <x>-18.8875321</x>
+                <y>34.023538</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='11' pols='1' name='1N-3-4'>
+            <adc_chan pol='x'>25</adc_chan>
+            <position>
+                <grid x='3' y='2'/>
+                <x>-10.8875321</x>
+                <y>34.023538</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='12' pols='1' name='1N-4-1'>
+            <adc_chan pol='x'>5</adc_chan>
+            <position>
+                <grid x='0' y='3'/>
+                <x>-34.8875321</x>
+                <y>47.632953</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='13' pols='1' name='1N-4-2'>
+            <adc_chan pol='x'>13</adc_chan>
+            <position>
+                <grid x='1' y='3'/>
+                <x>-26.8875321</x>
+                <y>47.632953</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='14' pols='1' name='1N-4-3'>
+            <adc_chan pol='x'>21</adc_chan>
+            <position>
+                <grid x='2' y='3'/>
+                <x>-18.8875321</x>
+                <y>47.632953</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='15' pols='1' name='1N-4-4'>
+            <adc_chan pol='x'>29</adc_chan>
+            <position>
+                <grid x='3' y='3'/>
+                <x>-10.8875321</x>
+                <y>47.632953</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='16' pols='1' name='1N-5-1'>
+            <adc_chan pol='x'>2</adc_chan>
+            <position>
+                <grid x='0' y='4'/>
+                <x>-34.8875321</x>
+                <y>61.242368</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='17' pols='1' name='1N-5-2'>
+            <adc_chan pol='x'>10</adc_chan>
+            <position>
+                <grid x='1' y='4'/>
+                <x>-26.8875321</x>
+                <y>61.242368</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='18' pols='1' name='1N-5-3'>
+            <adc_chan pol='x'>18</adc_chan>
+            <position>
+                <grid x='2' y='4'/>
+                <x>-18.8875321</x>
+                <y>61.242368</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='19' pols='1' name='1N-5-4'>
+            <adc_chan pol='x'>26</adc_chan>
+            <position>
+                <grid x='3' y='4'/>
+                <x>-10.8875321</x>
+                <y>61.242368</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='20' pols='1' name='1N-6-1'>
+            <adc_chan pol='x'>6</adc_chan>
+            <position>
+                <grid x='0' y='5'/>
+                <x>-34.8875321</x>
+                <y>74.851783</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='21' pols='1' name='1N-6-2'>
+            <adc_chan pol='x'>14</adc_chan>
+            <position>
+                <grid x='1' y='5'/>
+                <x>-26.8875321</x>
+                <y>74.851783</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='22' pols='1' name='1N-6-3'>
+            <adc_chan pol='x'>22</adc_chan>
+            <position>
+                <grid x='2' y='5'/>
+                <x>-18.8875321</x>
+                <y>74.851783</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='23' pols='1' name='1N-6-4'>
+            <adc_chan pol='x'>30</adc_chan>
+            <position>
+                <grid x='3' y='5'/>
+                <x>-10.8875321</x>
+                <y>74.851783</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='24' pols='1' name='1N-7-1'>
+            <adc_chan pol='x'>3</adc_chan>
+            <position>
+                <grid x='0' y='6'/>
+                <x>-34.8875321</x>
+                <y>88.461198</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='25' pols='1' name='1N-7-2'>
+            <adc_chan pol='x'>11</adc_chan>
+            <position>
+                <grid x='1' y='6'/>
+                <x>-26.8875321</x>
+                <y>88.461198</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='26' pols='1' name='1N-7-3'>
+            <adc_chan pol='x'>19</adc_chan>
+            <position>
+                <grid x='2' y='6'/>
+                <x>-18.8875321</x>
+                <y>88.461198</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='27' pols='1' name='1N-7-4'>
+            <adc_chan pol='x'>27</adc_chan>
+            <position>
+                <grid x='3' y='6'/>
+                <x>-10.8875321</x>
+                <y>88.461198</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='28' pols='1' name='1N-8-1'>
+            <adc_chan pol='x'>7</adc_chan>
+            <position>
+                <grid x='0' y='7'/>
+                <x>-34.8875321</x>
+                <y>102.070613</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='29' pols='1' name='1N-8-2'>
+            <adc_chan pol='x'>15</adc_chan>
+            <position>
+                <grid x='1' y='7'/>
+                <x>-26.8875321</x>
+                <y>102.070613</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='30' pols='1' name='1N-8-3'>
+            <adc_chan pol='x'>23</adc_chan>
+            <position>
+                <grid x='2' y='7'/>
+                <x>-18.8875321</x>
+                <y>102.070613</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+        <ant id='31' pols='1' name='1N-8-4'>
+            <adc_chan pol='x'>31</adc_chan>
+            <position>
+                <grid x='3' y='7'/>
+                <x>-10.8875321</x>
+                <y>102.070613</y>
+                <z>0.0</z>
+            </position>
+        </ant>
+    </antennas>
+</array>

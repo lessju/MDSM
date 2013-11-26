@@ -2,6 +2,7 @@
 #include "float.h"
 #include "math.h"
 #include "cpgplot.h"
+#include <algorithm>
 
 // ------------------------- CLUSTER CLASS ---------------------------------
 

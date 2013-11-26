@@ -1,0 +1,52 @@
+	<!-- Based on Medicina parameters -->
+<observation> 
+
+    <antennas number="32" />
+
+    <channels nchans="1024" subchannels="1024" startChannel="402" stopChannel="406"/>
+
+    <timing tsamp="0.0000512" />
+
+    <samples number="16384" bits="8" downsample="128" />
+
+    <writer filePrefix="Cygnus" baseDirectory="." singleFileMode="1"
+            secondsPerFile="300" usePCTime="0" test="0" />
+    
+    <gpus ids="0" />
+
+    <beams antennaFile="/home/lessju/Code/MDSM/config/antennas.xml" channelise="0" >
+        <beam beamId="0" dec="33.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="1" dec="33.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="2" dec="34.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="3" dec="34.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="4" dec="35.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="5" dec="35.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="6" dec="36.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="7" dec="36.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="8" dec="37.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="9" dec="37.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="10" dec="38.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="11" dec="38.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="12" dec="39.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="13" dec="39.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="14" dec="40.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="15" dec="40.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="16" dec="41.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="17" dec="41.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="18" dec="42.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="19" dec="42.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="20" dec="43.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="21" dec="43.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="22" dec="44.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="23" dec="44.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="24" dec="45.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="25" dec="45.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="26" dec="46.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="27" dec="46.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="28" dec="47.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="29" dec="47.7825" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="30" dec="48.2828" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="31" dec="48.7825" topFrequency="418" frequencyOffset="0.01953125" />
+    </beams>
+
+</observation>

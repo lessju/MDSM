@@ -1,0 +1,28 @@
+	<!-- Based on Medicina parameters -->
+<observation> 
+
+    <antennas number="32" />
+
+    <channels nchans="1024" subchannels="1024" startChannel="402" stopChannel="406"/>
+
+    <timing tsamp="0.0000512" />
+
+    <samples number="32768" bits="8" downsample="1" />
+
+    <writer filePrefix="Satellite_1361" baseDirectory="." singleFileMode="1"
+            secondsPerFile="300" usePCTime="0" test="0" />
+    
+    <gpus ids="1" />
+
+    <beams antennaFile="/home/lessju/Code/MDSM/config/antennas.xml" channelise="1" >
+        <beam beamId="0" dec="-1.4141" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="1" dec="-1.9141" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="2" dec="-0.4141" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="3" dec="-0.9141" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="4" dec="0.4141" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="5" dec="0.9141" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="6" dec="1.4141" topFrequency="418" frequencyOffset="0.01953125" />
+        <beam beamId="7" dec="1.9141" topFrequency="418" frequencyOffset="0.01953125" />
+    </beams>
+
+</observation>

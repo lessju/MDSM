@@ -4,14 +4,11 @@
 #include "time.h"
 #include "string.h"
 
-#ifndef DEDISP_THREADS
-    #define DEDISP_THREADS  128  
-#endif
+// Share memory version
+#define DEDISP_THREADS  128  
+#define DEDISP_DMS      32   
 
-#ifndef DEDISP_DMS
-    #define DEDISP_DMS      32   
-#endif
-
+// Cache version
 #define NUMREG 8
 #define DIVINT 4
 #define DIVINDM 32
@@ -278,6 +275,7 @@ int main(int argc, char *argv[])
 	CudaSafeCall(cudaMalloc((void **) &d_all_shifts, nchans * tdms * sizeof(int)));
 	CudaSafeCall(cudaMemcpy(d_all_shifts, all_shifts, nchans * tdms * sizeof(int), cudaMemcpyHostToDevice) );  
 
+    // Launch shared memory version 
 	dim3 gridDim(ceil(nsamp / (1.0 * DEDISP_THREADS)), ceil(tdms / (1.0 * DEDISP_DMS)));  
     cudaEventRecord(event_start, 0);
     dedisperse_loop1 <<< gridDim, DEDISP_THREADS, (DEDISP_THREADS + shift) * sizeof(float) >>> 

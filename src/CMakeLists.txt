@@ -7,7 +7,7 @@ list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_SOURCE_DIR}/cmake)
 
 # === Options and defaults.
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE debug)
+    set(CMAKE_BUILD_TYPE RELEASE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 if(NOT MDSM_INSTALL_DIR)
@@ -27,7 +27,7 @@ if(NOT BINARY_INSTALL_DIR)
 endif(NOT BINARY_INSTALL_DIR)
 
 if(NOT GPU_VERSION_ARCHITECTURE)
-    set(GPU_ARCHITECTURE "sm_30")
+    set(GPU_ARCHITECTURE "sm_35")
 endif(NOT GPU_VERSION_ARCHITECTURE)
 
 # === Compiler dependancies if compiler is GCC
@@ -73,6 +73,7 @@ include_directories(${CUDA_INCLUDE_DIRS})
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm-coherent")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/mdsm-multibeam")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/beamformer")
 #include_directories("${CMAKE_CURRENT_SOURCE_DIR}/pelican-mdsm/modules")
 include_directories(${QT_QTXML_INCLUDE_DIR})
 include_directories(${QT_QTCORE_INCLUDE_DIR})
@@ -87,8 +88,6 @@ include(modules.cmake)
 add_executable(standalone-mdsm MDSM.cpp)
 target_link_libraries(standalone-mdsm
     ${QT_QTCORE_LIBRARY}
-#    ${PELICAN_LOFAR_LIBRARIES}
-#    ${PELICAN_LIBRARIES}
     ${GSL_LIBRARIES} 
     ${GSLCBLAS_LIBRARIES}
     mdsm-multibeam-cuda
@@ -99,4 +98,11 @@ set_target_properties(standalone-mdsm PROPERTIES
     COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "-lgsl -lgslcblas"
+)
+
+add_executable(standalone-beamformer beamformer.cpp)
+target_link_libraries(standalone-beamformer
+    ${QT_QTCORE_LIBRARY}
+    beamformer-cuda
+    beamformer
 )

@@ -86,11 +86,11 @@ bandpass:
 	rm -f *.cu.o *.linkinfo
 
 beamformer:
-	$(NVCC) -o beamformer beamformer.cu $(INC) $(LDFLAGS) --gpu-architecture sm_30 --use_fast_math --ptxas-options=-v 
+	$(NVCC) -o beamformer beamformer.cu $(INC) $(LDFLAGS) --gpu-architecture sm_35 --use_fast_math --ptxas-options=-v 
 	rm -f *.cu.o *.linkinfo
 
 beamformer_medicina:
-	$(NVCC) -o beamformer_medicina beamformer_medicina.cu $(INC) $(LDFLAGS) --gpu-architecture sm_30 --use_fast_math --ptxas-options=-v 
+	$(NVCC) -o beamformer_medicina beamformer_medicina.cu $(INC) $(LDFLAGS) --gpu-architecture sm_35 --use_fast_math --ptxas-options=-v 
 	rm -f *.cu.o *.linkinfo
 
 periodicity:

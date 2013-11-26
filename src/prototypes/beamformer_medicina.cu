@@ -7,10 +7,11 @@
 #include <math.h>
 
 #define BEAMFORMER_THREADS 128
-#define BEAMS_PER_TB 1
-#define BEAMS 1
+#define BEAMS_PER_TB 16
+#define BEAMS 128
 #define ANTS 32
-unsigned nchans = 1024, nants = 32, nsamp = 32768;
+
+unsigned nchans = 1024, nants = 32, nsamp = 32768/4;
 
 // ======================== CUDA HELPER FUNCTIONS ==========================
 
@@ -214,17 +215,17 @@ int main(int agrc, char *argv[])
     float *d_shifts, *shifts;
 //    output_buffer = (float *) malloc(nchans * nsamp * BEAMS * sizeof(float));
 //    shifts = (float *) malloc(nchans * BEAMS * nants * sizeof(float));
-  CudaSafeCall(cudaHostAlloc((void **) &output_buffer, nchans * nsamp * BEAMS * sizeof(float), cudaHostAllocMapped));
+    CudaSafeCall(cudaHostAlloc((void **) &output_buffer, nchans * nsamp * BEAMS * sizeof(float), cudaHostAllocMapped));
 	CudaSafeCall(cudaHostAlloc((void **) &shifts, BEAMS * nants * nchans * sizeof(float), 0));
 
 
     // Generate fake data
-	for(unsigned i = 0; i < nchans; i++)
-		for(unsigned j = 0; j < nsamp; j++)
-			for(unsigned k = 0; k < nants; k++)
-				input_buffer[i * nsamp * nants + j * nants + k] = 0x11;
+//	for(unsigned i = 0; i < nchans; i++)
+//		for(unsigned j = 0; j < nsamp; j++)
+//			for(unsigned k = 0; k < nants; k++)
+//				input_buffer[i * nsamp * nants + j * nants + k] = 0x11;
 
-    printf("Generated fake data\n");
+//    printf("Generated fake data\n");
 
     // Generate shifts
     for(unsigned i = 0; i < nchans; i++)
@@ -255,7 +256,7 @@ int main(int agrc, char *argv[])
 	cudaEventElapsedTime(&timestamp, event_start, event_stop);
     double kernel_time = timestamp;
 	double flops = 17.0f * nchans * nsamp * BEAMS * (nants * 0.25) * (1.0 / (kernel_time * 0.001)) * 1e-9;
-	printf("Performed beamforming - Medicina [%.2f Gflops (%.1f)] in : %lf\n", flops, flops / 2500.0 * 100, timestamp);
+	printf("Performed beamforming - Medicina [%.2f Gflops (%.1f)] in : %lf\n", flops, flops / 3500.0 * 100, timestamp);
 
     // Copy output to CPU memory
     cudaEventRecord(event_start, 0);
@@ -267,12 +268,12 @@ int main(int agrc, char *argv[])
 
 
     // Check to see if all output has been successful
-    for(unsigned i = 0; i < BEAMS; i++)
-        for(unsigned j = 0; j < nchans; j++)
-            for(unsigned k = 0; k < nsamp; k++)
-				 if ((output_buffer[i * nchans * nsamp + j * nsamp + k] - (32.0 + j * j * 32.0)) > 0.001)
-				{
-                    printf("!! %d.%d.%d = %f != %f\n", i, j, k, output_buffer[i * nchans * nsamp + j * nsamp + k], 32.0 + j * j * 32.0);
-                    exit(0);
-                }
+//    for(unsigned i = 0; i < BEAMS; i++)
+//        for(unsigned j = 0; j < nchans; j++)
+//            for(unsigned k = 0; k < nsamp; k++)
+//				 if ((output_buffer[i * nchans * nsamp + j * nsamp + k] - (32.0 + j * j * 32.0)) > 0.001)
+//				{
+//                    printf("!! %d.%d.%d = %f != %f\n", i, j, k, output_buffer[i * nchans * nsamp + j * nsamp + k], 32.0 + j * j * 32.0);
+//                    exit(0);
+//                }
 }

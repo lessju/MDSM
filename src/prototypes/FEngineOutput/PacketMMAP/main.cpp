@@ -71,7 +71,7 @@ int main()
 
     // Copy the interface name to ifreq structure
     struct ifreq s_ifr;
-    strncpy(s_ifr.ifr_name, "eth0", sizeof(s_ifr.ifr_name));
+    strncpy(s_ifr.ifr_name, "eth3", sizeof(s_ifr.ifr_name));
 
     // Get interface index
     __check(ioctl(_socket, SIOCGIFINDEX, &s_ifr), "ioctl");
