@@ -191,7 +191,7 @@ beamformer_complex(char4 *input, float2 *output, float2 *shifts, unsigned nsamp,
     }
 }
 
-// ======================= Downsample Kernel =============================
+// ======================= Downsample KernelS =============================
 // Downfactor generated beam down to the required sampling time
 __global__ void downsample(float *input, float *output, unsigned nsamp, unsigned nchans, unsigned nbeams, unsigned factor)
 {
@@ -212,6 +212,57 @@ __global__ void downsample(float *input, float *output, unsigned nsamp, unsigned
 
         // Output needs to be transposed in memory
          output[(s * blockDim.x + threadIdx.x) * nchans * nbeams + blockIdx.x * nbeams + blockIdx.y] = value;
+    }
+}
+
+// Downfactor generated beam down to the required sampling time using atomics
+// NOTE: factor must be >= 64
+__global__ void downsample_atomics(float *input, float *output, unsigned nsamp, unsigned nchans, unsigned nbeams, unsigned factor)
+{
+    // Each thread block processes one channel/beam vector
+    extern __shared__ float vector[];
+
+    // Loop over all time samples
+    for(unsigned s = blockIdx.x;
+                 s < nsamp / factor;
+                 s += gridDim.x)
+    {
+        // Load input value
+        float local_value = input[(blockIdx.z * nchans + blockIdx.y) * nsamp + s * factor + threadIdx.x];
+
+        // Use kepler atomics to perform partial reduction
+        local_value += __shfl_down(local_value, 1, 2);
+        local_value += __shfl_down(local_value, 2, 4);
+        local_value += __shfl_down(local_value, 4, 8);
+        local_value += __shfl_down(local_value, 8, 16);
+        local_value += __shfl_down(local_value, 16, 32);
+
+        // Synchronise thread to finalise first part of partial reduction
+        __syncthreads();
+
+        // Store required value to shared memory
+        if (threadIdx.x % 32 == 0)
+            vector[threadIdx.x / 32] = local_value;
+
+        // Synchronise thread
+        __syncthreads();
+
+        // Perform second part of reduction
+        for (unsigned i = factor / 64; i >= 1; i /= 2)
+	    {
+		    if (threadIdx.x < i)
+                vector[threadIdx.x] += vector[threadIdx.x + i];
+		
+		    __syncthreads();
+	    }
+
+        // Store to output (transposed)
+        if (threadIdx.x == 0)
+            output[s * nchans * nbeams + blockIdx.y * nbeams + blockIdx.z] = vector[0];
+
+        // Synchronise threads
+        __syncthreads();
+    
     }
 }
 

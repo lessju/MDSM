@@ -183,9 +183,18 @@ void perform_downsampling(float *input, float *output, THREAD_PARAMS* params, cu
 
     cudaEventRecord(event_start, 0);	
 
-	dim3 gridDim(survey -> nchans, BEAMS);  
-    downsample<<< gridDim, 64 >>> (input, output, nsamp, survey -> nchans, BEAMS, survey -> downsample);
-
+    if (survey -> downsample <= 32)
+    {
+	    dim3 gridDim(survey -> nchans, BEAMS);  
+        downsample<<< gridDim, 128 >>> (input, output, nsamp, survey -> nchans, BEAMS, survey -> downsample);
+    }
+    else
+    {
+        dim3 gridDim((nsamp / survey -> downsample), survey -> nchans, survey -> nbeams);  
+        downsample_atomics <<< gridDim, survey -> downsample, survey -> downsample * sizeof(float) / 32 >>> 
+                              (input, output, nsamp, survey -> nchans, survey -> nbeams, survey -> downsample);
+    }
+    
     // All processing ready, wait for kernel execution
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);

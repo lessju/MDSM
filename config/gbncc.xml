@@ -1,0 +1,28 @@
+<observation> 
+
+    <dm lowDM="0" numDMs="16384" dmStep="0.02" />
+
+    <channels nchans="2048" npols="1" ncoeffs="12" />
+    
+    <timing tsamp="0.0003276" />
+
+    <samples number="65536" bits="8" voltage="0"/>
+    
+    <rfi applyRFIClipper="0" channelBlock="1024" spectrumThreshold="7" channelThreshold="4"/>
+
+    <detection threshold="4" applyMedianFilter="0" applyDetrending="0" enableTBB="0" />
+
+    <clustering applyClustering="1" minPoints="15" timeRange="40" dmRange="4" snrRange="4" 
+                minPuleWidth="0.01" applyClassification="1"/>
+
+    <writer writeToFile="0" outputBits="32" compression="255" 
+            filePrefix="GBNCC_Test" baseDirectory="." singleFileMode="1"
+            secondsPerFile="300" usePCTime="1" />
+
+    <gpus ids="1" />
+
+    <beams>
+        <beam beamId="0" topFrequency="399.951172" frequencyOffset="-0.048828" />
+    </beams>
+
+</observation>

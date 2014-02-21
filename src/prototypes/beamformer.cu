@@ -9,7 +9,7 @@
 
 #define BEAMFORMER_THREADS 128
 #define BEAMS_PER_TB 16
-#define BEAMS 32
+#define BEAMS 64
 #define ANTS 32
 unsigned nchans = 1024, nants = 32, nsamp = 8192;
 
@@ -50,11 +50,13 @@ inline void _cudaCheckError( const char *file, const int line )
 }
 
 // ==========================================================================
-__global__ void beamformer(char4 *input, float *output, float2 *shifts, unsigned nsamp, unsigned nchans)
-{
-    // Shared memory store for coefficients
+__global__ void 
+__launch_bounds__(BEAMFORMER_THREADS) 
+beamformer(const char4 *input, float *output, const __restrict__ float2 *shifts, const unsigned nsamp, const unsigned nchans)
+{   
+    // Shared memory store for phase shifts
     // The inner-most loop will split antennas into groups of four, so we only need
-    // BEAM_PER_TB * 4 float2 per iteration
+    // BEAM_PER_TB * 8 floats per iteration
     __shared__ float2 coefficients[BEAMS_PER_TB * 4];
 
     // Threablock will loop over time for a single channel
@@ -68,13 +70,13 @@ __global__ void beamformer(char4 *input, float *output, float2 *shifts, unsigned
                  time += gridDim.x * blockDim.x)
     {
         // Compute index to start of block
-        unsigned index = (blockIdx.y * nsamp + blockIdx.x) * ANTS / 4;
+        unsigned index = (blockIdx.y * nsamp + blockIdx.x * blockDim.x) * ANTS / 4;
 
         // Initialise beam registers
         register float beams_real[BEAMS_PER_TB] = { 0 };
         register float beams_imag[BEAMS_PER_TB] = { 0 };
 
-        // Loop over all antennas
+        // Loop over all antennas and compute phase components
         for(unsigned antenna = 0;
                      antenna < ANTS / 4;
                      antenna++)
@@ -90,10 +92,10 @@ __global__ void beamformer(char4 *input, float *output, float2 *shifts, unsigned
                                          antenna * 4 * BEAMS + blockIdx.z * BEAMS_PER_TB +
                                          i];
 
-            float4 ant_real = { (antenna_val.w >> 4) & 0xF, (antenna_val.x >> 4) & 0xF,
-                                (antenna_val.y >> 4) & 0xF, (antenna_val.z >> 4) & 0xF };
-            float4 ant_imag = { antenna_val.w & 0x0F, antenna_val.x & 0x0F,
-                                antenna_val.y & 0x0F, antenna_val.z & 0x0F };
+            float4 ant_real = {  (antenna_val.w >> 4) & 0xF,  (antenna_val.x >> 4) & 0xF,
+                                 (antenna_val.y >> 4) & 0xF,  (antenna_val.z >> 4) & 0xF };
+            float4 ant_imag = {  antenna_val.w & 0x0F,        antenna_val.x & 0x0F,
+                                 antenna_val.y & 0x0F,        antenna_val.z & 0x0F };
 
             // Synchronise threads
             __syncthreads();
@@ -106,19 +108,19 @@ __global__ void beamformer(char4 *input, float *output, float2 *shifts, unsigned
                 float2 shift;
 
                 shift = coefficients[beam];
-                beams_real[beam] += ant_real.w * shift.x - ant_imag.w * shift.y;
+                beams_real[beam] += ant_real.w * shift.x + ant_imag.w * shift.y;
                 beams_imag[beam] += ant_imag.w * shift.x + ant_real.w * shift.y;
 
                 shift = coefficients[BEAMS_PER_TB + beam];
-                beams_real[beam] += ant_real.x * shift.x - ant_imag.x * shift.y;
+                beams_real[beam] += ant_real.x * shift.x + ant_imag.x * shift.y;
                 beams_imag[beam] += ant_imag.x * shift.x + ant_real.x * shift.y;
 
                 shift = coefficients[2 * BEAMS_PER_TB + beam];
-                beams_real[beam] += ant_real.y * shift.x - ant_imag.y * shift.y;
+                beams_real[beam] += ant_real.y * shift.x + ant_imag.y * shift.y;
                 beams_imag[beam] += ant_imag.y * shift.x + ant_real.y * shift.y;
 
                 shift = coefficients[3 * BEAMS_PER_TB + beam];
-                beams_real[beam] += ant_real.z * shift.x - ant_imag.z * shift.y;
+                beams_real[beam] += ant_real.z * shift.x + ant_imag.z * shift.y;
                 beams_imag[beam] += ant_imag.z * shift.x + ant_real.z * shift.y;
             }
         }
@@ -126,7 +128,7 @@ __global__ void beamformer(char4 *input, float *output, float2 *shifts, unsigned
         // Add phase and amplitude parts and save computed beams to global memory
         for(unsigned beam = 0; beam < BEAMS_PER_TB; beam++)
             output[(blockIdx.z * BEAMS_PER_TB + beam) * nsamp * nchans + blockIdx.y * nsamp + time] = 
-                 __fsqrt_rz(beams_real[beam] * beams_real[beam] + beams_imag[beam] * beams_imag[beam]);
+                 sqrt(beams_real[beam] * beams_real[beam] + beams_imag[beam] * beams_imag[beam]);
 
         // Synchronise threads
         __syncthreads();
@@ -174,10 +176,10 @@ int main(int agrc, char *argv[])
     printf("Allocated output buffers\n");
 
     // Generate fake data
-//    for(unsigned i = 0; i < nsamp; i++)
-//        for(unsigned j = 0; j < nchans; j++)
-//            for(unsigned k = 0; k < nants * 2; k++)
-//                input_buffer[i * nchans * nants * 2 + j * nants * 2 + k] = j;
+    for(unsigned i = 0; i < nsamp; i++)
+        for(unsigned j = 0; j < nchans; j++)
+            for(unsigned k = 0; k < nants * 2; k++)
+                input_buffer[i * nchans * nants * 2 + j * nants * 2 + k] = j;
     memset(input_buffer, 1, nchans * nsamp * nants * sizeof(char2));
     printf("Generated fake data\n");
 

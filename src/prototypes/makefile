@@ -7,7 +7,7 @@ CCC = g++
 CC = $(CCC) $(DFITS) $(DFFTW) -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 NVCC 		:= nvcc
-CUDA_PATH     	:= /usr/local/cuda
+CUDA_PATH     	:= /usr/local/cuda-5.5
 CUDA_SDK_PATH 	:= /usr/local/cudaSDK/C
 PRESTO   := /home/lessju/Code/presto
 INC		:= -I. -I${CUDA_SDK_PATH}/common/inc -I${CUDA_PATH}/include

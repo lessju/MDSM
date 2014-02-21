@@ -174,7 +174,7 @@ def templatePlot():
     ax3.set_xlabel("SNR")
     ax3.set_ylabel("Number of pulses")
 
-    #pylab.savefig("Plots/detections.png")
+    pylab.savefig("Plots/detections.png")
     pylab.show()
 
 

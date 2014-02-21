@@ -336,12 +336,12 @@ void initialiseMDSM(SURVEY* input_survey)
                                       devices -> minTotalGlobalMem);
 
     // Check if nsamp is greater than maxshift
-    if (greatest_maxshift > survey -> nsamp)
-    {
-        fprintf(stderr, "Number of samples (%d) must be greater than maxshift (%d)\n", 
-                survey -> nsamp, greatest_maxshift);
-        exit(-1);
-    }
+//    if (greatest_maxshift > survey -> nsamp)
+//    {
+//        fprintf(stderr, "Number of samples (%d) must be greater than maxshift (%d)\n", 
+//                survey -> nsamp, greatest_maxshift);
+//        exit(-1);
+//    }
 
     // When beamforming, antenna data will be copied to the output buffer, so it's size
     // should be large enough to accommodate both

@@ -1,0 +1,45 @@
+# -*- coding: utf-8 -*-
+
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
+
+from dlgTest import Ui_dlgMPLTest
+
+import sys
+
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
+class TestDialog( QDialog ):
+	def __init__( self, parent = None ):
+		super( TestDialog, self ).__init__( parent )
+		self.setupUi( self )
+		
+		# initialize mpl plot
+		self.figure = Figure()
+		#self.figure.set_figsize_inches( ( 4.3, 4.2 ) )
+		self.axes = self.figure.add_subplot( 111 )
+		self.figure.suptitle( "Frequency distribution", fontsize = 12 )
+		self.axes.grid( True )
+		self.canvas = FigureCanvas( self.figure )
+                layout = QVBoxLayout()
+                self.widgetPlot.setLayout(layout)
+                layout.addWidget(self.canvas)
+		#self.canvas.setParent( self.widgetPlot )
+		
+		# draw mpl plot
+		#self.axes.clear()
+		#self.axes.grid( True )
+		#self.figure.suptitle( "Frequency distribution", fontsize = 12 )
+		self.axes.set_ylabel( "Count", fontsize = 8 )
+		self.axes.set_xlabel( "Values", fontsize = 8 )
+		x = [ 4, 1, 5, 3, 3, 2, 3, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1 ]
+		n, bins, pathes = self.axes.hist( x, 18, alpha=0.5, histtype = "bar" )
+		self.canvas.draw()
+		
+		self.setWindowTitle( self.tr( "MPL test" ) )
+	
+if __name__ == "__main__":
+	app = QApplication( sys.argv )
+	dialog = TestDialog()
+	sys.exit( dialog.exec_() )
