@@ -79,7 +79,7 @@ void* process_output(void* output_params)
     int ppnsamp = params -> survey -> nsamp;
     time_t start = params -> start;
     double pptimestamp = 0, ptimestamp = 0;
-//    double ppblockRate = 0, pblockRate = 0;
+
     int ret;
     FILE *fp = NULL;
 

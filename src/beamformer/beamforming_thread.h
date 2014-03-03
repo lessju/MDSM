@@ -4,6 +4,7 @@
 #include "pthread.h"
 #include "survey.h" 
 #include "unistd.h"
+#include "cufft.h"
 #include <omp.h>
 
 typedef struct {

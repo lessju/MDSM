@@ -169,8 +169,8 @@ SURVEY* processSurveyParameters(QString filepath)
             else if (QString::compare(e.tagName(), QString("timing"), Qt::CaseInsensitive) == 0)
                 survey -> tsamp = e.attribute("tsamp").toFloat();
             else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0) {
-			   survey -> nsamp = e.attribute("number").toUInt();
-			   survey -> nbits = e.attribute("bits").toUInt();
+			   survey -> nsamp = e.attribute("nsamp").toUInt();
+			   survey -> nbits = e.attribute("nbits").toUInt();
                survey -> voltage = e.attribute("voltage").toUInt();
             }
             else if (QString::compare(e.tagName(), QString("rfi"), Qt::CaseInsensitive) == 0) {
@@ -200,36 +200,85 @@ SURVEY* processSurveyParameters(QString filepath)
                         survey -> channel_mask[i].from = survey -> channel_mask[i].to = maskList[i].toUInt();
             }
             else if (QString::compare(e.tagName(), QString("detection"), Qt::CaseInsensitive) == 0) {
-			   survey -> detection_threshold = e.attribute("threshold").toFloat();
+			   survey -> detection_threshold = e.attribute("detectionThreshold").toFloat();
                survey -> apply_median_filter = e.attribute("applyMedianFilter").toUInt();
                survey -> apply_detrending = e.attribute("applyDetrending").toUInt();
                survey -> tbb_enabled = e.attribute("enableTBB").toUInt();
             }
-            else if (QString::compare(e.tagName(), QString("clustering"), Qt::CaseInsensitive) == 0) {
-			   survey -> apply_clustering  = e.attribute("applyClustering").toUInt();
-               survey -> dbscan_min_points = e.attribute("minPoints").toUInt();
-               survey -> dbscan_time_range = e.attribute("timeRange").toFloat();   
-               survey -> dbscan_dm_range   = e.attribute("dmRange").toFloat();   
-               survey -> dbscan_snr_range  = e.attribute("snrRange").toFloat(); 
-               survey -> min_pulse_width      = e.attribute("minPuleWidth").toFloat();
-               survey -> apply_classification = e.attribute("applyClassification").toUInt();  
+            else if (QString::compare(e.tagName(), QString("clustering"), Qt::CaseInsensitive) == 0) 
+            {
+	 		    survey -> apply_clustering  = e.attribute("applyClustering").toUInt();
+                survey -> apply_classification = e.attribute("applyClassification").toUInt();  
+
+                // Accepts two naming conventions, switches between the two 
+                int tempInt = e.attribute("minPoints", "-1").toInt();
+                if(tempInt == -1) 
+                    survey -> dbscan_min_points = e.attribute("clusteringMinPoints").toUInt();
+                else
+                    survey -> dbscan_min_points = (unsigned) tempInt;
+
+                float tempFloat =  e.attribute("timeRange", "-1").toFloat();   
+                if (tempFloat == -1)
+                    survey -> dbscan_time_range = e.attribute("clusteringTimeRange").toFloat();   
+                else
+                    survey -> dbscan_time_range = tempFloat;
+
+                tempFloat = e.attribute("dmRange", "-1").toFloat();   
+                if (tempFloat == -1)
+                    survey -> dbscan_dm_range   = e.attribute("clusteringDmRange").toFloat();   
+                else    
+                    survey -> dbscan_dm_range = tempFloat;
+
+                tempFloat = e.attribute("snrRange", "-1").toFloat(); 
+                if (tempFloat == -1)
+                    survey -> dbscan_snr_range  = e.attribute("clusteringSnrRange").toFloat(); 
+                else
+                    survey -> dbscan_snr_range = tempFloat;
+
+                tempFloat = e.attribute("minPulseWidth", "-1").toFloat();
+                if (tempFloat == -1)
+                    survey -> min_pulse_width      = e.attribute("clusteringMinPulseWidth").toFloat();
+                else
+                    survey -> min_pulse_width = tempFloat;
             }
             else if (QString::compare(e.tagName(), QString("writer"), Qt::CaseInsensitive) == 0) {
                 survey -> dump_to_disk = e.attribute("writeToFile").toUInt();
                 survey -> output_bits = e.attribute("outputBits").toUInt();
                 survey -> output_compression = e.attribute("compression").toUInt();
-                char *temp = e.attribute("filePrefix", "output").toUtf8().data();
+
+                // Accepts two naming conventions, switches between the two 
+                char *temp = e.attribute("filePrefix", "default").toUtf8().data();
+                if (strcmp(temp, "default") == 0)
+                    temp = e.attribute("outputFilePrefix", "output").toUtf8().data();
 			    strcpy(survey -> fileprefix, temp);
-                temp = e.attribute("baseDirectory", ".").toUtf8().data();
+
+                temp = e.attribute("baseDirectory", "default").toUtf8().data();
+                if (strcmp(temp, "default") == 0)
+                    temp = e.attribute("outputBaseDirectory", ".").toUtf8().data();
                 strcpy(survey -> basedir, temp);
-                survey -> secs_per_file = e.attribute("secondsPerFile", "600").toUInt();
-                survey -> use_pc_time = e.attribute("usePCTime", "1").toUInt();
-                survey -> single_file_mode = e.attribute("singleFileMode", "0").toUInt();
+
+                int val = e.attribute("secondsPerFile", "-1").toInt();
+                if (val == -1)
+                    survey -> secs_per_file = e.attribute("outputSecondsPerFile", "0").toUInt();            
+                else
+                    survey -> secs_per_file = (unsigned) val;
+
+                val = e.attribute("usePCTime", "-1").toInt();
+                if (val == -1)
+                    survey -> use_pc_time = e.attribute("outputUsePCTime", "0").toUInt();
+                else
+                    survey -> use_pc_time = (unsigned) val;
+
+                val = e.attribute("singleFileMode", "-1").toInt();                
+                if (val == -1)
+                    survey -> single_file_mode = e.attribute("outputSingleFileMode", "0").toUInt();
+                else
+                    survey -> single_file_mode = (unsigned) val;
             }
         
             // Check if user has specified GPUs to use
             else if (QString::compare(e.tagName(), QString("gpus"), Qt::CaseInsensitive) == 0) {
-			    QString gpus = e.attribute("ids");
+			    QString gpus = e.attribute("gpuIDs", "0");
                 QStringList gpuList = gpus.split(",", QString::SkipEmptyParts);
                 survey -> gpu_ids = (unsigned *) safeMalloc(sizeof(unsigned) * gpuList.count());
                 for(int i = 0; i < gpuList.count(); i++)
@@ -336,12 +385,12 @@ void initialiseMDSM(SURVEY* input_survey)
                                       devices -> minTotalGlobalMem);
 
     // Check if nsamp is greater than maxshift
-//    if (greatest_maxshift > survey -> nsamp)
-//    {
-//        fprintf(stderr, "Number of samples (%d) must be greater than maxshift (%d)\n", 
-//                survey -> nsamp, greatest_maxshift);
-//        exit(-1);
-//    }
+    if (greatest_maxshift > survey -> nsamp)
+    {
+        fprintf(stderr, "Number of samples (%d) must be greater than maxshift (%d)\n", 
+                survey -> nsamp, greatest_maxshift);
+        exit(-1);
+    }
 
     // When beamforming, antenna data will be copied to the output buffer, so it's size
     // should be large enough to accommodate both

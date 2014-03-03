@@ -14,8 +14,12 @@
 #include "beamshifts.h"
 #include "survey.h"
 
+#define D2R(x)  (x * M_PI) / 180.0
+#define R2D(x)  (x * 180) / M_PI
+
 using namespace std;
 
+// Array class function implementation
 Array *processArrayFile(QString filepath)
 {
     QDomDocument document("array");
@@ -141,30 +145,89 @@ Array *processArrayFile(QString filepath)
     return array;
 }
 
+// ================= Helper functions ============================
+// Get Julian Date
+double getLocalSideralTime(Array *array)
+{
+    // Get Current Time
+    time_t curr_time = time(0);
+    struct tm *now = gmtime(&curr_time);
+
+    // Adjust date to conform with following calculations
+    now -> tm_year += 1900;  // 0 is AD 0
+    now -> tm_mon += 1;      // 1 - 12 month range
+
+//    printf("UTC: %4d/%2d/%2d %2d:%2d:%2d\n", now->tm_year, now->tm_mon, now->tm_mday, now->tm_hour,now->tm_min,now->tm_sec);
+
+    // Check if January or February
+    if (now -> tm_mon <= 2)
+    {
+        now -> tm_year -= 1;
+        now -> tm_mon += 12;
+    }
+
+    // Compute julian date
+    double hour = now->tm_hour + now->tm_min/60.0 + now->tm_sec/3600.0;
+    double julian_date =  floorf( 365.25 * (now -> tm_year + 4716.0)) +
+                          floorf( 30.6001 *( now -> tm_mon + 1.0)) + 2.0 -
+                          floorf( now->tm_year / 100.0 ) +
+                          floorf( floorf( now -> tm_year / 100.0 ) / 4.0 ) +
+                          now -> tm_mday - 1524.5 +
+                          (now -> tm_hour + now -> tm_min / 60.0 + now -> tm_sec / 3600.0) / 24.0 -
+                          2451545.0;
+
+    // Get Local Sidereal Time
+    double lst = fmod(100.46 + (0.985647 * julian_date) + 15 * hour + array->getReferenceLong(), 360);
+    lst = (lst < 0) ? lst + 360 : lst;
+//    cout << "Julian Date: " << julian_date << " Sidereal time: " << lst << endl;
+
+    return lst;
+}
+
+// Calculate phase-delay shifts for all antennas, frequencies
 void calculate_shifts(SURVEY *survey, Array *array)
 {
+    // Get local sidereal time
+    double lst = getLocalSideralTime(array);
+
+    // Get array information
+    double lat = D2R(array -> getReferenceLat());
+
     // Loop over each beam which needs to be generated
     for(unsigned b = 0; b < survey -> nbeams; b++)
     {
         BEAM beam = survey -> beams[b];
         double bandwidth = fabs(survey -> nchans * beam.foff) * 1e6;
 
-        // Compute source declination in degrees
-        // If no source provided, use zenith (latitude of array)
-        double dec = beam.dec * (M_PI / 180.0f);  // in radians
+        // Get beam pointing information
+        double dec = D2R(beam.dec);
+        double ra  = D2R(beam.ra);
+        double ha  = D2R(beam.ha);
 
-        // Compute zenith and pointing direction
-        double zenith = array -> getReferenceLat() * M_PI / 180.0f;  // in radians
-        double direction = zenith - dec;
+        // Compute hour angle
+        // If RA is 0, then generate scanning beam (set HA to beam specified value)
+        // Otherwise calculate required RA
+        if (fabs(ra - 0) > 0.01) ha = D2R(lst) - ra;
+
+         // Compute azimuth and altitude
+         double el, az;
+         el = asin(sin(dec) * sin(lat) + cos(dec) * cos(lat) * cos(ha));
+         az = acos((sin(dec) - sin(el) * sin(lat)) / (cos(el) * cos(lat))) ;
+         az = (az != az) ? 0 : ((sin(ha) < 0) ? M_PI + az : M_PI - az);
 
         // Compute trigonometric factor and antenna position unit
-        double trig_factor = sin(direction);
+        double trig_factor_y = cos(el) * cos(az);
+        double trig_factor_x = cos(el) * sin(az);
         double unit_position = 299792458.0 / (array -> getCenterFrequency() * 1e9);
 
         // Compute antenna path differences
         double path_difference[array -> numberOfAntennas()];
         for(unsigned i = 0; i < array -> numberOfAntennas(); i++)
-            path_difference[i] = array -> getAntenna(i).getY() * unit_position * trig_factor;
+        {
+            double diff_x = array -> getAntenna(i).getX() * unit_position * trig_factor_x;
+            double diff_y = array -> getAntenna(i).getY() * unit_position * trig_factor_y;
+            path_difference[i] = diff_x + diff_y;
+        }
 
         // Loop over frequency channels
         for(unsigned i = 0; i < survey -> nchans; i++)

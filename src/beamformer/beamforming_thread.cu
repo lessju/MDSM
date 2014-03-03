@@ -183,6 +183,7 @@ void perform_downsampling(float *input, float *output, THREAD_PARAMS* params, cu
 
     cudaEventRecord(event_start, 0);	
 
+    // Choose downsampling kernel depending on decimation factor
     if (survey -> downsample <= 32)
     {
 	    dim3 gridDim(survey -> nchans, BEAMS);  
@@ -205,35 +206,55 @@ void perform_downsampling(float *input, float *output, THREAD_PARAMS* params, cu
 }
 
 // Wrapper for channelisation kernel
-void channelise(cufftComplex *input, THREAD_PARAMS* params, cudaEvent_t event_start,
-                cudaEvent_t event_stop, unsigned nsamp)
+void channelise(cufftComplex *input, float* fir, cufftComplex *lagged_buffer, 
+                THREAD_PARAMS* params, cudaEvent_t event_start,
+                cudaEvent_t event_stop, cufftHandle *plan, unsigned nsamp)
 {
     SURVEY *survey = params -> survey;
     unsigned tid = params -> thread_num;
     float timestamp;
 
+    unsigned nbeams = survey -> nbeams;
+    unsigned nsubs  = survey -> nchans;
+    unsigned nchans = survey -> subchannels;
+
+    // If PFB is enabled, apply filter
+    if (survey -> apply_pfb)
+    {
+        cudaEventRecord(event_start, 0);
+        unsigned num_threads = PFB_THREADS;
+        dim3 grid(nsubs, nbeams);
+
+        ppf_fir<<<grid, num_threads, NTAPS * num_threads * sizeof(float)>>>
+                                (input, lagged_buffer, fir, nsamp / nchans, nsubs, nbeams, nchans);                                                              
+
+        cudaThreadSynchronize();
+        cudaEventRecord(event_stop, 0);
+        cudaEventSynchronize(event_stop);
+        cudaEventElapsedTime(&timestamp, event_start, event_stop);
+        CudaCheckError();
+        printf("%d: Performed PFB Filtering [Thread %d]: %lf\n", (int) (time(NULL) - params -> start), 
+                                                                  tid, timestamp);
+    }
+    
+    // Apply forward C2C FFTs
     cudaEventRecord(event_start, 0);
-
-    cufftHandle plan;
-    CufftSafeCall(cufftPlan1d(&plan, survey -> subchannels, CUFFT_C2C, 
-                              survey -> nchans * nsamp / survey -> subchannels));
-
     for (unsigned i = 0; i < survey -> nbeams; i++)
-        CufftSafeCall(cufftExecC2C(plan, input + i * survey -> nchans * nsamp, 
-                                         input + i * survey -> nchans * nsamp, 
-                                         CUFFT_FORWARD));
+        CufftSafeCall(cufftExecC2C(*plan, input + i * survey -> nchans * nsamp, 
+                                     input + i * survey -> nchans * nsamp, 
+                                     CUFFT_FORWARD));
     cudaThreadSynchronize();
-    cufftDestroy(plan);
 
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);
     cudaEventElapsedTime(&timestamp, event_start, event_stop);
     CudaCheckError();
-    printf("%d: Performed Channelisation [Thread %d]: %lf\n", (int) (time(NULL) - params -> start), 
+    printf("%d: Performed FFT Channelisation [Thread %d]: %lf\n", (int) (time(NULL) - params -> start), 
                                                               tid, timestamp);	
 }
 
 // Fix data format in GPU memory after channelisation
+// TODO: This should remove half of the FFT output (reflection)
 void fix_channelisation_order(float2 *input, float* output, THREAD_PARAMS* params, cudaEvent_t event_start,
                         cudaEvent_t event_stop, unsigned nsamp)
 {
@@ -277,6 +298,13 @@ void* run_beamformer(void* thread_params)
         exit(1);
     }
 
+    // Check if number of taps conforms to object macro declaration
+    if (survey -> ntaps != NTAPS)
+    {
+        fprintf(stderr, "Incorrect PFB configuration (TAPS: %d, taps: %d)\n", NTAPS, survey -> ntaps);
+        exit(1);
+    }
+
     // Initialise device
     CudaSafeCall(cudaSetDevice(params -> device_id));
     CudaSafeCall(cudaDeviceReset());
@@ -300,6 +328,55 @@ void* run_beamformer(void* thread_params)
     cudaEvent_t event_start, event_stop;
     float timestamp;
     cudaEventCreate(&event_start);
+
+    // Initialise channelisation if required
+    cuComplex *d_lagged_buffer;  // Buffer inter-iteration values
+    float *d_fir;
+    cufftHandle fft_plan;
+    if (survey -> perform_channelisation)
+    {
+
+        printf("%d. Initialising PFB. Extra memory required: %.2f MB\n", (int) (time(NULL) - start), 
+                nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex) / (1024.0 * 1024.0));
+
+        // Initialise cuFFT plan
+        CufftSafeCall(cufftPlan1d(&fft_plan, survey -> subchannels, CUFFT_C2C, 
+                                  survey -> nchans * nsamp / survey -> subchannels));
+
+        // Allocate memory for channel buffers and FIR weights
+        CudaSafeCall(cudaMalloc((void **) &d_fir, nchans * NTAPS * sizeof(float)));
+        CudaSafeCall(cudaMalloc((void **) &d_lagged_buffer,  nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex)));
+
+        // Initialiase buffer to 1
+        CudaSafeCall(cudaMemset(d_lagged_buffer, 1,  nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex)));
+        
+        // Read fir coefficient file
+        float *weights = (float *) malloc(NTAPS * survey -> subchannels * sizeof(float));
+        char filename[500], temp[10];
+        strcpy(filename, survey -> fir_path);
+        strcat(filename, "/coeff_");
+        sprintf(temp, "%d", survey -> ntaps);
+        strcat(filename, temp);
+        strcat(filename, "_");
+        sprintf(temp, "%d", survey -> subchannels);
+        strcat(filename, temp);
+        strcat(filename, ".dat");
+
+        printf("%d. Loading PFB coefficients file [%s]\n", (int) (time(NULL) - start), filename);
+        FILE *fp = fopen(filename, "rb");
+        if (fread(weights, sizeof(float), NTAPS * nchans, fp) <= 0)
+        {
+            fprintf(stderr, "Error reading PFB coefficients file. Exiting.\n");
+            exit(1);
+        }
+        
+        // Copy weights to GPU memory
+        CudaSafeCall(cudaMemcpy(d_fir, weights, survey -> subchannels * NTAPS * sizeof(float), cudaMemcpyHostToDevice));
+
+        // Free up stuff 
+        free(weights);
+        fclose(fp);
+    }
 
  	// Initialise beamformer lookup table
     signed char table[16] = { 0 };
@@ -357,12 +434,13 @@ void* run_beamformer(void* thread_params)
 
             // Processing flow if channelisation is required
             if (survey -> perform_channelisation)
-            {
+            {               
                 // Perform beamforming (complex output)
                 perform_beamforming(d_input, d_output, d_beamshifts, params, event_start, event_stop, nsamp);
 
                 // Perform channelisation
-                channelise((cufftComplex *) d_output, params, event_start, event_stop, nsamp);
+                channelise((cufftComplex *) d_output, d_fir, d_lagged_buffer, 
+                           params, event_start, event_stop, &fft_plan, nsamp);
 
                 // Select required channel, fix channel ordering and transpose data
                 fix_channelisation_order((float2 *) d_output, (float *) d_input, params, event_start, event_stop, nsamp);

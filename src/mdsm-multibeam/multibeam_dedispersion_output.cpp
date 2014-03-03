@@ -17,9 +17,6 @@
 // Clustering Class
 #include "dbscan.h"
 
-// Temporary file for pipeline analysis
-FILE *pulses_found = fopen("found_pulses.txt", "w");
-
 // ========================== FILE HERLPER ===================================
 void create_files(FILE** fp, SURVEY* survey, double timestamp)
 {
@@ -34,8 +31,11 @@ void create_files(FILE** fp, SURVEY* survey, double timestamp)
             strcpy(pathName, survey -> basedir);
             strcat(pathName, "/");
             strcat(pathName, survey -> fileprefix);
-            strcat(pathName, "_beam_");
-            strcat(pathName, beam_no);
+            if (survey -> nbeams > 1)
+            {
+                strcat(pathName, "_beam_");
+                strcat(pathName, beam_no);
+            }
             strcat(pathName, ".dat");
             
             if ((fp[i] = fopen(pathName, "w")) == NULL)
@@ -43,6 +43,8 @@ void create_files(FILE** fp, SURVEY* survey, double timestamp)
                 fprintf(stderr, "Invalid output file path: %s\n", pathName);
                 exit(-1);
             }
+
+            printf("Output file: %s\n", pathName);
         }
     else
         // Multiple-file mode
@@ -80,6 +82,8 @@ void create_files(FILE** fp, SURVEY* survey, double timestamp)
                     fprintf(stderr, "Invalid output file path: %s\n", pathName);
                     exit(-1);
                 }
+
+                printf("Output file: %s\n", pathName);
             }
 }
 
@@ -254,11 +258,6 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
                                                          dataPoint.cluster + numClusters, dataPoint.type);
                 }
                 validClusters++;
-
-                // TEMP
-                fprintf(pulses_found, "{'dm' : %.2f, 'width' : %f, 'snr' : %.2f, 'pos' : %lf, 'rmse' : %.4f },", 
-                                       clusters[i] -> getDM(), clusters[i] -> getWidth(), clusters[i] -> getMaxSnr(), 
-                                       clusters[i] -> getPosition(), val);
             }
             else
             {
@@ -271,8 +270,6 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
                 }
                 validClusters++;
             }
-
-            fflush(pulses_found);
         }
         else  // Just dump clusters to disk
         {
@@ -332,9 +329,6 @@ void* process_output(void* output_params)
 
     unsigned numClusters[params -> nthreads];
     memset(numClusters, 0, params -> nthreads * sizeof(unsigned));
-
-    // TEMP
-    fprintf(pulses_found, "[");
 
     // Processing loop
     while (1) 
@@ -430,11 +424,6 @@ void* process_output(void* output_params)
 
         loop_counter++;
     }  
-
-    // TEMP
-    fseek(pulses_found, -1, SEEK_CUR); // Remove extra trailing comma
-    fprintf(pulses_found, "]");
-    fclose(pulses_found);
 
     printf("%d: Exited gracefully [output]\n", (int) (time(NULL) - start));
     pthread_exit((void*) output_params);

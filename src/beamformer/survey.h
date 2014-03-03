@@ -8,7 +8,7 @@ typedef struct
 {
     // Beam parameters
     unsigned beam_id, gpu_id;
-    float foff, fch1, ra, dec;
+    float foff, fch1, ra, dec, ha;
 } BEAM;
 
 typedef struct {
@@ -28,8 +28,9 @@ typedef struct {
     bool      test;
 
     // Channelisation parameters
-    bool perform_channelisation;
-    unsigned int subchannels;
+    char fir_path[120];
+    bool perform_channelisation, apply_pfb;
+    unsigned int subchannels, ntaps;
     unsigned start_channel, stop_channel;
       
     // Timing parameters

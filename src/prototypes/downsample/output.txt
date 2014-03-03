@@ -1,0 +1,5 @@
+nsamp: 32768, nchans: 1024, nbeams: 16, tsamp: 0.000051, factor: 16, new tsamp: 0.000819
+Memory requirements: Input: 2048.00 MB, Output: 128.00 
+Copied to GPU in: 715.639709
+Perform downsampling in: 43.525280 [12.33 GFLOPs] 
+Copied from GPU in: 78.146111

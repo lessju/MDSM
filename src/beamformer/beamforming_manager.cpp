@@ -127,10 +127,16 @@ SURVEY* processSurveyParameters(QString filepath)
         if( !e.isNull() )
         {
             if (QString::compare(e.tagName(), QString("channels"), Qt::CaseInsensitive) == 0) {
+                survey -> perform_channelisation = e.attribute("performChannelisation", "0").toUInt();
+                survey -> apply_pfb = e.attribute("applyPFB", "0").toUInt();
+                survey -> ntaps = e.attribute("ntaps", "32").toUInt();
                 survey -> nchans   = e.attribute("nchans").toUInt();
                 survey -> subchannels = e.attribute("subchannels", "1").toUInt();
                 survey -> start_channel = e.attribute("startChannel","0").toUInt();
                 survey -> stop_channel = e.attribute("stopChannel","1024").toUInt();
+
+                char *temp = e.attribute("firPath", ".").toUtf8().data();
+                strcpy(survey -> fir_path, temp);
             }
             else if (QString::compare(e.tagName(), QString("antennas"), Qt::CaseInsensitive) == 0) {
                 survey -> nantennas    = e.attribute("number").toUInt();
@@ -138,24 +144,48 @@ SURVEY* processSurveyParameters(QString filepath)
             else if (QString::compare(e.tagName(), QString("timing"), Qt::CaseInsensitive) == 0)
                 survey -> tsamp = e.attribute("tsamp").toFloat();
             else if (QString::compare(e.tagName(), QString("samples"), Qt::CaseInsensitive) == 0) {
-			   survey -> nsamp = e.attribute("number").toUInt();
-			   survey -> nbits = e.attribute("bits").toUInt();
+			   survey -> nsamp = e.attribute("nsamp").toUInt();
+			   survey -> nbits = e.attribute("nbits").toUInt();
                survey -> downsample = e.attribute("downsample").toUInt(); 
             }
-            else if (QString::compare(e.tagName(), QString("writer"), Qt::CaseInsensitive) == 0) {
-                char *temp = e.attribute("filePrefix", "output").toUtf8().data();
+            else if (QString::compare(e.tagName(), QString("writer"), Qt::CaseInsensitive) == 0) 
+            {
+                // Accepts two naming conventions, switches between the two 
+                char *temp = e.attribute("filePrefix", "default").toUtf8().data();
+                if (strcmp(temp, "default"))
+                    temp = e.attribute("outputFilePrefix", "output").toUtf8().data();
 			    strcpy(survey -> fileprefix, temp);
+
                 temp = e.attribute("baseDirectory", ".").toUtf8().data();
+                if (strcmp(temp, "default"))
+                    temp = e.attribute("outputBaseDirectory", ".").toUtf8().data();
                 strcpy(survey -> basedir, temp);
-                survey -> secs_per_file = e.attribute("secondsPerFile", "600").toUInt();
-                survey -> use_pc_time = e.attribute("usePCTime", "1").toUInt();
-                survey -> single_file_mode = e.attribute("singleFileMode", "0").toUInt();
+
+                int val = e.attribute("secondsPerFile", "-1").toInt();
+                if (val == -1)
+                    survey -> secs_per_file = e.attribute("outputSecondsPerFile", "0").toUInt();            
+                else
+                    survey -> secs_per_file = (unsigned) val;
+
+                val = e.attribute("usePCTime", "-1").toInt();
+                if (val == -1)
+                    survey -> use_pc_time = e.attribute("outputUsePCTime", "0").toUInt();
+                else
+                    survey -> use_pc_time = (unsigned) val;
+
+                val = e.attribute("singleFileMode", "-1").toInt();                
+                if (val == -1)
+                    survey -> single_file_mode = e.attribute("outputSingleFileMode", "0").toUInt();
+                else
+                    survey -> single_file_mode = (unsigned) val;
+
+                // ??
                 survey -> test = e.attribute("test", "0").toUInt();
             }
-        
+
             // Check if user has specified GPUs to use
             else if (QString::compare(e.tagName(), QString("gpus"), Qt::CaseInsensitive) == 0) {
-			    QString gpus = e.attribute("ids");
+			    QString gpus = e.attribute("gpuIDs");
                 QStringList gpuList = gpus.split(",", QString::SkipEmptyParts);
                 survey -> gpu_ids = (unsigned *) safeMalloc(sizeof(unsigned) * gpuList.count());
                 for(int i = 0; i < gpuList.count(); i++)
@@ -178,9 +208,6 @@ SURVEY* processSurveyParameters(QString filepath)
                     catch(QString e)
                     { std::cout << e.toUtf8().constData() << std::endl; exit(0); }
 
-                // Check if channelisation is required
-                survey -> perform_channelisation = e.attribute("channelise", "0").toUInt();
-
                 QDomNode beam = n.firstChild();
                 while (!beam.isNull())
                 {
@@ -189,7 +216,8 @@ SURVEY* processSurveyParameters(QString filepath)
                     survey -> beams[nbeams].fch1 = e.attribute("topFrequency").toFloat();
                     survey -> beams[nbeams].foff = e.attribute("frequencyOffset").toFloat();
                     survey -> beams[nbeams].dec  = e.attribute("dec").toFloat();
-                    survey -> beams[nbeams].ra   = e.attribute("ra").toFloat();
+                    survey -> beams[nbeams].ra   = e.attribute("ra", "0").toFloat();
+                    survey -> beams[nbeams].ha   = e.attribute("ha", "0").toFloat();
 
                     beam = beam.nextSibling();
                     nbeams++;
@@ -257,8 +285,12 @@ void initialise(SURVEY* input_survey)
     survey -> beam_shifts = (float2 *) safeMalloc(survey -> nchans * survey -> nbeams * survey -> nantennas * sizeof(float2));
 
     // Log parameters
-    printf("Observation Params: nchans = %d, nsamp = %d, tsamp = %f\n", 
-            survey -> nchans, survey -> nsamp, survey -> tsamp);
+    if (survey -> perform_channelisation)
+        printf("Observation Params: nsubs = %d, nchans = %d, nsamp = %d, tsamp = %f\n", 
+                survey -> nchans, survey -> subchannels, survey -> nsamp, survey -> tsamp);
+    else
+        printf("Observation Params: nchans = %d, nsamp = %d, tsamp = %f\n", 
+                survey -> nchans, survey -> nsamp, survey -> tsamp);
 
     printf("Beam Params [%d beams]:\n", survey -> nbeams);
     for(i = 0; i < survey -> nbeams; i++)

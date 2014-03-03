@@ -1,6 +1,6 @@
 <observation> 
 
-    <dm lowDM="0" numDMs="16384" dmStep="0.02" />
+    <dm lowDM="0" numDMs="8192" dmStep="0.5" />
 
     <channels nchans="2048" npols="1" ncoeffs="12" />
     

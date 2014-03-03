@@ -1,0 +1,28 @@
+<observation> 
+
+    <dm lowDM="" numDMs="" dmStep="" />
+
+    <channels nchans="" npols="1" ncoeffs="" />
+    
+    <timing tsamp="" />
+
+    <samples nsamp="" nbits="" voltage=""/>
+    
+    <rfi applyRFIClipper="" channelBlock="" spectrumThreshold="" channelThreshold=""/>
+
+    <detection detectionThreshold="" applyMedianFilter="" applyDetrending="" enableTBB="" />
+
+    <clustering applyClustering="" clusteringMinPoints="" clusteringTimeRange="" 
+                clusteringDmRange="" clusteringSnrRange="" 
+                clusteringMinPulseWidth="" applyClassification=""/>
+
+    <writer writeToFile="" outputBits="" compression="" 
+            outputFilePrefix="" outputBaseDirectory="" 
+            outputSingleFileMode="" outputSecondsPerFile="" 
+            outputUsePcTime="" />
+
+    <gpus gpuIDs="" />
+
+    <beams/>
+
+</observation>

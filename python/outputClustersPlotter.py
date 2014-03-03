@@ -69,7 +69,6 @@ def normalPlot():
     ax3.set_ylabel('Intensity')
     ax3.set_title('Intensity vs Time plot')
 
-
     if len(argv) == 5:
         plt.savefig(argv[4])
     else:
