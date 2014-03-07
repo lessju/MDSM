@@ -24,3 +24,4 @@ set_target_properties(medicinaBeamformer PROPERTIES
     COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}"
 )
+install(TARGETS "medicinaBeamformer" DESTINATION ${MDSM_INSTALL_DIR})

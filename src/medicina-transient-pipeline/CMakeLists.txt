@@ -24,3 +24,4 @@ set_target_properties(medicinaTransientPipeline PROPERTIES
     COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}"
 )
+install(TARGETS "medicinaTransientPipeline" DESTINATION ${MDSM_INSTALL_DIR})

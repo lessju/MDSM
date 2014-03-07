@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 if(NOT MDSM_INSTALL_DIR)
-    set(MDSM_INSTALL_DIR "mdsm")
+    set(MDSM_INSTALL_DIR "MDSM")
 endif(NOT MDSM_INSTALL_DIR)
 
 if(NOT LIBRARY_INSTALL_DIR)
@@ -99,6 +99,7 @@ set_target_properties(standalone-mdsm PROPERTIES
     LINK_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "-lgsl -lgslcblas"
 )
+install(TARGETS "standalone-mdsm" DESTINATION ${MDSM_INSTALL_DIR})
 
 add_executable(standalone-beamformer beamformer.cpp)
 target_link_libraries(standalone-beamformer
@@ -106,3 +107,5 @@ target_link_libraries(standalone-beamformer
     beamformer-cuda
     beamformer
 )
+install(TARGETS "standalone-beamformer" DESTINATION ${MDSM_INSTALL_DIR})
+
