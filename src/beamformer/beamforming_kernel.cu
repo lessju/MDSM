@@ -369,8 +369,13 @@ __global__ void downsample_atomics(float *input, float *output, unsigned nsamp, 
 //    }
 //}
 
-__global__ void fix_channelisation(float2 *input, float *output, unsigned nsamp, unsigned nchans, unsigned nbeams, 
-                                   unsigned subchans, unsigned start_chan)
+// Re-arrange data after channelisation:
+// - Remove half of the generated spectrum
+// - Perform an fftshift
+// - Use second half of the generated spectrum (N/2 -> N-1)
+__global__ void fix_channelisation(const float2 *input, float *output, const unsigned nsamp, 
+                                   const unsigned nchans, const unsigned nbeams, 
+                                   const unsigned subchans, const unsigned start_chan)
 {    
     // Time changes in the x direction
     // Channels change along the y direction. Indexing start at start_chan
@@ -378,16 +383,18 @@ __global__ void fix_channelisation(float2 *input, float *output, unsigned nsamp,
     // Each thread processes one sample
 
 	// Get index to start of current channelised block
-    // ThreadIdx.x is the nth channel formed in this block
-	unsigned long indexIn  = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + threadIdx.x;
-    unsigned long indexOut =  (blockIdx.y * subchans + threadIdx.x) * nbeams + blockIdx.z;
+    // ThreadIdx.x is the nth channel formed in this block (half the channel are processes, and are flipped)
+    unsigned int halfChans = subchans / 2;
+	unsigned long indexIn  = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + subchans - threadIdx.x;
+    unsigned long indexOut =  (blockIdx.y * halfChans + threadIdx.x) * nbeams + blockIdx.z;
+
 
     for(unsigned s = blockIdx.x;
                  s < nsamp / subchans;
                  s += gridDim.x)
     {
         float2 value = input[indexIn + s * subchans];
-        output[s * nbeams * gridDim.y * subchans + indexOut] = sqrtf(value.x * value.x + value.y * value.y);
+        output[s * nbeams * gridDim.y * halfChans + indexOut] = sqrtf(value.x * value.x + value.y * value.y);
     }
 }
 

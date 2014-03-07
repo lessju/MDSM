@@ -127,37 +127,6 @@ class MatplotlibPlot:
         self.figure.tight_layout()
         self.canvas.draw()
 
-# ------------------------- PROGRESS DIALOG----------------------------
-class FileProgressDialog():
-    """ Progress dialog for indefinite looping """
-
-    def __init__(self):
-        """ FileProgressDialog constructor """
-
-        # Initialise
-        self.dialog = gui.QProgressDialog("Opening file...", "Cancel", 0, 100)
-        self.value = 0;
-
-        self.dialog.setWindowModality(core.Qt.WindowModal)
-        self.dialog.setCancelButton(None)
-        self.dialog.exec_()
-    
-        # Create timer
-        self.timer = core.QTimer()
-        self.timer.setInterval(1)
-        core.QObject.connect(self.timer, core.SIGNAL('timeout'), self.timeout)
-        self.timer.start()
-
-    def timeout(self):
-        """ Timer timeout """
-        print "yeah"
-        self.value = (self.value + 1) % 100
-        self.dialog.setValue( (self.value % 100))
-        
-    def close(self):
-        """ Close progress dialog """
-        self.dialog.done(0)
-
 # ------------------------- MAIN WINDOW --------------------------------
 class BeamPlotter(gui.QMainWindow):
     """ Class encapsulating UI functionality"""
@@ -346,11 +315,6 @@ class BeamPlotter(gui.QMainWindow):
 
     def readDataSet(self):
         """ Read data set for further plotting """        
-
-        # Start progress dialog
-        print "Here"
-        dialog = FileProgressDialog()
-        print "Here"
 
         # Seek to required position
         with open(self.filename, 'rb') as f:

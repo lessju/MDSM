@@ -45,7 +45,7 @@ fft:
 	rm -f *.cu.o *.linkinfo
 
 cpu_dedisp:
-	$(CCC) -o cpu cpu_dedisp.c
+	$(CCC) -o cpu -g cpu_dedisp.c
 
 subband:
 	$(NVCC) -o subband subband_dedisp.cu --gpu-architecture sm_20 $(LDFLAGS) $(INC) -L/lib

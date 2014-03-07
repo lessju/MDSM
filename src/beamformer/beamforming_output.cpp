@@ -107,7 +107,7 @@ void* process_output(void* output_params)
         
             if (survey -> perform_channelisation)
             {
-                unsigned curr_nchans = survey -> subchannels * (survey -> stop_channel - survey -> start_channel);
+                unsigned curr_nchans = survey -> subchannels * (survey -> stop_channel - survey -> start_channel) / 2;
                 unsigned curr_nsamp = ppnsamp / survey -> subchannels;
                 
                 for(unsigned i = 0; i < curr_nsamp; i++)

@@ -264,7 +264,9 @@ void fix_channelisation_order(float2 *input, float* output, THREAD_PARAMS* param
 
     cudaEventRecord(event_start, 0);	
 
-	dim3 gridDim(nsamp / survey -> subchannels, survey -> stop_channel - survey -> start_channel, survey -> nbeams);  
+	dim3 gridDim(nsamp / survey -> subchannels, 
+                 survey -> stop_channel - survey -> start_channel, 
+                 survey -> nbeams);  
     fix_channelisation<<< gridDim, survey -> subchannels >>> 
                       (input, output, nsamp, survey -> nchans, BEAMS, survey -> subchannels, survey -> start_channel);
 
@@ -468,7 +470,7 @@ void* run_beamformer(void* thread_params)
 
             if (survey -> perform_channelisation)
             {
-                unsigned nchans = survey -> subchannels * (survey -> stop_channel - survey -> start_channel);
+                unsigned nchans = survey -> subchannels * (survey -> stop_channel - survey -> start_channel) / 2;
 
                 CudaSafeCall(cudaMemcpy( params -> output[params -> thread_num], d_input, 
                 						 BEAMS * nchans * sizeof(float) * survey -> nsamp / survey -> subchannels,
