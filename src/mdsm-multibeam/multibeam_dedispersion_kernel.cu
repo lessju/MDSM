@@ -42,7 +42,7 @@ __global__ void cache_dedispersion(float *output, float *input, float *dm_shifts
 
 // ---------------------- Shared memory optimised dedisperison  -------------------------------------
 __global__ void shared_dedispersion(const float* __restrict__ input, float* __restrict__ output, 
-							        const int* __restrict__ all_delays, const unsigned nchans, 
+	      		            const int* __restrict__ all_delays, const unsigned nchans, 
                                     const unsigned nsamp, const int maxshift, const int tdms)
 {
 		// Shared memory buffer to store channel vector
@@ -85,21 +85,11 @@ __global__ void shared_dedispersion(const float* __restrict__ input, float* __re
 		// Manual unlooping of four to overlap shared memory requests
 		#pragma unroll
 		for(int d = 0; d < DEDISP_DMS; d ++)
-            accumulators[d]  += vector[threadIdx.x + delays[d]];
-//		{
-//			int shift1          = delays[d];
-//			int shift2          = delays[d + 1];
-//			int shift3          = delays[d + 2];
-//			int shift4          = delays[d + 3];
-//     		accumulators[d]     += vector[threadIdx.x + shift1];
-//			accumulators[d + 1] += vector[threadIdx.x + shift2];
-//			accumulators[d + 2] += vector[threadIdx.x + shift3];
-//			accumulators[d + 3] += vector[threadIdx.x + shift4];
-//		}
+                    accumulators[d]  += vector[threadIdx.x + delays[d]];
 	}
 
 	// All done, store result to global memory
-    #pragma unroll
+        #pragma unroll
 	for(unsigned d = 0; d < DEDISP_DMS; d++)
 		output[(blockIdx.y * DEDISP_DMS + d) * nsamp + blockIdx.x * blockDim.x + threadIdx.x] = accumulators[d];
 }

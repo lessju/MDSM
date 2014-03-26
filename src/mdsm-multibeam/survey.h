@@ -47,7 +47,7 @@ typedef struct {
     FILE *fp;
 
     // Output parameters
-    char      fileprefix[80], basedir[120];
+    char      fileprefix[120], basedir[120];
     unsigned  secs_per_file;
     char      use_pc_time, single_file_mode;
 

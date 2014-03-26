@@ -250,12 +250,13 @@ SURVEY* processSurveyParameters(QString filepath)
                 char *temp = e.attribute("filePrefix", "default").toUtf8().data();
                 if (strcmp(temp, "default") == 0)
                     temp = e.attribute("outputFilePrefix", "output").toUtf8().data();
-			    strcpy(survey -> fileprefix, temp);
+                strcpy(survey -> fileprefix, temp);
 
                 temp = e.attribute("baseDirectory", "default").toUtf8().data();
                 if (strcmp(temp, "default") == 0)
                     temp = e.attribute("outputBaseDirectory", ".").toUtf8().data();
                 strcpy(survey -> basedir, temp);
+                printf("basedir: %s\n", temp);
 
                 int val = e.attribute("secondsPerFile", "-1").toInt();
                 if (val == -1)
@@ -387,9 +388,10 @@ void initialiseMDSM(SURVEY* input_survey)
     // Check if nsamp is greater than maxshift
     if (greatest_maxshift > survey -> nsamp)
     {
-        fprintf(stderr, "Number of samples (%d) must be greater than maxshift (%d)\n", 
-                survey -> nsamp, greatest_maxshift);
-        exit(-1);
+//        fprintf(stderr, "Number of samples (%d) must be greater than maxshift (%d)\n", 
+//                survey -> nsamp, greatest_maxshift);
+//        exit(-1);
+	printf("NOTE: Number of samples (%d) is less than maxshift (%d). This reduces performance.\n", survey -> nsamp, greatest_maxshift);
     }
 
     // When beamforming, antenna data will be copied to the output buffer, so it's size

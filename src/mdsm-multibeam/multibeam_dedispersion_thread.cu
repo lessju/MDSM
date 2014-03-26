@@ -216,7 +216,7 @@ void shared_brute_force(float *d_input, float *d_output, int *d_all_shifts, THRE
     cudaEventRecord(event_stop, 0);
     cudaEventSynchronize(event_stop);
     cudaEventElapsedTime(&timestamp, event_start, event_stop);
-    printf("%d: Performed [Shared] Brute-Force Dedispersion [Beam %d]: %lf\n", 
+    printf("%d: Performed Brute-Force Dedispersion [Beam %d]: %lf\n", 
             (int) (time(NULL) - params -> start), params -> thread_num, timestamp);
 }
 
@@ -549,7 +549,7 @@ void* dedisperse(void* thread_params)
 	    int *all_shifts = (int *) malloc(survey -> nchans * survey -> tdms * sizeof(int));
 	    for(unsigned c = 0; c < survey -> nchans; c++)
 		    for (unsigned d = 0; d < survey -> tdms; d++)
-		        all_shifts[c * survey -> tdms + d] = (int) (beam.dm_shifts[c] * (d * survey -> dmstep) / survey -> tsamp);
+		        all_shifts[c * survey -> tdms + d] = (int) (beam.dm_shifts[c] * (survey -> lowdm + d * survey -> dmstep) / survey -> tsamp);
 
 	    
 	    CudaSafeCall(cudaMalloc((void **) &d_all_shifts, survey -> nchans * survey -> tdms * sizeof(int)));
