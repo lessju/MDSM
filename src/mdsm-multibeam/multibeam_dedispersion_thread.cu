@@ -470,6 +470,7 @@ void* dedisperse(void* thread_params)
     int i, nsamp = params -> survey -> nsamp, nchans = params -> survey -> nchans, nants = survey -> nantennas;
     int loop_counter = 0, maxshift = beam.maxshift, iters = 0, tid = params -> thread_num;
     time_t start = params -> start;
+    int orig_nsamp = params -> survey -> nsamp;
 
     printf("%d: Started thread %d [GPU %d]\n", (int) (time(NULL) - start), tid, gpu -> device_id);
 
@@ -633,7 +634,7 @@ void* dedisperse(void* thread_params)
                     // If not performing beamforming, just copy maxshift spectra at the end of each channel (they
                     // will be copied to the front of the buffer during the next iteration
                     for (i = 0; i < nchans; i++)
-                        CudaSafeCall(cudaMemcpyAsync(d_input + (nsamp + maxshift) * i + nsamp, 
+                        CudaSafeCall(cudaMemcpyAsync(d_input + (orig_nsamp + maxshift) * i + orig_nsamp, 
                                                 input_ptr + nsamp * i + (nsamp - maxshift), 
                                                 maxshift * sizeof(float), cudaMemcpyHostToDevice));
 
@@ -782,8 +783,9 @@ void* dedisperse(void* thread_params)
             // Collect and write output to host memory
             // TODO: Overlap this copy with the input part of this thread
             cudaEventRecord(event_start, 0);
+
             CudaSafeCall(cudaMemcpy( params -> output[params -> thread_num], d_output, 
-            						 survey -> tdms * survey -> nsamp * sizeof(float),
+            						 survey -> tdms * nsamp * sizeof(float),
                                      cudaMemcpyDefault));
             cudaEventRecord(event_stop, 0);
             cudaEventSynchronize(event_stop);
@@ -802,17 +804,17 @@ void* dedisperse(void* thread_params)
         // Stopping clause
         if (((THREAD_PARAMS *) thread_params) -> stop) 
         {
-            if (iters >= params -> iterations - 1)
+            if (iters >= params -> iterations - 2)
             {
                 // Release rw_lock
                 if (pthread_rwlock_unlock(params -> rw_lock))
                     { fprintf(stderr, "Error releasing rw_lock [thread]\n"); exit(0); }
 
-                for(i = 0; i < params -> maxiters - params -> iterations ; i++) 
-                {
+           //     for(i = 0; i < params -> maxiters - params -> iterations ; i++) 
+           //     {
                     pthread_barrier_wait(params -> input_barrier);
                     pthread_barrier_wait(params -> output_barrier);
-                }
+           //     }
 
                 break; 
             }

@@ -43,8 +43,6 @@ void create_files(FILE** fp, SURVEY* survey, double timestamp)
                 fprintf(stderr, "Invalid output file path: %s\n", pathName);
                 exit(-1);
             }
-
-            printf("Output file: %s\n", pathName);
         }
     else
         // Multiple-file mode
@@ -148,7 +146,7 @@ void triggerTBB(SURVEY *survey, OUTPUT_PARAMS *params, float *input_buffer, doub
 
 // Process brute force dedispersion if that was chosen
 void process_brute(FILE* output, float *buffer, SURVEY *survey, int read_nsamp, 
-                   double timestamp, double blockRate, time_t start_time)
+                   double timestamp, double blockRate, time_t start_time, int last_buffer)
 {
     unsigned int j, k, l;
     
@@ -172,8 +170,8 @@ void process_brute(FILE* output, float *buffer, SURVEY *survey, int read_nsamp,
     // Subtract DM mean from all samples and apply threshold
     for (k = 0; k < survey -> tdms; k++) 
     {
-        int index = k * survey -> nsamp; 
-        for(l = 0; l < survey -> nsamp; l++) 
+        int index = k * read_nsamp; 
+        for(l = 0; l < read_nsamp; l++) 
         {
             // Detection threshold sigma filter
             float dm = survey -> lowdm + k * survey -> dmstep;
@@ -188,16 +186,24 @@ void process_brute(FILE* output, float *buffer, SURVEY *survey, int read_nsamp,
 
 // Process brute force dedispersion if that was chosen
 unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, unsigned numClusters,
-                              int read_nsamp, double timestamp, double blockRate, time_t start_time)
+                                 int read_nsamp, double timestamp, double blockRate, time_t start_time,
+                                 int last_buffer, int beam_num)
 {
     unsigned int j, k, l;
 
     // Initialise Data Points vector
     vector<DataPoint> dataPoints;
+
+    // Check whether this is the last buffer in file mode
     
     // Calculate the mean and standard deviation if not provided externally
     double localmean = 0, localrms = 0, tmp_stddev = 0;
-    if (!survey -> apply_detrending)
+    if (survey -> apply_detrending)
+    {
+        localmean = 0;
+        localrms = 0;
+    }
+    else if(!last_buffer)
     {
         for(j = 0; j < read_nsamp * survey -> tdms; j++)
         {
@@ -206,17 +212,29 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
         }
         localmean /= read_nsamp * survey -> tdms;
         localrms = sqrt(tmp_stddev / (read_nsamp * survey -> tdms) - localmean * localmean);
+    }   
+    else
+    {
+        unsigned long num_samp = 0;
+        for(j = 0; j < survey -> tdms; j++)
+            for(k = 0; k < survey -> last_nsamp - (survey -> beams[beam_num]).dm_shifts[j]; k++)
+            {
+                localmean += buffer[j * read_nsamp + k];   
+                tmp_stddev += pow(buffer[j * read_nsamp + k], 2);
+                num_samp++;
+            }
+
+        localmean /= num_samp;
+        localrms    = sqrt(tmp_stddev / num_samp - localmean * localmean);
     }
-    else // Normalisation was performed on the GPU
-        { localmean = 0; localrms = 1; }
 
     printf("%d: Mean: %f, Stddev: %f\n", (int) (time(NULL) - start_time), localmean, localrms);
         
     // Subtract DM mean from all samples and apply threshold
     for (k = 0; k < survey -> tdms; k++) 
     {
-        int index = k * survey -> nsamp; 
-        for(l = 0; l < survey -> nsamp; l++) 
+        int index = k * read_nsamp; 
+        for(l = 0; l < read_nsamp; l++) 
         {
             // Detection threshold sigma filter
             float dm = survey -> lowdm + k * survey -> dmstep;
@@ -356,12 +374,16 @@ void* process_output(void* output_params)
             {
                 unsigned threadId = omp_get_thread_num();
 
+                // Check if we're processing the last buffer
+                int lastBuffer = iters >= params -> iterations - 2;
+
                 // Apply clustering if required            
                 if (survey -> apply_clustering)
                 {
                     // Threshold and cluster points
                     unsigned found = process_brute_clustering(fp[threadId], (params -> output_buffer)[threadId], survey, 
-                                                              numClusters[threadId], ppnsamp, pptimestamp, ppblockRate, start);
+                                                              numClusters[threadId], ppnsamp, pptimestamp, ppblockRate, 
+                                                              start, lastBuffer, threadId);
                     numClusters[threadId] += found;
 
                     // If the TBB is enabled and there are valid detection, dump the unprocessed data to disk
@@ -371,7 +393,7 @@ void* process_output(void* output_params)
                 else
                     // Just cluster points and dump them to disk
                     process_brute(fp[threadId], (params -> output_buffer)[threadId], survey, ppnsamp, pptimestamp, 
-                                                ppblockRate, start);
+                                                ppblockRate, start, lastBuffer);
             }
             
             written_samples += ppnsamp;

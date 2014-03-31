@@ -95,7 +95,7 @@ target_link_libraries(standalone-mdsm
 )
 
 set_target_properties(standalone-mdsm PROPERTIES
-    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+    COMPILE_FLAGS "${OpenMP_CXX_FLAGS} -std=c++0x"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "-lgsl -lgslcblas"
 )

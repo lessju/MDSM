@@ -2,6 +2,10 @@
 #include "multibeam_dedispersion_manager.h"
 #include "file_handler.h"
 #include "survey.h"
+#include "cache_brute_force.h"
+
+#include <math.h>
+#include <random>
 
 // QT Stuff
 #include <QCoreApplication>
@@ -47,7 +51,7 @@ SURVEY* file_process_arguments(int argc, char *argv[])
     survey -> fp = fopen(argv[file], "rb");
     header = read_header(survey -> fp);
     if (header == NULL)
-        survey -> nbits = 32;
+        survey -> nbits = 8;
     else
         survey -> nbits = header -> nbits;
 
@@ -64,29 +68,55 @@ SURVEY* file_process_arguments(int argc, char *argv[])
 
 // Load data from binary file
 // This will split the bands into multiple beams (first beam highest band)
-unsigned long readBinaryData(float *buffer, FILE *fp, int nbits, int nsamp, int nchans, int nbeams)
+unsigned long readBinaryData(SURVEY *survey, float *buffer, FILE *fp, int nbits, int nsamp, int nchans, int nbeams)
 {
     int file_nchans = nchans * nbeams;
     float *temp_buffer = (float *) malloc(file_nchans * sizeof(float));
     size_t tot_nsamp = 0;
 
     // Corner turn while reading data
+    // Calculate buffer mean whilst corner turning
+    float sum = 0, tmpstd = 0;
     for(int i = 0; i < nsamp; i++) 
     {
         if (read_block(fp, nbits, temp_buffer, file_nchans ) != (unsigned) file_nchans)
-            return tot_nsamp;
+            break;
 
         for(int b = 0; b < nbeams; b++)
             for(int j = 0; j < nchans; j++)
-                buffer[b * nchans * nsamp + j * nsamp + i] = 
-                       temp_buffer[b * nchans + j];
+            {
+                float value = temp_buffer[b * nchans + j];
+                buffer[b * nchans * nsamp + j * nsamp + i] = value;
+                sum += temp_buffer[b * nchans + j];
+                tmpstd += pow(value, 2);
+            }
 
         tot_nsamp++;
     }
 
+    // Free temporary buffer
     free(temp_buffer);
 
-    return tot_nsamp;
+    // If we haven't read all required samples, populate rest of buffer with data mean
+    if (tot_nsamp == nsamp)
+        return nsamp;
+    else if (tot_nsamp == 0)
+        return 0;
+
+    survey -> last_nsamp = tot_nsamp;
+
+//    float mean = sum / (float) (tot_nsamp * nbeams * nchans);
+//    float std  = sqrt(tmpstd / (float) (tot_nsamp * nbeams * nchans) - mean * mean);
+
+//    std::default_random_engine generator;
+//    std::normal_distribution<double> distribution(mean, std);
+
+//    for(unsigned i = 0; i < nbeams; i++)
+//        for(unsigned j = 0; j < nchans; j++)
+//            for(unsigned k = tot_nsamp; k < nsamp; k++)
+//                buffer[i * nchans * nsamp + j * nsamp + k] = distribution(generator);
+
+    return nsamp;
 }
 
 // MDSM entry point
@@ -102,15 +132,28 @@ int main(int argc, char *argv[])
     float *input_buffer;
 
     // Process current chunk
-    unsigned int counter = 0, data_read = 0;
+    unsigned int counter = 0, data_read = 0, orig_nsamp = survey -> nsamp;
+    unsigned total_read = 0, i;
+    float mean = 0;
     while (TRUE) 
     {
         // Get current buffer pointer
         input_buffer = get_buffer_pointer();
 
 		// Read data from file
-		data_read = readBinaryData(input_buffer, survey -> fp, survey -> nbits, 
-                                   survey -> nsamp, survey -> nchans, survey -> nbeams);
+        if (counter > 0)
+        {
+		    data_read = readBinaryData(survey, input_buffer, survey -> fp, survey -> nbits, 
+                                       orig_nsamp, survey -> nchans, survey -> nbeams);
+
+            // Make sure that data_read is multiple of DEDISP_THREADS
+            data_read = data_read - (data_read % DEDISP_THREADS);
+        }
+        else
+        {
+            data_read = readBinaryData(survey, input_buffer, survey -> fp, survey -> nbits, 
+                                       survey -> beams[0].maxshift, survey -> nchans, survey -> nbeams);
+        }
 
         // If we have more than one input beam, copy to all beams
 //        for(unsigned i = 1; i < survey -> nbeams; i++)
@@ -119,10 +162,13 @@ int main(int argc, char *argv[])
 
         // Check if there is more processing to be done
 		unsigned int x;
-        next_chunk_multibeam(data_read, x, survey -> tsamp * survey -> nsamp * counter, survey -> tsamp);
+        next_chunk_multibeam(data_read, x, survey -> tsamp * total_read, survey -> tsamp);
 		if (!start_processing(data_read))  break;
        
         counter++;
+
+        if (counter > 0)
+            total_read += data_read;   
     }
 
     // Tear down MDSM

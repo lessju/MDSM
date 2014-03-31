@@ -1,6 +1,7 @@
 #ifndef DEDISPERSION_MANAGER_H_
 #define DEDISPERSION_MANAGER_H_
 
+#include "cache_brute_force.h"
 #include "survey.h"
 #include <QString>
 

@@ -29,6 +29,8 @@ typedef struct {
     unsigned nbeams, npols, nchans, nsamp, nbits, nantennas;
     float    tsamp;
 
+    unsigned last_nsamp; // For file mode only, proper handling of last data buffer
+
     // Beam parameters
     BEAM *beams;
 
