@@ -217,7 +217,7 @@ unsigned process_brute_clustering(FILE* output, float *buffer, SURVEY *survey, u
     {
         unsigned long num_samp = 0;
         for(j = 0; j < survey -> tdms; j++)
-            for(k = 0; k < survey -> last_nsamp - (survey -> beams[beam_num]).dm_shifts[j]; k++)
+            for(k = 0; k < survey -> last_nsamp; k++)
             {
                 localmean += buffer[j * read_nsamp + k];   
                 tmp_stddev += pow(buffer[j * read_nsamp + k], 2);

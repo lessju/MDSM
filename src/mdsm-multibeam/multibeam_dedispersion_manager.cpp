@@ -332,6 +332,14 @@ int calculate_nsamp(int maxshift, size_t *inputsize, size_t* outputsize, unsigne
     	survey -> nsamp = ((memory * 1000 * 0.99 / sizeof(float)) - maxshift * survey -> nchans) 
                            / (survey -> nchans + survey -> tdms);
 
+    // Check if nsamp is greater than maxshift
+    if (maxshift > survey -> nsamp)
+    {
+        unsigned nsamp = pow(2, ceil(log(maxshift)/log(2)));
+    	printf("NOTE: Number of samples (%d) is less than maxshift (%d). Setting nsamp to %d.\n", survey -> nsamp, maxshift, nsamp);
+        survey -> nsamp = nsamp;
+    }
+
     *inputsize = (survey -> nsamp + maxshift) * survey -> nchans * sizeof(float);
     *outputsize = survey -> nsamp * survey -> tdms * sizeof(float);
 
@@ -385,15 +393,6 @@ void initialiseMDSM(SURVEY* input_survey)
     survey -> nsamp = calculate_nsamp(greatest_maxshift, &inputsize, &outputsize, 
                                       devices -> minTotalGlobalMem);
 
-    // Check if nsamp is greater than maxshift
-    if (greatest_maxshift > survey -> nsamp)
-    {
-//        fprintf(stderr, "Number of samples (%d) must be greater than maxshift (%d)\n", 
-//                survey -> nsamp, greatest_maxshift);
-//        exit(-1);
-	printf("NOTE: Number of samples (%d) is less than maxshift (%d). This reduces performance.\n", survey -> nsamp, greatest_maxshift);
-    }
-
     // When beamforming, antenna data will be copied to the output buffer, so it's size
     // should be large enough to accommodate both
     if (survey -> apply_beamforming)
@@ -419,22 +418,12 @@ void initialiseMDSM(SURVEY* input_survey)
     // Allocate input buffer (MDSM_STAGES separate buffer to allow dumping to disk
     // during any iteration)
     input_buffer = (float **) safeMalloc(MDSM_STAGES * sizeof(float *));
-//    for(i = 0; i < MDSM_STAGES; i++)
-//    {
-//        float *pointer;
-//        allocateInputBuffer(&pointer, survey -> nbeams * survey -> nsamp * survey -> nchans * sizeof(float));
-//        input_buffer[i] = pointer;
-//    }
-
-
     for(i = 0; i < MDSM_STAGES; i++)
         input_buffer[i] = (float *) safeMalloc(survey -> nbeams * survey -> nsamp * 
                                                survey -> nchans * sizeof(float));
 
     // Allocate output buffer (one for each beam)
     output_buffer = (float **) safeMalloc(survey -> nbeams * sizeof(float *));
-//    for (i=0; i < survey -> nbeams; i++)
-//        output_buffer[i] = (float *) safeMalloc(survey -> nsamp * survey -> tdms * sizeof(float));
 
     // Allocate antenna buffer if beamforming
     antenna_buffer = NULL;

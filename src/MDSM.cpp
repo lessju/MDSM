@@ -84,12 +84,7 @@ unsigned long readBinaryData(SURVEY *survey, float *buffer, FILE *fp, int nbits,
 
         for(int b = 0; b < nbeams; b++)
             for(int j = 0; j < nchans; j++)
-            {
-                float value = temp_buffer[b * nchans + j];
-                buffer[b * nchans * nsamp + j * nsamp + i] = value;
-                sum += temp_buffer[b * nchans + j];
-                tmpstd += pow(value, 2);
-            }
+                buffer[b * nchans * nsamp + j * nsamp + i] = temp_buffer[b * nchans + j];
 
         tot_nsamp++;
     }
@@ -104,17 +99,6 @@ unsigned long readBinaryData(SURVEY *survey, float *buffer, FILE *fp, int nbits,
         return 0;
 
     survey -> last_nsamp = tot_nsamp;
-
-//    float mean = sum / (float) (tot_nsamp * nbeams * nchans);
-//    float std  = sqrt(tmpstd / (float) (tot_nsamp * nbeams * nchans) - mean * mean);
-
-//    std::default_random_engine generator;
-//    std::normal_distribution<double> distribution(mean, std);
-
-//    for(unsigned i = 0; i < nbeams; i++)
-//        for(unsigned j = 0; j < nchans; j++)
-//            for(unsigned k = tot_nsamp; k < nsamp; k++)
-//                buffer[i * nchans * nsamp + j * nsamp + k] = distribution(generator);
 
     return nsamp;
 }
