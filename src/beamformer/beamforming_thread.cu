@@ -114,13 +114,15 @@ DEVICES* initialise_devices(SURVEY* survey)
     return devices;
 }
 
-// Allocate memory-pinned input buffer
-void allocateInputBuffer(float **pointer, size_t size)
-{  CudaSafeCall(cudaHostAlloc((void **) pointer, size, cudaHostAllocPortable));  }
+// Allocate memory-pinned buffer
+void allocateBuffer(void **pointer, size_t size)
+{  
 
-// Allocate memory-pinned output buffer
-void allocateOutputBuffer(float **pointer, size_t size)
-{ CudaSafeCall(cudaHostAlloc((void **) pointer, size, cudaHostAllocPortable)); }
+    CudaSafeCall(cudaSetDevice(0));
+    CudaSafeCall(cudaHostAlloc(pointer, size, cudaHostAllocPortable)); 
+
+}
+
 
 // =================================== CUDA KERNEL HELPERS ====================================
 
@@ -193,7 +195,7 @@ void perform_downsampling(float *input, float *output, THREAD_PARAMS* params, cu
     {
         dim3 gridDim((nsamp / survey -> downsample), survey -> nchans, survey -> nbeams);  
         downsample_atomics <<< gridDim, survey -> downsample, survey -> downsample * sizeof(float) / 32 >>> 
-                              (input, output, nsamp, survey -> nchans, survey -> nbeams, survey -> downsample);
+                          (input, output, nsamp, survey -> nchans, survey -> nbeams, survey -> downsample);
     }
     
     // All processing ready, wait for kernel execution
@@ -222,11 +224,11 @@ void channelise(cufftComplex *input, float* fir, cufftComplex *lagged_buffer,
     if (survey -> apply_pfb)
     {
         cudaEventRecord(event_start, 0);
-        unsigned num_threads = PFB_THREADS;
+        unsigned num_threads = (nchans < 128) ? nchans : 128;
         dim3 grid(nsubs, nbeams);
 
-        ppf_fir<<<grid, num_threads, NTAPS * num_threads * sizeof(float)>>>
-                                (input, lagged_buffer, fir, nsamp / nchans, nsubs, nbeams, nchans);                                                              
+    	ppf_fir<<<grid, num_threads, NTAPS * num_threads * sizeof(float)>>>
+                            (input, lagged_buffer, fir, nsamp / nchans, nsubs, nbeams, nchans);
 
         cudaThreadSynchronize();
         cudaEventRecord(event_stop, 0);
@@ -240,9 +242,9 @@ void channelise(cufftComplex *input, float* fir, cufftComplex *lagged_buffer,
     // Apply forward C2C FFTs
     cudaEventRecord(event_start, 0);
     for (unsigned i = 0; i < survey -> nbeams; i++)
-        CufftSafeCall(cufftExecC2C(*plan, input + i * survey -> nchans * nsamp, 
-                                     input + i * survey -> nchans * nsamp, 
-                                     CUFFT_FORWARD));
+        CufftSafeCall(cufftExecC2C(*plan, input + i * nsubs * nsamp, 
+                                    input + i * nsubs * nsamp, 
+                                    CUFFT_FORWARD));
     cudaThreadSynchronize();
 
     cudaEventRecord(event_stop, 0);
@@ -266,9 +268,10 @@ void fix_channelisation_order(float2 *input, float* output, THREAD_PARAMS* param
 
 	dim3 gridDim(nsamp / survey -> subchannels, 
                  survey -> stop_channel - survey -> start_channel, 
-                 survey -> nbeams);  
+                 survey -> nbeams);
     fix_channelisation<<< gridDim, survey -> subchannels >>> 
-                      (input, output, nsamp, survey -> nchans, BEAMS, survey -> subchannels, survey -> start_channel);
+                      (input, output, nsamp, survey -> nchans, BEAMS, 
+                       survey -> subchannels, survey -> start_channel);
 
     // All processing ready, wait for kernel execution
     cudaEventRecord(event_stop, 0);
@@ -284,7 +287,8 @@ void* run_beamformer(void* thread_params)
 {
     THREAD_PARAMS* params = (THREAD_PARAMS *) thread_params;
     SURVEY *survey = params -> survey;
-    int i, nsamp = params -> survey -> nsamp, nchans = params -> survey -> nchans, nants = survey -> nantennas;
+    int nsamp = params -> survey -> nsamp, nchans = params -> survey -> nchans; 
+    int i, nants = survey -> nantennas;
     int loop_counter = 0, iters = 0, tid = params -> thread_num;
     time_t start = params -> start;
 
@@ -296,7 +300,8 @@ void* run_beamformer(void* thread_params)
     // Check if number of beams conforms to object macro declarations
     if (nbeams != BEAMS || BEAMS < BEAMS_PER_TB)
     {
-        fprintf(stderr, "Incorrect beamformer configuration (BPT: %d, BEAMS: %d, beams: %d)\n", BEAMS_PER_TB, BEAMS, nbeams);
+        fprintf(stderr, "Incorrect beamformer configuration (BPT: %d, BEAMS: %d, beams: %d)\n", 
+                        BEAMS_PER_TB, BEAMS, nbeams);
         exit(1);
     }
 
@@ -322,7 +327,8 @@ void* run_beamformer(void* thread_params)
 
     // Allocate shift buffers (only GPU's primary thread can use this memory buffer)
     float2 *beamshifts, *d_beamshifts;
-    CudaSafeCall(cudaMallocHost((void **) &beamshifts, nants * nchans * nbeams * sizeof(float2), cudaHostAllocPortable));
+    CudaSafeCall(cudaMallocHost((void **) &beamshifts, nants * nchans * nbeams * sizeof(float2), 
+                                cudaHostAllocPortable));
     CudaSafeCall(cudaMalloc((void **) &d_beamshifts, nants * nchans * nbeams * sizeof(float2)));
     CudaSafeCall(cudaMemset(d_beamshifts, 0, nants * nchans * nbeams * sizeof(float2))); 
 
@@ -337,47 +343,54 @@ void* run_beamformer(void* thread_params)
     cufftHandle fft_plan;
     if (survey -> perform_channelisation)
     {
-
-        printf("%d. Initialising PFB. Extra memory required: %.2f MB\n", (int) (time(NULL) - start), 
-                nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex) / (1024.0 * 1024.0));
-
         // Initialise cuFFT plan
         CufftSafeCall(cufftPlan1d(&fft_plan, survey -> subchannels, CUFFT_C2C, 
                                   survey -> nchans * nsamp / survey -> subchannels));
 
-        // Allocate memory for channel buffers and FIR weights
-        CudaSafeCall(cudaMalloc((void **) &d_fir, nchans * NTAPS * sizeof(float)));
-        CudaSafeCall(cudaMalloc((void **) &d_lagged_buffer,  nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex)));
+	if (survey -> apply_pfb)
+	{
+	        printf("%d. Initialising PFB. Extra memory required: %.2f MB\n", 
+                   (int) (time(NULL) - start), 
+                   nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex) / 
+                   (1024.0 * 1024.0));
 
-        // Initialiase buffer to 1
-        CudaSafeCall(cudaMemset(d_lagged_buffer, 1,  nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex)));
+            // Allocate memory for channel buffers and FIR weights
+            CudaSafeCall(cudaMalloc((void **) &d_fir, nchans * NTAPS * sizeof(float)));
+            CudaSafeCall(cudaMalloc((void **) &d_lagged_buffer,  
+                        nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex)));
+
+            // Initialiase buffer to 1
+            CudaSafeCall(cudaMemset(d_lagged_buffer, 0,  
+                         nbeams * nchans * survey -> subchannels * NTAPS * sizeof(cuComplex)));
         
-        // Read fir coefficient file
-        float *weights = (float *) malloc(NTAPS * survey -> subchannels * sizeof(float));
-        char filename[500], temp[10];
-        strcpy(filename, survey -> fir_path);
-        strcat(filename, "/coeff_");
-        sprintf(temp, "%d", survey -> ntaps);
-        strcat(filename, temp);
-        strcat(filename, "_");
-        sprintf(temp, "%d", survey -> subchannels);
-        strcat(filename, temp);
-        strcat(filename, ".dat");
+            // Read fir coefficient file
+            float *weights = (float *) malloc(NTAPS * survey -> subchannels * sizeof(float));
+            char filename[500], temp[10];
+            strcpy(filename, survey -> fir_path);
+            strcat(filename, "/coeff_");
+            sprintf(temp, "%d", survey -> ntaps);
+            strcat(filename, temp);
+            strcat(filename, "_");
+            sprintf(temp, "%d", survey -> subchannels);
+            strcat(filename, temp);
+            strcat(filename, ".dat");
 
-        printf("%d. Loading PFB coefficients file [%s]\n", (int) (time(NULL) - start), filename);
-        FILE *fp = fopen(filename, "rb");
-        if (fread(weights, sizeof(float), NTAPS * nchans, fp) <= 0)
-        {
-            fprintf(stderr, "Error reading PFB coefficients file. Exiting.\n");
-            exit(1);
-        }
+            printf("%d. Loading PFB coefficients file [%s]\n", (int) (time(NULL) - start), filename);
+            FILE *fp = fopen(filename, "rb");
+            if (fread(weights, sizeof(float), NTAPS * nchans, fp) <= 0)
+            {
+                fprintf(stderr, "Error reading PFB coefficients file. Exiting.\n");
+                exit(1);
+            }
         
-        // Copy weights to GPU memory
-        CudaSafeCall(cudaMemcpy(d_fir, weights, survey -> subchannels * NTAPS * sizeof(float), cudaMemcpyHostToDevice));
+            // Copy weights to GPU memory
+            CudaSafeCall(cudaMemcpy(d_fir, weights, survey -> subchannels * NTAPS * sizeof(float),
+                         cudaMemcpyHostToDevice));
 
-        // Free up stuff 
-        free(weights);
-        fclose(fp);
+            // Free up stuff 
+            free(weights);
+            fclose(fp);
+	}
     }
 
  	// Initialise beamformer lookup table
@@ -402,11 +415,11 @@ void* run_beamformer(void* thread_params)
         if (loop_counter > params -> iterations)
         {
             // Copy input data to GPU memory
-            CudaSafeCall(cudaMemcpyAsync(d_input, params -> input, nsamp * nchans 
-                                        * nants * sizeof(unsigned char), cudaMemcpyHostToDevice));
+            CudaSafeCall(cudaMemcpy(d_input, params -> input, nsamp * nchans 
+                                    * nants * sizeof(unsigned char), cudaMemcpyHostToDevice));
 
             // Update beamformer shifts
-            CudaSafeCall(cudaMemcpyAsync(d_beamshifts, 
+            CudaSafeCall(cudaMemcpy(d_beamshifts, 
                                          survey -> beam_shifts, 
                                          survey -> nantennas * survey -> nchans * nbeams * sizeof(float2), 
                                          cudaMemcpyHostToDevice));
@@ -429,10 +442,12 @@ void* run_beamformer(void* thread_params)
         if (loop_counter > params -> iterations)
         {
             // Rearrange data to match beamformer processing requirements
-            perform_rearrangement(d_input, (unsigned char *) d_output, params, event_start, event_stop, nsamp);
+            perform_rearrangement(d_input, (unsigned char *) d_output, 
+                                  params, event_start, event_stop, nsamp);
 
             // Copy rearranged data back to input buffer for conformity with future processing
-            CudaSafeCall(cudaMemcpy(d_input, d_output, nchans * nsamp * ANTS * sizeof(unsigned char), cudaMemcpyDeviceToDevice));
+            CudaSafeCall(cudaMemcpy(d_input, d_output, nchans * nsamp * ANTS * sizeof(unsigned char), 
+                                    cudaMemcpyDeviceToDevice));
 
             // Processing flow if channelisation is required
             if (survey -> perform_channelisation)
@@ -445,7 +460,8 @@ void* run_beamformer(void* thread_params)
                            params, event_start, event_stop, &fft_plan, nsamp);
 
                 // Select required channel, fix channel ordering and transpose data
-                fix_channelisation_order((float2 *) d_output, (float *) d_input, params, event_start, event_stop, nsamp);
+                fix_channelisation_order((float2 *) d_output, (float *) d_input, 
+                                          params, event_start, event_stop, nsamp);
             }
             else
             {
@@ -470,16 +486,15 @@ void* run_beamformer(void* thread_params)
 
             if (survey -> perform_channelisation)
             {
-                unsigned nchans = survey -> subchannels * (survey -> stop_channel - survey -> start_channel) / 2;
-
-                CudaSafeCall(cudaMemcpy( params -> output[params -> thread_num], d_input, 
-                						 BEAMS * nchans * sizeof(float) * survey -> nsamp / survey -> subchannels,
-                                         cudaMemcpyDefault));
+                unsigned nchans = survey -> subchannels * (survey -> stop_channel - survey -> start_channel);
+                CudaSafeCall(cudaMemcpy(params -> output[params -> thread_num], d_input, 
+          				BEAMS * nchans * sizeof(float) * survey -> nsamp / survey -> subchannels,
+                                        cudaMemcpyDefault));
             }
             else
-                CudaSafeCall(cudaMemcpy( params -> output[params -> thread_num], d_input, 
-                						 BEAMS * survey -> nchans * sizeof(float) * survey -> nsamp / survey -> downsample,
-                                         cudaMemcpyDefault));
+                CudaSafeCall(cudaMemcpy(params -> output[params -> thread_num], d_input, 
+                			BEAMS * survey -> nchans * sizeof(float) * survey -> nsamp / survey -> downsample,
+                                        cudaMemcpyDefault));
 
 
             cudaEventRecord(event_stop, 0);

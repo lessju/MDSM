@@ -6,11 +6,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include "params.h"
 
 // C++ stuff
 #include <QFile>
 #include <cstdlib>
 #include <iostream>
+
+#include "cpgplot.h"
 
 
 // ========================== FILE HERLPER ===================================
@@ -29,7 +32,6 @@ FILE* create_files(FILE* fp, SURVEY* survey, double timestamp)
         strcat(pathName, "/");
         strcat(pathName, survey -> fileprefix);
         strcat(pathName, "_test.dat");
-
     }
     else
     {
@@ -64,7 +66,6 @@ FILE* create_files(FILE* fp, SURVEY* survey, double timestamp)
 
     // Write file header
 //    fprintf(fp, "nchans=%d,nbeams=%d,tsamp=%.6f\n", survey -> nchans, survey -> nbeams, survey -> tsamp * survey -> downsample);
-
     return fp;
 
 }
@@ -82,6 +83,18 @@ void* process_output(void* output_params)
 
     int ret;
     FILE *fp = NULL;
+
+    // If plotting, start device
+    #if PLOT
+        if(cpgbeg(0, "/xwin", 1, 1) != 1)
+        {
+            printf("Could not initialise plotting\n");
+            exit(-1);
+        }
+        cpgask(false);
+        cpgsvp(0.0,1.0,0.0,1.0);
+        cpgswin(0.0,1.0,0.0,1.0);
+    #endif
 
     printf("%d: Started output thread\n", (int) (time(NULL) - start));
 
@@ -104,11 +117,55 @@ void* process_output(void* output_params)
             // First iteration, create file
             if (loop_counter == params -> iterations)
                 fp = create_files(fp, survey, pptimestamp);
-        
+
             if (survey -> perform_channelisation)
             {
-                unsigned curr_nchans = survey -> subchannels * (survey -> stop_channel - survey -> start_channel) / 2;
+                unsigned curr_nchans = survey -> subchannels * 
+                                       (survey -> stop_channel - survey -> start_channel);
                 unsigned curr_nsamp = ppnsamp / survey -> subchannels;
+
+                // Plot selected beam if required
+                #if PLOT
+
+                    // Allocate array to store each plot
+                    float *array = (float *) malloc(curr_nchans * curr_nsamp * sizeof(float)); 
+
+                    // Define transformation matrix
+                    float tr[6];
+                    tr[0]=1; tr[1] = 1; tr[2] = 0.0;
+                    tr[3]=1; tr[4] = 0.0; tr[5] = 1;          
+
+                    // Set window and adjust viewport to same aspect ratio
+                    cpgwnad(0, curr_nchans, 0, curr_nsamp);
+
+                    // Populate array for current beams
+                    float min = 9999999, max = 0;
+                    for(unsigned j = 0; j < curr_nchans; j++)
+                        for(unsigned k = 0; k < curr_nsamp; k++)
+                        {
+                            float value = ((params -> output_buffer)[0])
+                                    [survey->nbeams * (j * curr_nsamp + k) + survey -> plot_beam];
+
+                            array[j * curr_nsamp + k] = value;
+                            min = (value < min) ? value : min;
+                            max = (value > max) ? value : max;
+                        }
+
+                    // Color image from a 2D data array
+                    cpgimag(array, curr_nchans, curr_nsamp, 1, curr_nchans, 1, 
+                            curr_nsamp, min, max, tr);   
+
+                    cpgbox("BCTN", 0.0, 0, "BCNST", 0.0, 0);
+
+                    // Write labels for x and y axies and top of plot
+                    cpglab("Channel","Time","Beam");  
+
+                    // Free array
+                    free(array);                    
+                
+                #endif
+
+
                 
                 for(unsigned i = 0; i < curr_nsamp; i++)
                     fwrite((params -> output_buffer)[0] + i * curr_nchans * survey -> nbeams, 
@@ -119,12 +176,58 @@ void* process_output(void* output_params)
                 // Calculate sampling time, nsamp
                 unsigned curr_nsamp = ppnsamp / survey -> downsample;
 
-                // Write beam output to file in sample/channel/beam order (output buffer should be in this format)
+                // Write beam output to file in sample/channel/beam order 
+                // (output buffer should be in this format)
+
+                // Plot selected beam if required
+                #if PLOT
+
+                    // Allocate array to store each plot
+                    float *array = (float *) malloc(survey -> nchans * curr_nsamp * 
+                                                    sizeof(float)); 
+
+                    // Define transformation matrix
+                    float tr[6];
+                    tr[0]=1; tr[1] = 1; tr[2] = 0.0;
+                    tr[3]=1; tr[4] = 0.0; tr[5] = 1;          
+
+                    // Set window and adjust viewport to same aspect ratio
+                    cpgwnad(0, survey -> nchans, 0, curr_nsamp);
+
+                    // Populate array for current beams
+                    float min = 9999999, max = 0;
+                    for(unsigned j = 0; j < survey -> nchans; j++)
+                        for(unsigned k = 0; k < curr_nsamp; k++)
+                        {
+                            float value = ((params -> output_buffer)[0])
+                                    [survey->nbeams * (j * curr_nsamp + k) + survey -> plot_beam];
+
+                            array[j * curr_nsamp + k] = value;
+                            min = (value < min) ? value : min;
+                            max = (value > max) ? value : max;
+                        }
+
+                    // Color image from a 2D data array
+                    cpgimag(array, survey -> nchans, curr_nsamp, 1, 
+                            survey -> nchans, 1, curr_nsamp, 
+                            min, max, tr);   
+
+                    cpgbox("BCTN", 0.0, 0, "BCNST", 0.0, 0);
+
+                    // Write labels for x and y axies and top of plot
+                    cpglab("Channel","Time","Beam");  
+
+                    // Free array
+                    free(array);                    
+                
+                #endif
+
                 // Output is split into nthreads buffers, with beams split quasi-evenly among them
                 // NOTE: we assume one GPU for now
                 for(unsigned i = 0; i < curr_nsamp; i++)
                     fwrite((params -> output_buffer)[0] + i * survey -> nchans * survey -> nbeams, 
                              sizeof(float), survey -> nchans * survey -> nbeams, fp);
+
             }
 
             fflush(fp);
@@ -136,7 +239,6 @@ void* process_output(void* output_params)
             mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
 
             printf("%d: Processed Output %d: %ld ms\n", (int) (time(NULL) - start), loop_counter, mtime);
-//            exit(0);
         }
 
         // Wait output barrier

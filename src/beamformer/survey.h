@@ -23,7 +23,7 @@ typedef struct {
 
     // Output parameters
     char      fileprefix[80], basedir[120];
-    unsigned  secs_per_file;
+    unsigned  secs_per_file, plot_beam;
     char      use_pc_time, single_file_mode;
     bool      test;
 

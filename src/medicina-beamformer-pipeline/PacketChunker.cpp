@@ -107,7 +107,8 @@ void PacketChunker::connectDevice()
     }
 
     // Map kernel buffer to user space using mmap
-    _map = (char *) mmap(NULL, req.tp_block_nr * req.tp_block_size, PROT_READ | PROT_WRITE, MAP_SHARED, _socket, 0);
+    _map = (char *) mmap(NULL, req.tp_block_nr * req.tp_block_size, 
+                         PROT_READ | PROT_WRITE, MAP_SHARED, _socket, 0);
     if (_map == MAP_FAILED)
     {
         perror("mmap()");
@@ -141,7 +142,7 @@ void PacketChunker::run()
     unsigned _numPackets = 0;
 
     // Main processing loop
-    for(unsigned i = 0;;)
+    for (unsigned i = 0;; )
     {
         // Fetch next frame and check whether it is available for processing
         volatile struct tpacket_hdr *header = (struct tpacket_hdr *) _ring[i].iov_base;
@@ -177,7 +178,7 @@ void PacketChunker::run()
         // Get UDP packet contents
         unsigned char *data = (unsigned char *) (((char *) udp_header) + sizeof(udphdr));
 
-        long unsigned int data_header =  be64toh(((uint64_t *) data)[0]);
+        long unsigned data_header =  be64toh(((uint64_t *) data)[0]);
         unsigned long  time    = data_header >> 26;
         unsigned short channel = (data_header >> 16) & 0x03FF;
         
@@ -188,8 +189,8 @@ void PacketChunker::run()
             channel = 512 + (channel - 1) / 2;
 
         float value = 0;
-        for(unsigned i = 0; i < PACKET_DATA_LEN; i++)
-            value += data[PACKET_HEADER_LEN + i];
+        for(unsigned j = 0; j < PACKET_DATA_LEN; j++)
+            value += data[PACKET_HEADER_LEN + j];
 
         // Check if we are processing a new heap
         if (_currTime == 0)
@@ -207,10 +208,11 @@ void PacketChunker::run()
             else
             {
                 // We are processing a packet from a new heap
-                fprintf(stderr, "We have lost some packets: %d of %d for %ld\n", _numPackets, _npackets, _currTime);
+                fprintf(stderr, "We have lost some packets: %d of %d for %ld\n", 
+                                 _numPackets, _npackets, _currTime);
 
                 // Mark previous heap as finished
-                _heap =  _buffer -> writeHeap(1351174098.5 + (1024 * _currTime) / (40e6/2.0/128.0),
+                _heap =  _buffer -> writeHeap(1397631261.500001 + (1024 * _currTime) / (40e6/2.0/128.0),
                                               1 / 19531.25);
 
                 // Copy to new heap
@@ -240,7 +242,7 @@ void PacketChunker::run()
             if (_numPackets == _npackets)
             {
                 // Mark heap as finished
-                _heap =  _buffer -> writeHeap(1384974700.000001 + (1024 * _currTime) / (40e6/2.0/128.0),
+                _heap =  _buffer -> writeHeap(1397631261.500001 + (1024 * _currTime) / (40e6/2.0/128.0),
                                               1 / 19531.25);
                 _currTime = 0;
                 _numPackets = 0;

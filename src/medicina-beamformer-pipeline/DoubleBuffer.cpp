@@ -25,6 +25,10 @@ DoubleBuffer::DoubleBuffer(unsigned nantennas, unsigned nchans, unsigned nsamp)
     
     printf("============== Buffers Initialised - read: %d, write: %d ==============\n", _readerBuffer, _writerBuffer);
 
+    // Initialise synchronisation objects
+    pthread_mutex_init(&_readMutex, NULL);
+    pthread_mutex_init(&_writeMutex, NULL);
+
     // Set thread affinity
     pthread_t thread = pthread_self();
     cpu_set_t cpuset;
@@ -72,9 +76,11 @@ unsigned char *DoubleBuffer::prepareRead(double *timestamp, double *blockrate)
 void DoubleBuffer::readReady()
 {
     // Mutex buffer control, mark buffer as empty
-    _readMutex.lock();
+    //_readMutex.lock();
+    pthread_mutex_lock(&_readMutex);
     _fullBuffers--;
-    _readMutex.unlock();
+    pthread_mutex_unlock(&_readMutex);
+    //_readMutex.unlock();
     printf("========================== Full Buffers: %d ==========================\n", _fullBuffers);
 }
 
@@ -91,14 +97,18 @@ unsigned char *DoubleBuffer::writeHeap(double timestamp, double blockrate)
     if (_have_timing == false)
     { _timestamp = timestamp; _blockrate = blockrate; _have_timing = true; }
 
-    _writeMutex.lock();
+//    _writeMutex.lock();
+    pthread_mutex_lock(&_writeMutex);
     while (_readerHeap == _writerHeap)
     {
-        _writeMutex.unlock();
+//        _writeMutex.unlock();
+        pthread_mutex_unlock(&_writeMutex);
         sleep(BUSY_WAIT);
-        _writeMutex.lock();
+        pthread_mutex_lock(&_writeMutex);
+//        _writeMutex.lock();
     }
-    _writeMutex.unlock();
+    pthread_mutex_unlock(&_writeMutex);
+//    _writeMutex.unlock();
 
     // Return new heap buffer
     return _heapBuffers[_readerHeap];
@@ -131,24 +141,14 @@ void DoubleBuffer::run()
         // 8-bits per value (4-bit real, 4-bit imaginary)
 
         for(unsigned c = 0; c < _heapChans; c++)
-        {
-//            unsigned char * buffer_ptr = _heapBuffers[_writerHeap] + c * _nantennas * _heapNsamp;
-
-            // Loop over groups of antennas to populate local heap buffer
- //           for(unsigned a = 0; a < _nantennas / 2; a++)
- //               for(unsigned s = 0; s < _heapNsamp; s++)
- //               {
- //                   local_heap[s * _nantennas + a * 2 + 1] = buffer_ptr[a * _heapNsamp * 2 + s * 2 + 1];
- //                   local_heap[s * _nantennas + a * 2]     = buffer_ptr[a * _heapNsamp * 2 + s * 2];
-  //              }
-    
+        {    
             // Write re-organised channel to double buffer
- //           memcpy(&_buffer[_writerBuffer][c * _nsamp * _nantennas + _samplesBuffered * _nantennas],
-//                   local_heap, _nantennas * _heapNsamp * sizeof(unsigned char));
+            memcpy(&_buffer[_writerBuffer][c * _nsamp * _nantennas + _samplesBuffered * _nantennas],
+                   local_heap, _nantennas * _heapNsamp * sizeof(unsigned char));
 
             memcpy(_buffer[_writerBuffer] + c * _nsamp * _nantennas + _samplesBuffered * _nantennas,
                    _heapBuffers[_writerHeap] + c * _nantennas * _heapNsamp, _nantennas * _heapNsamp * sizeof(unsigned char));
-        }
+       }
 
         // Increment sample count
         _samplesBuffered += _heapNsamp;
@@ -157,34 +157,38 @@ void DoubleBuffer::run()
         if (_samplesBuffered == _nsamp)
         {
             // TEMP: Heap is ready... dump to disk
-        //    if (counter > 1)
-        //    {
-        //        FILE *fp = fopen("heap_dump.dat", "wb");
-        //        fwrite(_buffer[_writerBuffer], sizeof(unsigned char), _nsamp * _nantennas * _heapChans, fp);
-        //        fclose(fp);
-        //        printf("Written buffer to disk\n");
-        //        sleep(60);
-        //        exit(0);
-        //    }
+//            if (counter > 1)
+//            {
+//                FILE *fp = fopen("heap_dump.dat", "wb");
+//                fwrite(_buffer[_writerBuffer], sizeof(unsigned char), _nsamp * _nantennas * _heapChans, fp);
+//                fclose(fp);
+//                printf("Written buffer to disk\n");
+//                sleep(60);Mutex
+//                exit(0);
+//            }
 
             // Check if reading buffer has been read
             while(_fullBuffers == 1)
                 sleep(BUSY_WAIT);
         
             // Lock critical section with mutex, and swap buffers
-            _readMutex.lock();
+//            _readMutex.lock();
+            pthread_mutex_lock(&_readMutex);
             _samplesBuffered = 0; _fullBuffers++;
             SWAP(_writerBuffer, _readerBuffer)
+            pthread_mutex_unlock(&_readMutex);
+//            _readMutex.unlock();
             printf("========================== Full Buffers: %d ==========================\n", _fullBuffers);
-            _readMutex.unlock();
             counter++;
         }
 
         // Finished writing heap
-        _writeMutex.lock();
+//        _writeMutex.lock();
+        pthread_mutex_lock(&_writeMutex);
         if (_samplesBuffered == 0)
             _have_timing = 0;
         _writerHeap = (_writerHeap + 1) % HEAP_BUFFERS;
-        _writeMutex.unlock();
+        pthread_mutex_unlock(&_writeMutex);
+//        _writeMutex.unlock();
     }
 }

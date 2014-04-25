@@ -6,6 +6,7 @@
 
 #include <QMutex>
 #include <QThread>
+#include <pthread.h>
 
 class DoubleBuffer: public QThread 
 {
@@ -56,8 +57,9 @@ class DoubleBuffer: public QThread
         // Variables dictating whether we are copying voltages and whether we have timing
         double    _timestamp,_blockrate;
         bool      _have_timing;
-        
-        QMutex    _readMutex, _writeMutex; 
+
+        pthread_mutex_t _readMutex, _writeMutex; 
+        // QMutex    _readMutex, _writeMutex; 
 };
 
 #endif // DoubleBuffer_H

@@ -58,7 +58,6 @@ typedef struct THREAD_PARAMS
 
 } THREAD_PARAMS;
 
-void allocateInputBuffer(float **pointer, size_t size);
-void allocateOutputBuffer(float **pointer, size_t size);
+void allocateBuffer(void **pointer, size_t size);
 
 #endif

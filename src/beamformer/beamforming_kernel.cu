@@ -53,10 +53,14 @@ beamformer(char4 *input, float *output, float2 *shifts, unsigned nsamp, unsigned
                                          antenna * 4 * BEAMS + blockIdx.z * BEAMS_PER_TB +
                                          i];
 
-            float4 ant_real = {  lookup_table[(antenna_val.w >> 4) & 0xF],  lookup_table[(antenna_val.x >> 4) & 0xF],
-                                 lookup_table[(antenna_val.y >> 4) & 0xF],  lookup_table[(antenna_val.z >> 4) & 0xF] };
-            float4 ant_imag = {  lookup_table[antenna_val.w & 0x0F],        lookup_table[antenna_val.x & 0x0F],
-                                 lookup_table[antenna_val.y & 0x0F],        lookup_table[antenna_val.z & 0x0F] };
+            float4 ant_real = {  lookup_table[(antenna_val.w >> 4) & 0xF],  
+                                 lookup_table[(antenna_val.x >> 4) & 0xF],
+                                 lookup_table[(antenna_val.y >> 4) & 0xF],  
+                                 lookup_table[(antenna_val.z >> 4) & 0xF] };
+            float4 ant_imag = {  lookup_table[antenna_val.w & 0x0F],        
+                                 lookup_table[antenna_val.x & 0x0F],
+                                 lookup_table[antenna_val.y & 0x0F],        
+                                 lookup_table[antenna_val.z & 0x0F] };
 
             // Synchronise threads
             __syncthreads();
@@ -141,10 +145,14 @@ beamformer_complex(char4 *input, float2 *output, float2 *shifts, unsigned nsamp,
                                          antenna * 4 * BEAMS + blockIdx.z * BEAMS_PER_TB +
                                          i];
 
-            float4 ant_real = {  lookup_table[(antenna_val.w >> 4) & 0xF],  lookup_table[(antenna_val.x >> 4) & 0xF],
-                                 lookup_table[(antenna_val.y >> 4) & 0xF],  lookup_table[(antenna_val.z >> 4) & 0xF] };
-            float4 ant_imag = {  lookup_table[antenna_val.w & 0x0F],        lookup_table[antenna_val.x & 0x0F],
-                                 lookup_table[antenna_val.y & 0x0F],        lookup_table[antenna_val.z & 0x0F] };
+            float4 ant_real = {  lookup_table[(antenna_val.w >> 4) & 0xF],  
+                                 lookup_table[(antenna_val.x >> 4) & 0xF],
+                                 lookup_table[(antenna_val.y >> 4) & 0xF],  
+                                 lookup_table[(antenna_val.z >> 4) & 0xF] };
+            float4 ant_imag = {  lookup_table[antenna_val.w & 0x0F],        
+                                 lookup_table[antenna_val.x & 0x0F],
+                                 lookup_table[antenna_val.y & 0x0F],        
+                                 lookup_table[antenna_val.z & 0x0F] };
 
             // Synchronise threads
             __syncthreads();
@@ -177,7 +185,8 @@ beamformer_complex(char4 *input, float2 *output, float2 *shifts, unsigned nsamp,
         // Add phase and amplitude parts and save computed beams to global memory
         for(unsigned beam = 0; beam < BEAMS_PER_TB; beam++)
         {
-            unsigned index = (blockIdx.z * BEAMS_PER_TB + beam) * nsamp * nchans + blockIdx.y * nsamp + time;
+            unsigned index = (blockIdx.z * BEAMS_PER_TB + beam) * nsamp * nchans + 
+                              blockIdx.y * nsamp + time;
             output[index].x = beams_real[beam];
             output[index].y = beams_imag[beam];
         }
@@ -213,14 +222,16 @@ ppf_fir(float2 *input, float2 *buffer, const float *window, const unsigned nsamp
         float2 fifo[NTAPS] = { 0 };  
 
         // Initialise FIFO with first NTAPS values from lagged buffer
-        unsigned index = blockIdx.y * nsubs * nchans * NTAPS + blockIdx.x * nchans * NTAPS;
+        unsigned index = blockIdx.y * nsubs * nchans * NTAPS + 
+                         blockIdx.x * nchans * NTAPS;
         for(unsigned i = 0; i < NTAPS - 1; i++)
             fifo[i] = buffer[index + (i + 1) * nchans + c];
 
         // Replace values in lagged buffer from input buffer
-        unsigned buf_index = blockIdx.y * nsubs * nsamp * nchans + blockIdx.x * nsamp * nchans + (nsamp * nchans - nchans * NTAPS);
+        unsigned buf_index = blockIdx.y * nsubs * nchans * nsamp + 
+                             blockIdx.x * nchans * nsamp;
         for(unsigned i = 0; i < NTAPS; i++)
-            buffer[index + i * nchans + c] = input[buf_index + i * nchans + c];
+            buffer[index + i * nchans + c] = input[buf_index + (nsamp - NTAPS + i) * nchans+ c];
 
         // Load window coefficients to be used by each thread
         for(unsigned i = 0; i < NTAPS; i++)
@@ -255,7 +266,6 @@ ppf_fir(float2 *input, float2 *buffer, const float *window, const unsigned nsamp
             input[index + s * nchans + c] = output;
 
             // Re-arrange FIFO buffer
-			#pragma unroll NTAPS
 			for(unsigned i = 0; i < NTAPS - 1; i++)
 				fifo[i] = fifo[i + 1];
         } 
@@ -289,7 +299,8 @@ __global__ void downsample(float *input, float *output, unsigned nsamp, unsigned
 
 // Downfactor generated beam down to the required sampling time using atomics
 // NOTE: factor must be >= 64
-__global__ void downsample_atomics(float *input, float *output, unsigned nsamp, unsigned nchans, unsigned nbeams, unsigned factor)
+__global__ void downsample_atomics(float *input, float *output, unsigned nsamp, 
+                                   unsigned nchans, unsigned nbeams, unsigned factor)
 {
     // Each thread block processes one channel/beam vector
     extern __shared__ float vector[];
@@ -334,63 +345,64 @@ __global__ void downsample_atomics(float *input, float *output, unsigned nsamp, 
 
         // Synchronise threads
         __syncthreads();
-    
     }
 }
 
 // ======================= Rearrange Kernel =============================
 // Re-organise data after finer channelisation
 // No donwsampling performed 
-//__global__ void fix_channelisation(float2 *input, float *output, unsigned nsamp, unsigned nchans, unsigned nbeams, 
-//                                   unsigned subchans, unsigned start_chan)
-//{    
-//    // Time changes in the x direction
-//    // Channels change along the y direction. Indexing start at start_chan
-//    // Beams change along the z direction
-//    // Each thread processes one sample
-//    for(unsigned s = blockIdx.x;
-//                 s < nsamp / subchans;
-//                 s += gridDim.x)
-//    {
-//        // Get index to start of current channelised block
-//        // ThreadIdx.x is the nth channel formed in this block
-//        unsigned index = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + s * subchans + threadIdx.x;
-//        float2 value = input[index];
-
-//        // Store this in output buffer (transposed)
-//        index = s * nbeams * gridDim.y * subchans + (blockIdx.y * subchans + threadIdx.x) * nbeams + blockIdx.z;
-//        output[index] = __fsqrt_rz(value.x * value.x + value.y * value.y);
-//    }
-//}
-
-// Re-arrange data after channelisation:
-// - Remove half of the generated spectrum
-// - Perform an fftshift
-// - Use second half of the generated spectrum (N/2 -> N-1)
-__global__ void fix_channelisation(const float2 *input, float *output, const unsigned nsamp, 
-                                   const unsigned nchans, const unsigned nbeams, 
-                                   const unsigned subchans, const unsigned start_chan)
+__global__ void fix_channelisation(float2 *input, float *output, unsigned nsamp, unsigned nchans, unsigned nbeams, 
+                                   unsigned subchans, unsigned start_chan)
 {    
     // Time changes in the x direction
     // Channels change along the y direction. Indexing start at start_chan
     // Beams change along the z direction
     // Each thread processes one sample
-
-	// Get index to start of current channelised block
-    // ThreadIdx.x is the nth channel formed in this block (half the channel are processes, and are flipped)
-    unsigned int halfChans = subchans / 2;
-	unsigned long indexIn  = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + subchans - threadIdx.x;
-    unsigned long indexOut =  (blockIdx.y * halfChans + threadIdx.x) * nbeams + blockIdx.z;
-
-
     for(unsigned s = blockIdx.x;
                  s < nsamp / subchans;
                  s += gridDim.x)
     {
-        float2 value = input[indexIn + s * subchans];
-        output[s * nbeams * gridDim.y * halfChans + indexOut] = sqrtf(value.x * value.x + value.y * value.y);
+        // Get index to start of current channelised block
+        // ThreadIdx.x is the nth channel formed in this block
+        unsigned index = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + 
+                         s * subchans + threadIdx.x;
+        float2 value = input[index];
+
+        // Store this in output buffer (transposed)
+        index = s * nbeams * gridDim.y * subchans + 
+                    (blockIdx.y * subchans + threadIdx.x) * nbeams + blockIdx.z;
+        output[index] = __fsqrt_rz(value.x * value.x + value.y * value.y);
     }
-}
+} 
+
+// Re-arrange data after channelisation:
+// - Remove half of the generated spectrum
+// - Perform an fftshift
+// - Use second half of the generated spectrum (N/2 -> N-1)
+//__global__ void fix_channelisation(const float2 *input, float *output, const unsigned nsamp, 
+//                                   const unsigned nchans, const unsigned nbeams, 
+//                                   const unsigned subchans, const unsigned start_chan)
+//{    
+//    // Time changes in the x direction
+//    // Channels change along the y direction. Indexing start at start_chan
+//    // Beams change along the z direction
+//    // Each thread processes one sample
+
+//	// Get index to start of current channelised block
+//    // ThreadIdx.x is the nth channel formed in this block (half the channel are processes, and are flipped)
+//    unsigned int halfChans = subchans / 2;
+//    unsigned long indexIn  = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + subchans - threadIdx.x;
+//    unsigned long indexOut =  (blockIdx.y * halfChans + threadIdx.x) * nbeams + blockIdx.z;
+
+
+//    for(unsigned s = blockIdx.x;
+//                 s < nsamp / subchans;
+//                 s += gridDim.x)
+//    {
+//        float2 value = input[indexIn + s * subchans];
+//        output[s * nbeams * gridDim.y * halfChans + indexOut] = sqrtf(value.x * value.x + value.y * value.y);
+//    }
+//}
 
 // ======================= Rearrange Kernel =============================
 // Rearrange medicina antenna data to match beamformer required input 
@@ -408,11 +420,13 @@ __global__ void rearrange_medicina(unsigned char *input, unsigned char *output, 
         // Thread ID acts as pointer to required sample
         for(unsigned a = 0; a < ANTS * 0.5; a++)
         {
-            output[index + threadIdx.x * ANTS + a * 2 + 1] = input[index + a * HEAP * 2 + threadIdx.x * 2 + 1];
-            output[index + threadIdx.x * ANTS + a * 2    ] = input[index + a * HEAP * 2 + threadIdx.x * 2];
+            output[index + threadIdx.x * ANTS + a * 2 + 1] = 
+                        input[index + a * HEAP * 2 + threadIdx.x * 2 + 1];
+            output[index + threadIdx.x * ANTS + a * 2    ] = 
+                        input[index + a * HEAP * 2 + threadIdx.x * 2];
         }
     }
-}
+} 
 // --------------------------------------------------------------------------------------------------------------------
 
 #endif

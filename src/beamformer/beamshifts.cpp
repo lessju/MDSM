@@ -14,10 +14,17 @@
 #include "beamshifts.h"
 #include "survey.h"
 
-#define D2R(x)  (x * M_PI) / 180.0
-#define R2D(x)  (x * 180) / M_PI
-
 using namespace std;
+
+inline double D2R(double x)
+{
+    return x * M_PI / 180.0;
+}
+
+inline double R2D(double x)
+{
+    return x * 180.0 / M_PI;
+}
 
 // Array class function implementation
 Array *processArrayFile(QString filepath)
@@ -117,7 +124,6 @@ Array *processArrayFile(QString filepath)
                     array -> setReferenceLong(mult * lon_degrees);
                 }
 
-
                 // Otherwise, it should be an antenna
                 if (QString::compare(n.nodeName(), QString("ant"), Qt::CaseInsensitive) == 0)
                 {
@@ -206,19 +212,23 @@ void calculate_shifts(SURVEY *survey, Array *array)
 
         // Compute hour angle
         // If RA is 0, then generate scanning beam (set HA to beam specified value)
-        // Otherwise calculate required RA
-        if (fabs(ra - 0) > 0.01) ha = D2R(lst) - ra;
+        // Otherwise calculate required HA
+        if (fabs(ra - 0) > 0.01) 
+            ha = D2R(lst) - ra;
 
          // Compute azimuth and altitude
          double el, az;
          el = asin(sin(dec) * sin(lat) + cos(dec) * cos(lat) * cos(ha));
          az = acos((sin(dec) - sin(el) * sin(lat)) / (cos(el) * cos(lat))) ;
-         az = (az != az) ? 0 : ((sin(ha) < 0) ? M_PI + az : M_PI - az);
+         az = (az != az) ? 0 : ((sin(ha) > 0) ? az : 2 * M_PI - az);
 
         // Compute trigonometric factor and antenna position unit
         double trig_factor_y = cos(el) * cos(az);
         double trig_factor_x = cos(el) * sin(az);
         double unit_position = 299792458.0 / (array -> getCenterFrequency() * 1e9);
+
+//        printf("AZ %.4f, EL %.4f for DEC %.2f, RA %.2f (HA: %.2f)\n", 
+//                R2D(az), R2D(el), beam.dec, beam.ra, R2D(ha));
 
         // Compute antenna path differences
         double path_difference[array -> numberOfAntennas()];
@@ -233,16 +243,29 @@ void calculate_shifts(SURVEY *survey, Array *array)
         for(unsigned i = 0; i < survey -> nchans; i++)
         {
             // Compute center channel frequency
-            double frequency = (array -> getCenterFrequency()) * 1e9 + bandwidth / 2 - beam.foff * 1e6 * i - beam.foff / 2;
+            double frequency = (array -> getCenterFrequency()) * 1e9 + 
+                                bandwidth / 2 - beam.foff * 1e6 * i - beam.foff / 2;
             double wavelength = 299792458.0 / frequency;
 
             // Loop over each antenna
             for(unsigned j = 0; j < array -> numberOfAntennas(); j++)
             {
-                double phase = -2 * M_PI * path_difference[j] / wavelength; // negative since we want to compensate for the path difference
-                unsigned index = i * survey -> nbeams * array -> numberOfAntennas() + j * survey -> nbeams + b;
-                (survey -> beam_shifts)[index].x = cos(phase);
-                (survey -> beam_shifts)[index].y = sin(phase);
+                // Negative since we want to compensate for the path difference
+                double phase = -2 * M_PI * path_difference[j] / wavelength; 
+                unsigned index = i * survey -> nbeams * array -> numberOfAntennas() + 
+                                 j * survey -> nbeams + b;
+
+                // NOTE: Temporary, defective antennas
+                /*if (j >= 12 && j <= 15)
+                {
+                    (survey -> beam_shifts)[index].x = 0;
+                    (survey -> beam_shifts)[index].y = 0;
+                } 
+                else
+                {*/
+                    (survey -> beam_shifts)[index].x = cos(phase);
+                    (survey -> beam_shifts)[index].y = sin(phase);
+                /*}*/
             }
 
         }

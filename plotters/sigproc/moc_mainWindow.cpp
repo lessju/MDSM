@@ -1,8 +1,8 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'mainWindow.h'
 **
-** Created: Wed Nov 20 21:30:29 2013
-**      by: The Qt Meta Object Compiler version 62 (Qt 4.6.2)
+** Created: Tue Apr 8 12:29:42 2014
+**      by: The Qt Meta Object Compiler version 63 (Qt 4.8.1)
 **
 ** WARNING! All changes made in this file will be lost!
 *****************************************************************************/
@@ -10,8 +10,8 @@
 #include "mainWindow.h"
 #if !defined(Q_MOC_OUTPUT_REVISION)
 #error "The header file 'mainWindow.h' doesn't include <QObject>."
-#elif Q_MOC_OUTPUT_REVISION != 62
-#error "This file was generated using the moc from 4.6.2. It"
+#elif Q_MOC_OUTPUT_REVISION != 63
+#error "This file was generated using the moc from 4.8.1. It"
 #error "cannot be used with the include files from this version of Qt."
 #error "(The moc has changed too much.)"
 #endif
@@ -20,7 +20,7 @@ QT_BEGIN_MOC_NAMESPACE
 static const uint qt_meta_data_MainWindow[] = {
 
  // content:
-       4,       // revision
+       6,       // revision
        0,       // classname
        0,    0, // classinfo
       16,   14, // methods
@@ -62,9 +62,40 @@ static const char qt_meta_stringdata_MainWindow[] = {
     "exportPlot()\0"
 };
 
+void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
+{
+    if (_c == QMetaObject::InvokeMetaMethod) {
+        Q_ASSERT(staticMetaObject.cast(_o));
+        MainWindow *_t = static_cast<MainWindow *>(_o);
+        switch (_id) {
+        case 0: _t->openFile(); break;
+        case 1: _t->liveFiles(); break;
+        case 2: _t->saveBuffer(); break;
+        case 3: _t->quit(); break;
+        case 4: _t->plot((*reinterpret_cast< bool(*)>(_a[1]))); break;
+        case 5: _t->plot(); break;
+        case 6: _t->sliderMoved((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 7: _t->dmChanged((*reinterpret_cast< double(*)>(_a[1]))); break;
+        case 8: _t->beamNumberChanged((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 9: _t->plotChannel((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 10: _t->sampleSpin((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 11: _t->applyRFI(); break;
+        case 12: _t->applyFolding(); break;
+        case 13: _t->foldNumberChanged((*reinterpret_cast< int(*)>(_a[1]))); break;
+        case 14: _t->initialisePlotter(); break;
+        case 15: _t->exportPlot(); break;
+        default: ;
+        }
+    }
+}
+
+const QMetaObjectExtraData MainWindow::staticMetaObjectExtraData = {
+    0,  qt_static_metacall 
+};
+
 const QMetaObject MainWindow::staticMetaObject = {
     { &QMainWindow::staticMetaObject, qt_meta_stringdata_MainWindow,
-      qt_meta_data_MainWindow, 0 }
+      qt_meta_data_MainWindow, &staticMetaObjectExtraData }
 };
 
 #ifdef Q_NO_DATA_RELOCATION
@@ -90,25 +121,8 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        switch (_id) {
-        case 0: openFile(); break;
-        case 1: liveFiles(); break;
-        case 2: saveBuffer(); break;
-        case 3: quit(); break;
-        case 4: plot((*reinterpret_cast< bool(*)>(_a[1]))); break;
-        case 5: plot(); break;
-        case 6: sliderMoved((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 7: dmChanged((*reinterpret_cast< double(*)>(_a[1]))); break;
-        case 8: beamNumberChanged((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 9: plotChannel((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 10: sampleSpin((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 11: applyRFI(); break;
-        case 12: applyFolding(); break;
-        case 13: foldNumberChanged((*reinterpret_cast< int(*)>(_a[1]))); break;
-        case 14: initialisePlotter(); break;
-        case 15: exportPlot(); break;
-        default: ;
-        }
+        if (_id < 16)
+            qt_static_metacall(this, _c, _id, _a);
         _id -= 16;
     }
     return _id;

@@ -23,7 +23,7 @@ void process_arguments(int argc, char *argv[])
         i++;
         
     if (i != 2) {
-        printf("MDSM needs observation file!\n");
+        printf("Pipeline needs observation file!\n");
         exit(-1);
     }
     

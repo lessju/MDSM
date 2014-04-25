@@ -152,12 +152,12 @@ SURVEY* processSurveyParameters(QString filepath)
             {
                 // Accepts two naming conventions, switches between the two 
                 char *temp = e.attribute("filePrefix", "default").toUtf8().data();
-                if (strcmp(temp, "default"))
+                if (strcmp(temp, "default") == 0)
                     temp = e.attribute("outputFilePrefix", "output").toUtf8().data();
 			    strcpy(survey -> fileprefix, temp);
 
                 temp = e.attribute("baseDirectory", ".").toUtf8().data();
-                if (strcmp(temp, "default"))
+                if (strcmp(temp, "default") == 0)
                     temp = e.attribute("outputBaseDirectory", ".").toUtf8().data();
                 strcpy(survey -> basedir, temp);
 
@@ -179,7 +179,7 @@ SURVEY* processSurveyParameters(QString filepath)
                 else
                     survey -> single_file_mode = (unsigned) val;
 
-                // ??
+                survey -> plot_beam = e.attribute("plotBeam", "0").toUInt();
                 survey -> test = e.attribute("test", "0").toUInt();
             }
 
@@ -273,7 +273,8 @@ void initialise(SURVEY* input_survey)
 
     // Allocate input buffer (MDSM_STAGES separate buffer to allow dumping to disk
     // during any iteration)
-    input_buffer = (unsigned char *) safeMalloc(inputsize);
+//    input_buffer = (unsigned char *) safeMalloc(inputsize);
+    allocateBuffer((void **) &input_buffer, inputsize);
 
     // Allocate output buffer
     output_buffer = (float **) safeMalloc(survey -> num_threads * sizeof(float *));
