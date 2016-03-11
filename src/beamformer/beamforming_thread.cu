@@ -265,11 +265,13 @@ void fix_channelisation_order(float2 *input, float* output, THREAD_PARAMS* param
     float timestamp;
 
     cudaEventRecord(event_start, 0);	
+    
+    unsigned numthreads = (survey -> subchannels > 1024) ? 1024: survey -> subchannels;
 
 	dim3 gridDim(nsamp / survey -> subchannels, 
                  survey -> stop_channel - survey -> start_channel, 
                  survey -> nbeams);
-    fix_channelisation<<< gridDim, survey -> subchannels >>> 
+    fix_channelisation<<< gridDim, numthreads >>> 
                       (input, output, nsamp, survey -> nchans, BEAMS, 
                        survey -> subchannels, survey -> start_channel);
 

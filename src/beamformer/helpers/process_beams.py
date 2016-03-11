@@ -146,7 +146,7 @@ def plot(opts):
 
         ax = fig.add_subplot(1,2,1)
         ax.set_title("Beam %d" % opts.beam)
-        ax.imshow(np.log10(data[:,:,opts.beam]), aspect='auto',
+        ax.imshow(np.log10(data[:,:,opts.beam]), aspect='auto', interpolation='none',
                   origin='lower', extent=[frequency[0], frequency[-1], 0, time[-1]])
         ax.xaxis.set_major_formatter(formatter)
         ax.set_xlabel("Channel (kHz)")
@@ -239,7 +239,7 @@ def transpose(opts):
 
         # Write to respective file
         for j in range(nbeams):
-            files[j].write(struct.pack('f'*nchans, *data[j,:]))
+            files[j].write(struct.pack('f' * nchans, *data[j,:]))
 
         sys.stdout.write("Processing %d of %d [%.2f%%]   \r" % (i, nsamp, (i / float(nsamp) * 100)))
         sys.stdout.flush()
@@ -268,19 +268,19 @@ def integrate(opts):
 
         # Get file size to calculate number of time spectra
         filesize = os.path.getsize(filename)    
-        iterations = filesize / (4 * nchans * opts.samples)
+        iterations = filesize / (4 * opts.nchans * opts.samples)
 
         # Process file
         for i in range(iterations):
-            data = f.read(nchans * opts.samples * 4)
-            nsamp = len(data) / (nchans * 4)
-            data = np.array(struct.unpack('f' * nchans * nsamp, data), dtype=float)
-            data = np.reshape(data, (nsamp, nchans))
+            data = f.read(opts.nchans * opts.samples * 4)
+            nsamp = len(data) / (opts.nchans * 4)
+            data = np.array(struct.unpack('f' * opts.nchans * nsamp, data), dtype=float)
+            data = np.reshape(data, (nsamp, opts.nchans))
 
             # TEMPORARY: Mask some channels
             data[:,100:300] = np.zeros((nsamp, 200))
 
-            w.write(struct.pack('f', np.sum(np.sum(data, axis = 1) / nchans) / nsamp))
+            w.write(struct.pack('f', np.sum(np.sum(data, axis = 1) / opts.nchans) / nsamp))
 
             sys.stdout.write("===== Processing %d of %d [%.2f%%]   \r" % 
                             (i, iterations, (i / float(iterations) * 100)))

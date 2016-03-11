@@ -25,7 +25,7 @@ beamformer(char4 *input, float *output, float2 *shifts, unsigned nsamp, unsigned
     // Channel changes in the y-direction
     // Multiple blocks in the x-direction
 
-    // Loop over time samples for current block
+    // Loop over time samples fori current block
     for(unsigned time = blockIdx.x * blockDim.x + threadIdx.x;
                  time < nsamp;
                  time += gridDim.x * blockDim.x)
@@ -51,7 +51,7 @@ beamformer(char4 *input, float *output, float2 *shifts, unsigned nsamp, unsigned
                          i += blockDim.x)
                 coefficients[i] = shifts[blockIdx.y * BEAMS * ANTS +
                                          antenna * 4 * BEAMS + blockIdx.z * BEAMS_PER_TB +
-                                         i];
+                                         (i / BEAMS_PER_TB) * BEAMS + i % (BEAMS_PER_TB)];
 
             float4 ant_real = {  lookup_table[(antenna_val.w >> 4) & 0xF],  
                                  lookup_table[(antenna_val.x >> 4) & 0xF],
@@ -73,20 +73,20 @@ beamformer(char4 *input, float *output, float2 *shifts, unsigned nsamp, unsigned
                 float2 shift;
 
                 shift = coefficients[beam];
-                beams_real[beam] += ant_real.w * shift.x + ant_imag.w * shift.y;
-                beams_imag[beam] += ant_imag.w * shift.x + ant_real.w * shift.y;
+                beams_real[beam] += (ant_real.w * shift.x - ant_imag.w * shift.y);
+                beams_imag[beam] += (ant_imag.w * shift.x + ant_real.w * shift.y);
 
                 shift = coefficients[BEAMS_PER_TB + beam];
-                beams_real[beam] += ant_real.x * shift.x + ant_imag.x * shift.y;
-                beams_imag[beam] += ant_imag.x * shift.x + ant_real.x * shift.y;
+                beams_real[beam] += (ant_real.x * shift.x - ant_imag.x * shift.y);
+                beams_imag[beam] += (ant_imag.x * shift.x + ant_real.x * shift.y);
 
                 shift = coefficients[2 * BEAMS_PER_TB + beam];
-                beams_real[beam] += ant_real.y * shift.x + ant_imag.y * shift.y;
-                beams_imag[beam] += ant_imag.y * shift.x + ant_real.y * shift.y;
+                beams_real[beam] += (ant_real.y * shift.x - ant_imag.y * shift.y);
+                beams_imag[beam] += (ant_imag.y * shift.x + ant_real.y * shift.y);
 
                 shift = coefficients[3 * BEAMS_PER_TB + beam];
-                beams_real[beam] += ant_real.z * shift.x + ant_imag.z * shift.y;
-                beams_imag[beam] += ant_imag.z * shift.x + ant_real.z * shift.y;
+                beams_real[beam] += (ant_real.z * shift.x - ant_imag.z * shift.y);
+                beams_imag[beam] += (ant_imag.z * shift.x + ant_real.z * shift.y);
             }
         }
 
@@ -362,16 +362,24 @@ __global__ void fix_channelisation(float2 *input, float *output, unsigned nsamp,
                  s < nsamp / subchans;
                  s += gridDim.x)
     {
-        // Get index to start of current channelised block
-        // ThreadIdx.x is the nth channel formed in this block
-        unsigned index = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + 
-                         s * subchans + threadIdx.x;
-        float2 value = input[index];
+    
+        // Inner loop to handle cases where number of channels exceed available number
+        // of threads in a block
+        for(unsigned c = 0;
+                     c < subchans / blockDim.x;
+                     c ++)
+        {
+            // Get index to start of current channelised block
+            // ThreadIdx.x is the nth channel formed in this block
+            unsigned index = blockIdx.z * nchans * nsamp + (start_chan + blockIdx.y) * nsamp + 
+                             s * subchans + c * blockDim.x + threadIdx.x;
+            float2 value = input[index];
 
-        // Store this in output buffer (transposed)
-        index = s * nbeams * gridDim.y * subchans + 
-                    (blockIdx.y * subchans + threadIdx.x) * nbeams + blockIdx.z;
-        output[index] = __fsqrt_rz(value.x * value.x + value.y * value.y);
+            // Store this in output buffer (transposed)
+            index = s * nbeams * gridDim.y * subchans + 
+                        (blockIdx.y * subchans + c * blockDim.x + threadIdx.x) * nbeams + blockIdx.z;
+            output[index] = __fsqrt_rz(value.x * value.x + value.y * value.y);
+        }
     }
 } 
 

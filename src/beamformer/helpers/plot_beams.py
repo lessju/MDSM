@@ -29,40 +29,17 @@ if __name__ == "__main__":
 #        number = int(re.match(".*beam(?P<number>\d+).*", f).groupdict()['number'])
 #        files[number] = f
 
-    files  = {
-#    0 : "/data/2014/14/CasA/CasA_beam0.dat",
-#    1 : "/data/2014/14/CasA/CasA_beam1.dat",
-#    2 : "/data/2014/14/CasA/CasA_beam2.dat",
-#    3 : "/data/2014/14/CasA/CasA_beam3.dat",
-#    4 : "/data/2014/14/CasA/CasA_beam4.dat",
-#    5 : "/data/2014/14/CasA/CasA_beam5.dat",
-#    6 : "/data/2014/14/CasA/CasA_beam6.dat",
-#    7 : "/data/2014/14/CasA/CasA_beam7.dat",
-#    8 : "/data/2014/14/CasA/CasA_beam8.dat",
-#    9 : "/data/2014/14/CasA/CasA_beam9.dat",
-    10 : "/data/2014/14/CasA/CasA_beam10.dat",
-    11 : "/data/2014/14/CasA/CasA_beam11.dat" ,
-    12 : "/data/2014/14/CasA/CasA_beam12.dat",
-    13 : "/data/2014/14/CasA/CasA_beam13.dat",
-    14 : "/data/2014/14/CasA/CasA_beam14.dat",
-#    15 : "/data/2014/14/CasA/CasA_beam15.dat",
-#    16 : "/data/2014/14/CasA/CasA_beam16.dat",
-#    17 : "/data/2014/14/CasA/CasA_beam17.dat",
-#    18 : "/data/2014/14/CasA/CasA_beam18.dat",
-#    19 : "/data/2014/14/CasA/CasA_beam19.dat",
-#    20 : "/data/2014/14/CasA/CasA_beam20.dat",
-#    21 : "/data/2014/14/CasA/CasA_beam21.dat",
-#    22 : "/data/2014/14/CasA/CasA_beam22.dat",
-#    23 : "/data/2014/14/CasA/CasA_beam23.dat",
-#    24 : "/data/2014/14/CasA/CasA_beam24.dat",
-#    25 : "/data/2014/14/CasA/CasA_beam25.dat",
-#    26 : "/data/2014/14/CasA/CasA_beam26.dat",
-#    27 : "/data/2014/14/CasA/CasA_beam27.dat",
-#    28 : "/data/2014/14/CasA/CasA_beam28.dat",
-#    29 : "/data/2014/14/CasA/CasA_beam29.dat",
-#    30 : "/data/2014/14/CasA/CasA_beam30.dat",
-#    31 : "/data/2014/14/CasA/CasA_beam31.dat",
-    }
+    filename = "/home/lessju/Code/MDSM/build/medicina-beamformer-pipeline/tau_test_beam&&_timeseries_1.dat"
+    indices  = [#0, 1, 2, 3, 4]
+                #5, 6, 7, 8, 9]
+                10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+                #21, 22, 23, 24, 25, 
+                #26, 27, 28, 29, 30]
+                #15,31]
+
+    files = { }
+    for i in indices:
+        files[i] = filename.replace("&&", str(i))
 
 
     # Plot all the files

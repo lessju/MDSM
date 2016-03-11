@@ -181,7 +181,7 @@ void PacketChunker::run()
         long unsigned data_header =  be64toh(((uint64_t *) data)[0]);
         unsigned long  time    = data_header >> 26;
         unsigned short channel = (data_header >> 16) & 0x03FF;
-        
+
         // Tackle reordering issue
         if (channel % 2 == 0)
             channel /= 2;
@@ -212,7 +212,7 @@ void PacketChunker::run()
                                  _numPackets, _npackets, _currTime);
 
                 // Mark previous heap as finished
-                _heap =  _buffer -> writeHeap(1397631261.500001 + (1024 * _currTime) / (40e6/2.0/128.0),
+                _heap =  _buffer -> writeHeap(1457442095.000001 + (1024 * _currTime) / (40e6/2.0/128.0),
                                               1 / 19531.25);
 
                 // Copy to new heap
@@ -242,7 +242,7 @@ void PacketChunker::run()
             if (_numPackets == _npackets)
             {
                 // Mark heap as finished
-                _heap =  _buffer -> writeHeap(1397631261.500001 + (1024 * _currTime) / (40e6/2.0/128.0),
+                _heap =  _buffer -> writeHeap(1457442095.000001 + (1024 * _currTime) / (40e6/2.0/128.0),
                                               1 / 19531.25);
                 _currTime = 0;
                 _numPackets = 0;

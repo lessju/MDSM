@@ -2,7 +2,7 @@ from matplotlib import pyplot as plt
 import struct, sys
 import numpy as np
 
-PACKET = False 
+PACKET = True 
 
 nchans = 1024
 nants  = 32
@@ -49,12 +49,12 @@ if __name__ == "__main__":
         fig = plt.figure(figsize=(12,12))
         for i in range(nants):
             ax = fig.add_subplot(6, 6, i + 1)
-            new_data = np.sum(data[:,:,i], axis=1) / nsamp
-            new_data[np.where(new_data == 0)] = 0.0001
-            ax.plot(np.log10(new_data))
-            ax.set_xlim((0,1024))
+#            new_data = np.sum(data[:,:,i], axis=1) / nsamp
+#            new_data[np.where(new_data == 0)] = 0.0001
+#            ax.plot(np.log10(new_data))
+#            ax.set_xlim((0,1024))
             
-#            ax.imshow(data[:,:,i], aspect='auto', interpolation='nearest')
+            ax.imshow(data[:,:,i], aspect='auto', interpolation='nearest')
 
         plt.show()
 #        plt.savefig('fig.png')

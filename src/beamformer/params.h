@@ -1,5 +1,5 @@
 // Parameters modifiable by the user
-#define BEAMS 32                 // Number of beams to generate
+#define BEAMS 32               // Number of beams to generate
 #define NTAPS 16                // Number of taps for PFB FIR
 #define PLOT 0                  // Enable or disbale plotting
 
